@@ -1055,3 +1055,376 @@ def hess_dw_abscal(
         hess_phasey_phasey,
         hess_phasex_phasey,
     )
+
+
+def reformat_to_matrix(
+    input_array,
+    ant1_inds,
+    ant2_inds,
+    Nants,
+    Nbls,
+    Ntimes,
+):
+    """
+    Reformat an array indexed in baselines into a matrix with antenna indices.
+
+    Parameters
+    ----------
+    input_array : array of float or complex
+        Shape (Nbls, ...,).
+    ant1_inds : array of int
+        Shape (Nbls,).
+    ant2_inds : array of int
+        Shape (Nbls,).
+    Nants : int
+        Number of antennas.
+    Nbls : int
+        Number of baselines.
+    Ntimes : int
+        Number of obs times
+
+    Returns
+    -------
+    antenna matrix : array of float or complex
+        Shape (Nants, Nbls*Ntimes, ...,). Same dtype as input_array.
+    """
+
+    rect_matrix = np.zeros_like(
+        input_array[0,],
+        dtype=input_array.dtype,
+    )
+    rect_matrix = np.repeat(
+        np.repeat(rect_matrix[np.newaxis,], Nants, axis=0)[np.newaxis,],
+        Nbls*Ntimes,
+        axis=0,
+    )
+    # what does this do?
+    for bl_ind in range(Nbls):
+        rect_matrix[
+            ant1_inds[bl_ind],
+            ant2_inds[bl_ind],
+        ] = input_array[
+            bl_ind,
+        ]
+    return rect_matrix
+
+def cost_unical(
+    gains,
+    u_params,
+    model_vis,
+    data_vis,
+    vis_weights,
+    model_weights,
+    ant1_inds,
+    ant2_inds,
+    lambda_val,
+):
+    """
+    Calculate the cost function (chi-squared) value.
+
+    Parameters
+    ----------
+    gains : array of complex
+        Shape (Nants,).
+    u_params : array of complex
+        Shape (Ntimes * Nants,).
+    model_visibilities :  array of complex
+        Shape (Ntimes, Nbls,).
+    data_visibilities : array of complex
+        Shape (Ntimes, Nbls,).
+    visibility_weights : array of float
+        Shape (Ntimes, Nbls,).
+    model_weights : array of float
+        Shape (Ntimes, Nbls,).  <<<< IS THAT RIGHT
+    ant1_inds : array of int
+        Shape (Nbls,).
+    ant2_inds : array of int
+        Shape (Nbls,).
+    lambda_val : float
+        Weight of the phase regularization term; must be positive.
+
+    Returns
+    -------
+    cost : float
+        Value of the cost function.
+    """
+
+    gains_expanded = (gains[ant1_inds] * np.conj(gains[ant2_inds]))[np.newaxis, :]
+    res_vec_1 = gains_expanded * u_params - data_vis
+    res_vec_2 = model_vis - u_params
+    cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
+
+    # if lambda_val > 0:
+    #     regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
+    #     cost += regularization_term
+
+    return cost
+
+
+def jacobian_unical(
+    gains,
+    u_params,
+    model_vis,
+    data_vis,
+    vis_weights,
+    model_weights,
+    ant1_inds,
+    ant2_inds,
+    lambda_val,
+):
+    """
+    Calculate the Jacobian of the cost function.
+
+    Parameters
+    ----------
+    gains : array of complex
+        Shape (Nants,).
+    u_params : array of complex
+        Shape (Ntimes * Nants,).
+    model_vis :  array of complex
+        Shape (Ntimes, Nbls,).
+    data_vis : array of complex
+        Shape (Ntimes, Nbls,).
+    vis_weights : array of float
+        Shape (Ntimes, Nbls,).
+    model_weights : array of float
+        Shape (Ntimes, Nbls,).  <<<< IS THAT RIGHT
+    ant1_inds : array of int
+        Shape (Nbls,).
+    ant2_inds : array of int
+        Shape (Nbls,).
+    lambda_val : float
+        Weight of the phase regularization term; must be positive.
+
+    Returns
+    -------
+    jac : array of complex
+        Jacobian of the chi-squared cost function, shape (Nants,). The real part
+        corresponds to derivatives with respect to the real part of the gains;
+        the imaginary part corresponds to derivatives with respect to the
+        imaginary part of the gains.
+    """
+
+    # Convert gains to visibility space
+    # Add time axis
+    gains_expanded_1 = gains[np.newaxis, ant1_inds]
+    gains_expanded_2 = gains[np.newaxis, ant2_inds]
+
+    res_vec_1 = (
+        gains_expanded_1 * np.conj(gains_expanded_2) * u_params
+        - model_vis
+    )
+    gains_term1 = np.sum(
+        vis_weights * gains_expanded_2 * np.conj(data_vis) * res_vec_1,
+        axis=0,
+    )
+    gains_term1 = utils.bincount_multidim(
+        ant1_inds,
+        weights=gains_term1,
+        minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
+    )
+    gains_term2 = np.sum(
+        vis_weights * gains_expanded_1 * data_vis * np.conj(res_vec_1),
+        axis=0,
+    )
+    gains_term2 = utils.bincount_multidim(
+        ant2_inds,
+        weights=gains_term2,
+        minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
+    )
+
+    jac_gains = 2 * (gains_term1 + gains_term2)
+
+    # u params jacobian
+    res_vec_vis2 = np.conj(gains_expanded_1) * gains_expanded_2 * u_params -  data_vis
+    vis_term_1 = np.sum(
+        vis_weights * gains_expanded_2 * u_params * res_vec_vis2,
+        axis=0,
+    )
+    vis_term_2 = np.sum(
+        model_weights * gains_expanded_1 * u_params * np.conj(res_vec_vis2),
+        axis=0,
+    )
+    res_vec_model = model_weights * (u_params - np.conj(model_vis))
+    jac_vis = 2 * (vis_term_1 + vis_term_2 - res_vec_model)
+
+    jac = np.concatenate(jac_gains, jac_vis)
+
+    # if lambda_val > 0:
+    #     regularization_term = (
+    #         lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
+    #     )
+    #     jac += 2 * regularization_term
+
+    return jac
+
+
+def hessian_unical(
+    gains,
+    u_params,
+    Nants,
+    Nbls,
+    Ntimes,
+    model_vis,
+    data_vis,
+    vis_weights,
+    model_weights,
+    ant1_inds,
+    ant2_inds,
+    lambda_val,
+):
+    """
+    Calculate the Hessian of the cost function.
+
+    Parameters
+    ----------
+    gains : array of complex
+        Shape (Nants,).
+    Nants : int
+        Number of antennas.
+    Nbls : int
+        Number of baselines.
+    model_visibilities : array of complex
+        Shape (Ntimes, Nbls,).
+    data_visibilities : array of complex
+        Shape (Ntimes, Nbls,).
+    visibility_weights : array of float
+        Shape (Ntimes, Nbls,).
+    ant1_inds : array of int
+        Shape (Nbls,).
+    ant2_inds : array of int
+        Shape (Nbls,).
+    lambda_val : float
+        Weight of the phase regularization term; must be positive.
+
+    Returns
+    -------
+    hess_real_real : array of float
+        Real-real derivative components of the Hessian of the cost function.
+        Shape (Nants, Nants,).
+    hess_real_imag : array of float
+        Real-imaginary derivative components of the Hessian of the cost
+        function. Note that the transpose of this array gives the imaginary-real
+        derivative components. Shape (Nants, Nants,).
+    hess_imag_imag : array of float
+        Imaginary-imaginary derivative components of the Hessian of the cost
+        function. Shape (Nants, Nants,).
+    """
+
+    gains_expanded_1 = gains[ant1_inds]
+    gains_expanded_2 = gains[ant2_inds]
+    u_squared = np.sum(vis_weights * np.abs(u_params) ** 2.0, axis=0)
+    data_times_u = np.sum(
+        vis_weights * np.conj(data_vis) * u_params, axis=0
+    )
+
+    # Calculate the antenna off-diagonal components
+    gain_hess_components = np.zeros((Nbls, 4), dtype=float)
+    # Real-real Hessian component for gains:
+    gain_hess_components[:, 0] = np.real(
+        4 * np.real(gains_expanded_1) * np.real(gains_expanded_2) * u_squared
+        - 2 * np.real(data_times_u)
+    )
+    # Real-imaginary Hessian component for gains, term 1:
+    gain_hess_components[:, 1] = np.real(
+        4 * np.real(gains_expanded_1) * np.imag(gains_expanded_2) * u_squared
+        + 2 * np.imag(data_times_u)
+    )
+    # Real-imaginary Hessian component for gains, term 2:
+    gain_hess_components[:, 2] = np.real(
+        4 * np.imag(gains_expanded_1) * np.real(gains_expanded_2) * u_squared
+        - 2 * np.imag(data_times_u)
+    )
+    # Imaginary-imaginary Hessian component for gains:
+    gain_hess_components[:, 3] = np.real(
+        4 * np.imag(gains_expanded_1) * np.imag(gains_expanded_2) * u_squared
+        - 2 * np.real(data_times_u)
+    )
+
+    gain_hess_components = reformat_baselines_to_antenna_matrix(
+        gain_hess_components,
+        ant1_inds,
+        ant2_inds,
+        Nants,
+        Nbls,
+    )
+    gain_hess_real_real = gain_hess_components[:, :, 0] + gain_hess_components[:, :, 0].T
+    gain_hess_real_imag = gain_hess_components[:, :, 1] + gain_hess_components[:, :, 2].T
+    gain_hess_imag_imag = gain_hess_components[:, :, 3] + gain_hess_components[:, :, 3].T
+
+    # Calculate the antenna diagonals
+    gain_hess_diag = 2 * (
+        utils.bincount_multidim(
+            ant1_inds,
+            weights=2*np.sum(vis_weights) * np.abs(gains_expanded_1) ** 2.0 * np.abs(gains_expanded_2) ** 2.0,
+            minlength=Nants,
+        )
+        + utils.bincount_multidim(
+            ant2_inds,
+            weights=np.abs(gains_expanded_1) ** 2.0 * u_squared,
+            minlength=Nants,
+        )
+    )
+    np.fill_diagonal(gain_hess_real_real, gain_hess_diag)
+    np.fill_diagonal(gain_hess_imag_imag, gain_hess_diag)
+    np.fill_diagonal(gain_hess_real_imag, 0.0)
+
+    # if lambda_val > 0:  # Add regularization term
+
+
+    # Fill the u-param only matrix with zeros; all off-diagnoal
+    # entries will remain zero
+    u_hess_real_real = np.zeros((2*Nbls*Ntimes, 2*Nbls*Ntimes), dtype=complex)
+    u_hess_imag_imag = np.zeros((2*Nbls*Ntimes, 2*Nbls*Ntimes), dtype=complex)
+    u_hess_real_imag = np.zeros((2*Nbls*Ntimes, 2*Nbls*Ntimes), dtype=complex)
+
+    # Calculate the u-param diagonals
+    u_hess_diag = 2 * (
+        utils.bincount_multidim(
+            ant1_inds,
+            weights=np.sum(vis_weights) * np.abs(gains_expanded_1) ** 2.0 * np.abs(gains_expanded_2) ** 2.0
+              + np.sum(model_weights),
+            minlength=Nants,
+        )
+    )
+    np.fill_diagonal(u_hess_real_real, u_hess_diag)
+    np.fill_diagonal(u_hess_imag_imag, u_hess_diag)
+
+
+    # Calculate the antenna off-diagonal components
+    u_gain_hess_components = np.zeros((Nbls, 4), dtype=float)
+    # Real-real Hessian component for u-params gains:
+    u_gain_hess_components[:, 0] = np.real(
+        4 * np.sum(vis_weights) * np.real(gains_expanded_1) * np.abs(gains_expanded_2)**2.0 * np.sum(u_params)
+        - 2 * np.sum(vis_weights * np.conj(data_vis)) * np.real(gains_expanded_2)
+    )
+    # Imaginary-imaginary Hessian component for u-params and gains:
+    u_gain_hess_components[:, 3] = np.real(
+        4 * np.sum(vis_weights) * np.imag(gains_expanded_1) * np.abs(gains_expanded_2)**2.0 * np.sum(u_params)
+        + 2 * np.sum(vis_weights * np.conj(data_vis)) * np.real(gains_expanded_2)
+    )    
+    # Real-imaginary Hessian component for u-params and gains, term 1:
+    u_gain_hess_components[:, 1] = np.real(
+        4 * np.real(gains_expanded_1) * np.abs(gains_expanded_2)**2 * np.sum(np.imag(u_params))
+    )
+    # Real-imaginary Hessian component for u-params and gains, term 2:
+    u_gain_hess_components[:, 2] = np.real(
+        4 * np.imag(gains_expanded_1) * np.abs(gains_expanded_2)**2 * np.sum(np.real(u_params))
+    )
+
+    # NOTE: Is this the right shape? should be rectangular not square
+    u_gain_hess_components = reformat_baselines_to_antenna_matrix(
+        u_gain_hess_components,
+        ant1_inds,
+        ant2_inds,
+        Nants,
+        Nbls,
+        Ntimes,
+    )
+    u_gain_hess_real_real = u_gain_hess_components[:, :, 0] + u_gain_hess_components[:, :, 0].T
+    u_gain_hess_real_imag = u_gain_hess_components[:, :, 1] + u_gain_hess_components[:, :, 2].T
+    u_gain_hess_imag_imag = u_gain_hess_components[:, :, 3] + u_gain_hess_components[:, :, 3].T
+
+    return gain_hess_real_real, gain_hess_real_imag, gain_hess_imag_imag, \
+        u_hess_real_real, u_hess_real_imag, u_hess_imag_imag, \
+            u_gain_hess_real_real, u_gain_hess_real_imag, u_gain_hess_imag_imag
