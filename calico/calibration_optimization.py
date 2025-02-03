@@ -562,6 +562,206 @@ def hessian_dw_abscal_wrapper(
     return hess
 
 
+def cost_unical_wrapper(
+    params_flattened,
+    caldata_obj,
+    ant_inds,
+):
+    """
+    Wrapper for function cost_unical. Reformats the input gains to be compatible
+    with the scipy.optimize.minimize function.
+
+    Parameters
+    ----------
+    gains_flattened : array of float
+        Array of gain values. Even indices correspond to the real components of the
+        gains and odd indices correspond to the imaginary components. Shape
+        (2*Nants_unflagged,).
+    caldata_obj : CalData
+    ant_inds : array of int
+        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+    freq_ind : int
+        Frequency channel index.
+    vis_pol_ind : int
+        Index of the visibility polarization.
+
+    Returns
+    -------
+    cost : float
+        Value of the cost function.
+    """
+
+    # reshape gain params
+    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
+    gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
+    gains = np.ones((caldata_obj.Nants), dtype=complex)
+    gains[ant_inds] = gains_reshaped
+    # reshape u params
+    u_params_reshaped = np.reshape(params_flattened[2*len(ant_inds):], (len(),2))
+    u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
+    u_params = np.ones((caldata_obj.Nbls*caldata_obj.Ntimes), dtype=complex)  # set these to model vis
+    u_params[ant_inds] = gains_reshaped  # still do this?
+    if caldata_obj.gains_multiply_model:
+        cost = cost_function_calculations.cost_skycal(
+            gains,
+            caldata_obj.data_vis_reshaped,
+            caldata_obj.model_vis_reshaped,
+            caldata_obj.vis_weights_reshaped,
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+    else:
+        cost = cost_function_calculations.cost_skycal(
+            gains,
+            caldata_obj.model_vis_reshaped,
+            caldata_obj.data_vis_reshaped,
+            caldata_obj.vis_weights_reshaped,
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+    return cost
+
+
+def jacobian_skycal_wrapper(
+    gains_flattened,
+    caldata_obj,
+    ant_inds,
+):
+    """
+    Wrapper for function jacobian_skycal. Reformats the input gains and
+    output Jacobian to be compatible with the scipy.optimize.minimize function.
+
+    Parameters
+    ----------
+    gains_flattened : array of float
+        Array of gain values. Even indices correspond to the real components of the
+        gains and odd indices correspond to the imaginary components. Shape
+        (2*Nants_unflagged,).
+    caldata_obj : CalData
+    ant_inds : array of int
+        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+    freq_ind : int
+        Frequency channel index.
+    vis_pol_ind : int
+        Index of the visibility polarization.
+
+    Returns
+    -------
+    jac_flattened : array of float
+        Jacobian of the cost function, shape (2*Nants_unflagged,).
+        Even indices correspond to the derivatives with respect to the real part
+        of the gains and odd indices correspond to derivatives with respect to
+        the imaginary part of the gains.
+    """
+
+    gains_reshaped = np.reshape(gains_flattened, (len(ant_inds), 2))
+    gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
+    gains = np.ones((caldata_obj.Nants), dtype=complex)
+    gains[ant_inds] = gains_reshaped
+    if caldata_obj.gains_multiply_model:
+        jac = cost_function_calculations.jacobian_skycal(
+            gains,
+            caldata_obj.data_vis_reshaped,
+            caldata_obj.model_vis_reshaped,
+            caldata_obj.vis_weights_reshaped,
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+    else:
+        jac = cost_function_calculations.jacobian_skycal(
+            gains,
+            caldata_obj.model_vis_reshaped,
+            caldata_obj.data_vis_reshaped,
+            caldata_obj.vis_weights_reshaped,
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+    jac_flattened = np.stack(
+        (np.real(jac[ant_inds]), np.imag(jac[ant_inds])), axis=1
+    ).flatten()
+    return jac_flattened
+
+
+def hessian_skycal_wrapper(
+    gains_flattened,
+    caldata_obj,
+    ant_inds,
+):
+    """
+    Wrapper for function hessian_skycal. Reformats the input gains and
+    output Hessian to be compatible with the scipy.optimize.minimize function.
+
+    Parameters
+    ----------
+    gains_flattened : array of float
+        Array of gain values. Even indices correspond to the real components of the
+        gains and odd indices correspond to the imaginary components. Shape
+        (2*Nants_unflagged,).
+    caldata_obj : CalData
+    ant_inds : array of int
+        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+    freq_ind : int
+        Frequency channel index.
+    vis_pol_ind : int
+        Index of the visibility polarization.
+
+    Returns
+    -------
+    hess_flattened : array of float
+        Hessian of the cost function, shape (2*Nants_unflagged, 2*Nants_unflagged,).
+    """
+
+    Nants_unflagged = len(ant_inds)
+    gains_reshaped = np.reshape(gains_flattened, (Nants_unflagged, 2))
+    gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
+    gains = np.ones((caldata_obj.Nants), dtype=complex)
+    gains[ant_inds] = gains_reshaped
+    if caldata_obj.gains_multiply_model:
+        (
+            hess_real_real,
+            hess_real_imag,
+            hess_imag_imag,
+        ) = cost_function_calculations.hessian_skycal(
+            gains,
+            caldata_obj.Nants,
+            caldata_obj.Nbls,
+            caldata_obj.data_vis_reshaped,
+            caldata_obj.model_vis_reshaped,
+            caldata_obj.vis_weights_reshaped,
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+    else:
+        (
+            hess_real_real,
+            hess_real_imag,
+            hess_imag_imag,
+        ) = cost_function_calculations.hessian_skycal(
+            gains,
+            caldata_obj.Nants,
+            caldata_obj.Nbls,
+            caldata_obj.model_vis_reshaped,
+            caldata_obj.data_vis_reshaped,
+            caldata_obj.vis_weights_reshaped,
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+
+    return flatten_hessian(
+        [
+            hess_real_real,
+            hess_real_imag,
+            hess_imag_imag,
+        ],
+        Nants_unflagged,
+    )
+
 def run_skycal_optimization_per_pol_single_freq(
     caldata_obj,
     xtol,
@@ -823,3 +1023,156 @@ def run_dw_abscal_optimization(
         sys.stdout.flush()
 
     return abscal_params
+
+def run_unical_optimization(
+    caldata_obj,
+    xtol,
+    maxiter,
+    freq_ind=0,
+    verbose=True,
+    get_crosspol_phase=True,
+    crosspol_phase_strategy="crosspol model",
+):
+    """
+    Run calibration per polarization. Here the XX and YY visibilities are
+    calibrated individually. If get_crosspol_phase is set, the cross-
+    polarization phase is applied from the XY and YX visibilities after the
+    fact.
+
+    Parameters
+    ----------
+    caldata_obj : CalData
+    xtol : float
+        Accuracy tolerance for optimizer.
+    maxiter : int
+        Maximum number of iterations for the optimizer.
+    freq_ind : int
+        Frequency channel to process. Default 0.
+    verbose : bool
+        Set to True to print optimization outputs. Default True.
+    get_crosspol_phase : bool
+        Set to True to constrain the cross-polarizaton phase from the XY and YX
+        visibilities. Default True.
+    crosspol_phase_strategy : str
+        Options are "crosspol model" or "pseudo Stokes V". Used only if
+        get_crosspol_phase is True. If "crosspol model", contrains the crosspol
+        phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
+        crosspol phase by minimizing pseudo Stokes V. Default "crosspol model".
+
+    Returns
+    -------
+    gains_fit : array of complex
+        Fit gain values. Shape (Nants, 1, N_feed_pols,).
+    """
+
+    print("***NEW CAL***")
+
+    gains_fit = np.full(
+        (caldata_obj.Nants, caldata_obj.N_feed_pols),
+        np.nan + 1j * np.nan,
+        dtype=complex,
+    )
+    if np.max(caldata_obj.visibility_weights[:, :, freq_ind, :]) == 0.0:
+        print("ERROR: All data flagged.")
+        gains_fit[:, :] = np.nan + 1j * np.nan
+        return gains_fit
+
+    for feed_pol_ind, feed_pol in enumerate(caldata_obj.feed_polarization_array):
+        vis_pol_ind = np.where(caldata_obj.vis_polarization_array == feed_pol)[0]
+
+        if (
+            np.max(caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
+        ):  # All flagged
+            gains_fit[:, feed_pol_ind] = np.nan + 1j * np.nan
+        else:
+            caldata_obj.set_ant_inds(freq_ind, feed_pol_ind)
+
+            gains_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind)
+
+            caldata_obj.reshape_data(freq_ind, vis_pol_ind)
+
+            # Minimize the cost function
+            start_optimize = time.time()
+            result = scipy.optimize.minimize(
+                cost_skycal_wrapper,
+                gains_init_flattened,
+                args=(caldata_obj, caldata_obj.ant_inds),
+                method="Newton-CG",
+                jac=jacobian_skycal_wrapper,
+                hess=hessian_skycal_wrapper,
+                options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
+            )
+            end_optimize = time.time()
+            if verbose:
+                print(result.message)
+                print(
+                    f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
+                )
+            sys.stdout.flush()
+            gains_fit_single_pol = np.reshape(result.x, (len(caldata_obj.ant_inds), 2))
+            gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
+                gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
+            )
+
+            # Ensure that the phase of the gains is mean-zero
+            # This adds should be handled by the phase regularization term, but
+            # this step removes any optimizer precision effects.
+            avg_angle = np.arctan2(
+                np.nanmean(np.sin(np.angle(gains_fit[:, feed_pol_ind]))),
+                np.nanmean(np.cos(np.angle(gains_fit[:, feed_pol_ind]))),
+            )
+            gains_fit[:, feed_pol_ind] *= np.cos(avg_angle) - 1j * np.sin(avg_angle)
+
+    # Constrain crosspol phase
+    if (
+        get_crosspol_phase
+        and caldata_obj.N_feed_pols == 2
+        and caldata_obj.N_vis_pols == 4
+    ):
+        if (
+            caldata_obj.feed_polarization_array[0] == -5
+            and caldata_obj.feed_polarization_array[1] == -6
+        ):
+            crosspol_polarizations = [-7, -8]
+        elif (
+            caldata_obj.feed_polarization_array[0] == -6
+            and caldata_obj.feed_polarization_array[1] == -5
+        ):
+            crosspol_polarizations = [-8, -7]
+        crosspol_indices = np.array(
+            [
+                np.where(caldata_obj.vis_polarization_array == pol)[0][0]
+                for pol in crosspol_polarizations
+            ]
+        )
+        if crosspol_phase_strategy.lower() == "pseudo stokes v":
+            crosspol_phase = cost_function_calculations.set_crosspol_phase_pseudoV(
+                gains_fit,
+                caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
+                caldata_obj.visibility_weights[:, :, freq_ind, crosspol_indices],
+                caldata_obj.ant1_inds,
+                caldata_obj.ant2_inds,
+            )
+        elif crosspol_phase_strategy.lower() == "crosspol model":
+            crosspol_phase = cost_function_calculations.set_crosspol_phase(
+                gains_fit,
+                caldata_obj.model_visibilities[:, :, freq_ind, crosspol_indices],
+                caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
+                caldata_obj.visibility_weights[:, :, freq_ind, crosspol_indices],
+                caldata_obj.ant1_inds,
+                caldata_obj.ant2_inds,
+            )
+        else:
+            print(
+                "WARNING: Unknown crosspol_phase_strategy. Skipping fitting crosspol phase."
+            )
+            crosspol_phase = 0.0
+
+        if caldata_obj.gains_multiply_model:
+            gains_fit[:, 0] /= np.exp(-1j * crosspol_phase / 2)
+            gains_fit[:, 1] /= np.exp(1j * crosspol_phase / 2)
+        else:
+            gains_fit[:, 0] *= np.exp(-1j * crosspol_phase / 2)
+            gains_fit[:, 1] *= np.exp(1j * crosspol_phase / 2)
+
+    return gains_fit
