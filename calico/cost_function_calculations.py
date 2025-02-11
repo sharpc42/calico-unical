@@ -1063,7 +1063,6 @@ def reformat_to_matrix(
     ant2_inds,
     Nants,
     Nbls,
-    Ntimes,
 ):
     """
     Reformat an array indexed in baselines into a matrix with antenna indices.
@@ -1086,7 +1085,7 @@ def reformat_to_matrix(
     Returns
     -------
     antenna matrix : array of float or complex
-        Shape (Nants, Nbls*Ntimes, ...,). Same dtype as input_array.
+        Shape (Nants, Nbls, ...,). Same dtype as input_array.
     """
 
     rect_matrix = np.zeros_like(
@@ -1095,7 +1094,7 @@ def reformat_to_matrix(
     )
     rect_matrix = np.repeat(
         np.repeat(rect_matrix[np.newaxis,], Nants, axis=0)[np.newaxis,],
-        Nbls*Ntimes,
+        Nbls,
         axis=0,
     )
     # what does this do?
@@ -1127,7 +1126,7 @@ def cost_unical(
     gains : array of complex
         Shape (Nants,).
     u_params : array of complex
-        Shape (Ntimes * Nants,).
+        Shape (Nbls,).
     model_visibilities :  array of complex
         Shape (Ntimes, Nbls,).
     data_visibilities : array of complex
@@ -1180,7 +1179,7 @@ def jacobian_unical(
     gains : array of complex
         Shape (Nants,).
     u_params : array of complex
-        Shape (Ntimes * Nants,).
+        Shape (Nbls,).
     model_vis :  array of complex
         Shape (Ntimes, Nbls,).
     data_vis : array of complex
@@ -1236,7 +1235,7 @@ def jacobian_unical(
     jac_gains = 2 * (gains_term1 + gains_term2)
 
     # u params jacobian
-    res_vec_vis2 = np.conj(gains_expanded_1) * gains_expanded_2 * u_params -  data_vis
+    res_vec_vis2 = np.conj(gains_expanded_1) * gains_expanded_2 * u_params -  data_vis[0,:]
     vis_term_1 = np.sum(
         vis_weights * gains_expanded_2 * u_params * res_vec_vis2,
         axis=0,
@@ -1245,10 +1244,11 @@ def jacobian_unical(
         model_weights * gains_expanded_1 * u_params * np.conj(res_vec_vis2),
         axis=0,
     )
-    res_vec_model = model_weights * (u_params - np.conj(model_vis))
+    res_vec_model = model_weights[0,:] * (u_params - np.conj(model_vis[0,:]))
+    print("***RES VEC MODEL", res_vec_model.shape)
     jac_vis = 2 * (vis_term_1 + vis_term_2 - res_vec_model)
-
-    jac = np.concatenate(jac_gains, jac_vis)
+    print("***JAC VIS***", jac_vis.shape)
+    jac = np.concatenate((jac_gains, jac_vis))
 
     # if lambda_val > 0:
     #     regularization_term = (
@@ -1280,6 +1280,8 @@ def hessian_unical(
     ----------
     gains : array of complex
         Shape (Nants,).
+    u_params : array of complex
+        Shape (Nbls,).
     Nants : int
         Number of antennas.
     Nbls : int
@@ -1374,9 +1376,9 @@ def hessian_unical(
 
     # Fill the u-param only matrix with zeros; all off-diagnoal
     # entries will remain zero
-    u_hess_real_real = np.zeros((2*Nbls*Ntimes, 2*Nbls*Ntimes), dtype=complex)
-    u_hess_imag_imag = np.zeros((2*Nbls*Ntimes, 2*Nbls*Ntimes), dtype=complex)
-    u_hess_real_imag = np.zeros((2*Nbls*Ntimes, 2*Nbls*Ntimes), dtype=complex)
+    u_hess_real_real = np.zeros((2*Nbls, 2*Nbls), dtype=complex)
+    u_hess_imag_imag = np.zeros((2*Nbls, 2*Nbls), dtype=complex)
+    u_hess_real_imag = np.zeros((2*Nbls, 2*Nbls), dtype=complex)
 
     # Calculate the u-param diagonals
     u_hess_diag = 2 * (
@@ -1419,7 +1421,6 @@ def hessian_unical(
         ant2_inds,
         Nants,
         Nbls,
-        Ntimes,
     )
     u_gain_hess_real_real = u_gain_hess_components[:, :, 0] + u_gain_hess_components[:, :, 0].T
     u_gain_hess_real_imag = u_gain_hess_components[:, :, 1] + u_gain_hess_components[:, :, 2].T

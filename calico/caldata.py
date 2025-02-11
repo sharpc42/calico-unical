@@ -14,6 +14,8 @@ class CalData:
     -------
     gains : array of complex
         Shape (Nants, Nfreqs, N_feed_pols,).
+    u_params : array of complex
+        Shape ().
     abscal_params : array of float
         Shape (3, Nfreqs, N_feed_pols). abscal_params[0, :, :] are the overall amplitudes,
         abscal_params[1, :, :] are the x-phase gradients in units 1/m, and abscal_params[2, :, :]
@@ -44,6 +46,8 @@ class CalData:
         Shape (Ntimes, Nbls, Nfreqs, N_vis_pols,).
     visibility_weights : array of float
         Shape (Ntimes, Nbls, Nfreqs, N_vis_pols,).
+    model_weights : array of float
+        Shape (Ntimes, Nbls, Nfreqs, N_vis_pols)
     dwcal_inv_covariance : array of complex
         Matrix defining frequency-frequency covariances used in delay-weighted
         calibration. Needed only if delay weighting is used in calibration.
@@ -58,6 +62,8 @@ class CalData:
     ant1_inds : array of int
         Shape (Nbls,).
     ant2_inds : array of int
+        Shape (Nbls,).
+    bl_inds : array of int
         Shape (Nbls,).
     gains_multiply_model : bool
         If True, measurement equation is defined as v_ij ≈ g_i g_j^* m_ij. If False,
@@ -84,11 +90,28 @@ class CalData:
     telescope_location : array of float
     lambda_val : float
         Weight of the phase regularization term; must be positive. Default 100.
+    gains_real : array of float
+        Shape (Nants,). Real part of gains per frequency and per polarization.
+    gains_imag : array of float
+        Shape (Nants,). Imaginary part of gains per frequency and per polarization.
+    u_params_real : array of 
+        Shape (). Real part of model parameters per frequency and per polarization.
+    u_params_imag : array of float
+        Shape (). Imaginary part of model parameters per frequency and per polarization.
+    data_vis_reshaped : array of complex
+        Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
+    model_vis_reshaped : array of complex
+        Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
+    vis_weights_reshaped : array of float
+        Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
+    ant_inds : array of int
+        Shape (Nants_unflagged). Indices of unflagged antennas to be calibrated.
     """
 
     def __init__(self):
         self.gains = None
         self.abscal_params = None
+        self.u_params = None
         self.Nants = 0
         self.Nbls = 0
         self.Ntimes = 0
@@ -100,10 +123,12 @@ class CalData:
         self.model_visibilities = None
         self.data_visibilities = None
         self.visibility_weights = None
+        self.model_weights = None
         self.dwcal_inv_covariance = None
         self.dwcal_memory_save_mode = None
         self.ant1_inds = None
         self.ant2_inds = None
+        self.bl_inds = None
         self.gains_multiply_model = None
         self.antenna_names = None
         self.antenna_numbers = None
@@ -117,6 +142,14 @@ class CalData:
         self.lst = None
         self.telescope_location = None
         self.lambda_val = None
+        self.gains_real = None
+        self.gains_imag = None
+        self.u_params_real = None
+        self.u_params_imag = None
+        self.data_vis_reshaped = None
+        self.model_vis_reshaped = None
+        self.vis_weights_reshaped = None
+        self.ant_inds = None
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -168,6 +201,7 @@ class CalData:
         gain_init_to_vis_ratio=True,
         gains_multiply_model=False,
         gain_init_stddev=0.0,
+        u_params_init_stddev=0.0,
         N_feed_pols=None,
         feed_polarization_array=None,
         min_cal_baseline_m=None,
@@ -204,6 +238,9 @@ class CalData:
         gain_init_stddev : float
             Default 0.0. Standard deviation of a random complex Gaussian
             perturbation to the initial gains.
+        u_params_init_stddev : float
+            Default 0.0. Standard deviation of a random complex Gaussian
+            perturbation to the initial u-parameter values.
         N_feed_pols : int
             Default min(2, N_vis_pols). Number of feed polarizations, equal to
             the number of gain values to be calculated per antenna.
@@ -455,6 +492,14 @@ class CalData:
                 self.antenna_numbers == metadata_reference.ant_2_array[baseline]
             )[0]
 
+        # baseline indices
+        # this is a hack-y solution but I don't like this
+        # I feel like there are redundancies and so this
+        # would not map to the correct order of ants (does that matter?)
+        self.bl_inds = np.arange(0,len(metadata_reference.baseline_array),1)  
+        # baseline_index_base = 2048 + 1 + 2**16
+        # self.bl_inds = (metadata_reference.baseline_array - baseline_index_base).astype(np.int64)
+
         # Get ordered list of antenna names
         self.antenna_names = np.array(
             [
@@ -607,6 +652,27 @@ class CalData:
         self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
         self.abscal_params[0, :, :] = 1.0
 
+        # Initialize u parameters
+        self.u_params = self.model_visibilities[0,:,:,:]
+        if u_params_init_stddev != 0.0:
+            self.u_params += np.random.normal(
+                0.0,
+                u_params_init_stddev,
+                size=(
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_feed_pols,
+                ),
+            ) + 1.0j * np.random.normal(
+                0.0,
+                u_params_init_stddev,
+                size=(
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_feed_pols,
+                ),
+            )
+
         # Define visibility weights
         self.visibility_weights = np.ones(
             (
@@ -619,6 +685,17 @@ class CalData:
         )
         if np.max(flag_array):  # Apply flagging
             self.visibility_weights[np.where(flag_array)] = 0.0
+
+        # Define model weights (this feels like the user should set)
+        self.model_weights = np.ones(
+            (
+                self.Ntimes,
+                self.Nbls,
+                self.Nfreqs,
+                self.N_vis_pols,
+            ),
+            dtype=float,
+        )
 
         self.lambda_val = lambda_val
 
@@ -1242,24 +1319,62 @@ class CalData:
 
         self.dwcal_inv_covariance = weight_mat
 
-    gains_real = None
-    gains_imag = None
-    def pack(self, freq_ind, feed_pol_ind):
+    def pack(self, freq_ind, feed_pol_ind, unical=False):
+        """
+        This function packs the parameters (for now gains, in future the u-params)
+        both real and imaginary parts into a single flattened array for use in
+        the optimizing function.
+        Parameters
+        ----------
+        freq_ind : int
+            Frequency channel index.
+        feed_pol_ind : int
+            Feed polarization index.
+        unical : bool
+            Whether to do unified calibration
+        """
         self.gains_real = np.real(self.gains[self.ant_inds, freq_ind, feed_pol_ind])
         self.gains_imag = np.imag(self.gains[self.ant_inds, freq_ind, feed_pol_ind])
+        print("***BL INDS***", self.bl_inds)
+        print("***U PARAMS***", self.u_params.shape)
+        self.u_params_real = np.real(self.u_params[self.bl_inds, freq_ind, feed_pol_ind])
+        self.u_params_imag = np.imag(self.u_params[self.bl_inds, freq_ind, feed_pol_ind])
+        print("***U PARAMS REAL***", self.u_params_real.shape)
+        print("***U PARAMS IMAG***", self.u_params_imag.shape)
 
-        return np.stack(
-            (
-                self.gains_real,
-                self.gains_imag,
-            ),
-            axis=1,
-        ).flatten()
+        if unical:
+            params_flattened = np.hstack(
+                (
+                    np.ravel(self.gains_real),
+                    np.ravel(self.gains_imag),
+                    np.ravel(self.u_params_real),
+                    np.ravel(self.u_params_imag),
+                )
+            )
+        else:
+            params_flattened = np.stack(
+                (
+                    self.gains_real,
+                    self.gains_imag,
+                ),
+                axis=1,
+            ).flatten()
+        print("***PARAMS FLATTENED***", params_flattened.shape)
+        return params_flattened
 
-    data_vis_reshaped = None
-    model_vis_reshaped = None
-    vis_weights_reshaped = None
-    def reshape_data(self, freq_ind, vis_pol_ind):
+    def reshape_data(self, freq_ind, vis_pol_ind,unical=False):
+        """
+        This function reshapes data and model visibilities as well
+        as visibility weights (and in the future, model weights)
+        for use by the cost function, Jacobian, and Hessian
+        wrappers called by the optimizing function.
+        Parameters
+        ----------
+        freq_ind : int
+            Frequency channel index.
+        vis_pol_ind : int
+            Visibility polarization index.
+        """
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
@@ -1272,9 +1387,23 @@ class CalData:
             self.visibility_weights[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
         )
+        if unical:
+            self.model_weights_reshaped = np.reshape(
+                self.model_weights[:, :, freq_ind, vis_pol_ind],
+                (self.Ntimes, self.Nbls),
+            )
     
-    ant_inds = None
     def set_ant_inds(self, freq_ind, feed_pol_ind):
+        """
+        This function sets indices of unflagged antennas
+        to be calibrated.
+        Parameters
+        ----------
+        freq_ind : int
+            Frequency channel index.
+        feed_pol_ind : int
+            Feed polarization index.
+        """
         vis_weights_summed = np.sum(
             self.visibility_weights[:, :, freq_ind, feed_pol_ind], axis=0
         )  # Sum over times
@@ -1288,3 +1417,135 @@ class CalData:
             minlength=self.Nants,
         )
         self.ant_inds = np.where(weight_per_ant > 0.0)[0]
+
+    def set_bl_inds(self, freq_ind, feed_pol_ind):
+        model_weights_summed = np.sum(
+            self.model_weights[:, :, freq_ind, feed_pol_ind], axis=0
+        )
+        weight_per_bl = np.bincount(
+            self.bl_inds,
+            weights=model_weights_summed,
+            minlength=self.Nbls,
+        )
+        print("***MODEL WEIGHTS PER BL***", weight_per_bl.shape)
+        print(weight_per_bl)
+        self.bl_inds = np.where(weight_per_bl > 0.0)[0]
+
+    def write_u_params(self):
+        if not self.ant_inds:
+            print("WARNING: All data was flagged. No u_cal file could be written.")  # update this later to a proper warning
+            return
+        u_params_uvdata = pyuvdata.UVData()
+        u_params_uvdata.data_array = self.u_params
+        u_params_uvdata._Nants_data = len(self.ant_inds)
+        u_params_uvdata.write_uvfits("data/u_param_cal_out.uvfits")
+
+    def unified_calibration(
+        self,
+        xtol=1e-5,
+        maxiter=200,
+        get_crosspol_phase=True,
+        crosspol_phase_strategy="crosspol model",
+        parallel=False,
+        max_processes=40,
+        pool=None,
+        verbose=False,
+    ):
+        """
+        Run calibration per polarization. Updates the gains attribute and u parameters with
+        calibrated values. Here the XX and YY visibilities are calibrated individually and 
+        the cross-polarization phase is applied from the XY and YX visibilities after the fact
+        to the gains (models later?). Option to parallelize calibration across frequency.
+
+        Parameters
+        ----------
+        xtol : float
+            Accuracy tolerance for optimizer. Default 1e-5.
+        maxiter : int
+            Maximum number of iterations for the optimizer. Default 200.
+        get_crosspol_phase : bool
+            If True, crosspol phase is calculated. Default True.
+        crosspol_phase_strategy : str
+            Options are "crosspol model" or "pseudo Stokes V". Used only if
+            get_crosspol_phase is True. If "crosspol model", contrains the crosspol
+            phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
+            crosspol phase by minimizing pseudo Stokes V. Default "crosspol model".
+        parallel : bool
+            Set to True to parallelize across frequency with multiprocessing.
+            Default False if pool is None.
+        max_processes : int
+            Maximum number of multithreaded processes to use. Applicable only if
+            parallel is True and pool is None. If None, uses the multiprocessing
+            default. Default 40.
+        pool : multiprocessing.pool.Pool or None
+            Pool for multiprocessing. If None and parallel is True, a new pool will be
+            created. Default None.
+        verbose : bool
+            Set to True to print optimization outputs. Default False.
+        """
+
+        if np.max(self.visibility_weights) == 0.0:
+            print("ERROR: All data flagged.")
+            sys.stdout.flush()
+            self.gains[:, :, :] = np.nan + 1j * np.nan
+        else:
+            if pool is not None:
+                parallel = True
+                use_pool = pool
+            if parallel:
+                caldata_list = self.expand_in_frequency()
+                args_list = []
+                for freq_ind in range(self.Nfreqs):
+                    args = (
+                        caldata_list[freq_ind],
+                        xtol,
+                        maxiter,
+                        0,
+                        verbose,
+                        get_crosspol_phase,
+                    )
+                    args_list.append(args)
+                if pool is None:
+                    if max_processes is None:
+                        use_pool = multiprocessing.Pool()
+                    else:
+                        use_pool = multiprocessing.Pool(processes=max_processes)
+                gains_fit = use_pool.starmap(
+                    calibration_optimization.run_unical_optimization,
+                    args_list,
+                )
+                for freq_ind in range(self.Nfreqs):
+                    self.gains[:, [freq_ind], :] = gains_fit[freq_ind][:, np.newaxis, :]
+                if pool is None:  # Leave things how we found them
+                    use_pool.terminate()
+            else:
+                freq_ind=0  # testing on just one freq for now
+                gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
+                    self,
+                    xtol,
+                    maxiter,
+                    freq_ind=freq_ind,
+                    verbose=verbose,
+                    get_crosspol_phase=get_crosspol_phase,
+                    crosspol_phase_strategy=crosspol_phase_strategy,
+                )
+                print("***GAINS SHAPE***", self.gains.shape)
+                print("***U PARAMS SHAPE***", self.u_params.shape)
+                self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
+                self.u_params[:, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
+                self.write_u_params()
+                
+                # for freq_ind in range(self.Nfreqs):
+                #     gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
+                #         self,
+                #         xtol,
+                #         maxiter,
+                #         freq_ind=freq_ind,
+                #         verbose=verbose,
+                #         get_crosspol_phase=get_crosspol_phase,
+                #         crosspol_phase_strategy=crosspol_phase_strategy,
+                #     )
+                #     print("***GAINS SHAPE***", self.gains.shape)
+                #     print("***U PARAMS SHAPE***", self.u_params.shape)
+                #     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
+                #     self.u_params[:, [freq_ind], :] = u_params_fit[:, np.newaxis, :]

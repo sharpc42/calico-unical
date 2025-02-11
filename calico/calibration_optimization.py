@@ -17,10 +17,18 @@ from calico import cost_function_calculations
 def flatten_hessian(
     hess_arrays,
     Nants_unflagged,
+    Ntimes = None,
+    Nbls = None,
 ):
-    hess_flattened = np.full(
-        (2 * Nants_unflagged, 2 * Nants_unflagged), np.nan, dtype=float
-    )
+    unical = len(hess_arrays[:]) > 3  # see if additional arrays for unical are passed
+    if not unical:
+        hess_flattened = np.full(
+            (2 * Nants_unflagged, 2 * Nants_unflagged), np.nan, dtype=float
+        )
+    else:
+        hess_flattened = np.full(
+            (2 * Nants_unflagged + 2 * Nbls, 2 * Nants_unflagged + 2 * Nbls), np.nan, dtype=float
+        )
     for ant_ind_1 in range(Nants_unflagged):
         for ant_ind_2 in range(Nants_unflagged):
             hess_flattened[2 * ant_ind_1, 2 * ant_ind_2] = hess_arrays[0][
@@ -35,6 +43,22 @@ def flatten_hessian(
             hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2 + 1] = hess_arrays[2][
                 ant_ind_1, ant_ind_2
             ]
+    if unical:
+        for ant_ind_1 in range(Nants_unflagged, Nants_unflagged + Nbls):
+            for ant_ind_2 in range(Nants_unflagged, Nants_unflagged + Nbls):
+                hess_flattened[2 * ant_ind_1, 2 * ant_ind_2] = hess_arrays[3][
+                    ant_ind_1, ant_ind_2
+                ]
+                hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2] = hess_arrays[4][
+                    ant_ind_1, ant_ind_2
+                ]
+                hess_flattened[2 * ant_ind_1, 2 * ant_ind_2 + 1] = np.conj(
+                    hess_arrays[4][ant_ind_2, ant_ind_1]
+                )
+                hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2 + 1] = hess_arrays[5][
+                    ant_ind_1, ant_ind_2
+                ]
+
     return hess_flattened
 
 def cost_skycal_wrapper(
@@ -566,6 +590,7 @@ def cost_unical_wrapper(
     params_flattened,
     caldata_obj,
     ant_inds,
+    Nants_unflagged,
 ):
     """
     Wrapper for function cost_unical. Reformats the input gains to be compatible
@@ -573,13 +598,13 @@ def cost_unical_wrapper(
 
     Parameters
     ----------
-    gains_flattened : array of float
-        Array of gain values. Even indices correspond to the real components of the
-        gains and odd indices correspond to the imaginary components. Shape
-        (2*Nants_unflagged,).
+    params_flattened : array of float
+        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params 
+        and u params. Even indices correspond to the real components of the and odd 
+        indices correspond to the imaginary components.
     caldata_obj : CalData
     ant_inds : array of int
-        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+        Shape (Nants_unflagged,). Indices of unflagged antennas to be calibrated.
     freq_ind : int
         Frequency channel index.
     vis_pol_ind : int
@@ -592,31 +617,36 @@ def cost_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
+    gains_reshaped = np.reshape(params_flattened[:2*Nants_unflagged], (Nants_unflagged, 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    u_params_reshaped = np.reshape(params_flattened[2*len(ant_inds):], (len(),2))
+    u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                   (caldata_obj.Nbls, 2))
     u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
-    u_params = np.ones((caldata_obj.Nbls*caldata_obj.Ntimes), dtype=complex)  # set these to model vis
+    u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
     u_params[ant_inds] = gains_reshaped  # still do this?
     if caldata_obj.gains_multiply_model:
-        cost = cost_function_calculations.cost_skycal(
+        cost = cost_function_calculations.cost_unical(
             gains,
+            u_params,
             caldata_obj.data_vis_reshaped,
             caldata_obj.model_vis_reshaped,
             caldata_obj.vis_weights_reshaped,
+            caldata_obj.model_weights_reshaped,
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
         )
     else:
-        cost = cost_function_calculations.cost_skycal(
+        cost = cost_function_calculations.cost_unical(
             gains,
+            u_params,
             caldata_obj.model_vis_reshaped,
             caldata_obj.data_vis_reshaped,
             caldata_obj.vis_weights_reshaped,
+            caldata_obj.model_weights_reshaped,
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
@@ -624,10 +654,11 @@ def cost_unical_wrapper(
     return cost
 
 
-def jacobian_skycal_wrapper(
-    gains_flattened,
+def jacobian_unical_wrapper(
+    params_flattened,
     caldata_obj,
     ant_inds,
+    Nants_unflagged,
 ):
     """
     Wrapper for function jacobian_skycal. Reformats the input gains and
@@ -635,13 +666,13 @@ def jacobian_skycal_wrapper(
 
     Parameters
     ----------
-    gains_flattened : array of float
-        Array of gain values. Even indices correspond to the real components of the
-        gains and odd indices correspond to the imaginary components. Shape
-        (2*Nants_unflagged,).
+    params_flattened : array of float
+        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params 
+        and u params. Even indices correspond to the real components of the and odd 
+        indices correspond to the imaginary components.
     caldata_obj : CalData
     ant_inds : array of int
-        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+        Shape (Nants_unflagged,). Indices of unflagged antennas to be calibrated.
     freq_ind : int
         Frequency channel index.
     vis_pol_ind : int
@@ -656,26 +687,37 @@ def jacobian_skycal_wrapper(
         the imaginary part of the gains.
     """
 
-    gains_reshaped = np.reshape(gains_flattened, (len(ant_inds), 2))
+    # reshape gain params
+    gains_reshaped = np.reshape(params_flattened[:2*Nants_unflagged], (Nants_unflagged, 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
+    # reshape u params
+    u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                   (caldata_obj.Nbls, 2))
+    u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
+    u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
+    u_params[ant_inds] = gains_reshaped  # still do this?
     if caldata_obj.gains_multiply_model:
-        jac = cost_function_calculations.jacobian_skycal(
+        jac = cost_function_calculations.jacobian_unical(
             gains,
+            u_params,
             caldata_obj.data_vis_reshaped,
             caldata_obj.model_vis_reshaped,
             caldata_obj.vis_weights_reshaped,
+            caldata_obj.model_weights_reshaped,
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
         )
     else:
-        jac = cost_function_calculations.jacobian_skycal(
+        jac = cost_function_calculations.jacobian_unical(
             gains,
+            u_params,
             caldata_obj.model_vis_reshaped,
             caldata_obj.data_vis_reshaped,
             caldata_obj.vis_weights_reshaped,
+            caldata_obj.model_weights_reshaped,
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
@@ -686,10 +728,11 @@ def jacobian_skycal_wrapper(
     return jac_flattened
 
 
-def hessian_skycal_wrapper(
-    gains_flattened,
+def hessian_unical_wrapper(
+    params_flattened,
     caldata_obj,
     ant_inds,
+    Nants_unflagged,
 ):
     """
     Wrapper for function hessian_skycal. Reformats the input gains and
@@ -697,13 +740,13 @@ def hessian_skycal_wrapper(
 
     Parameters
     ----------
-    gains_flattened : array of float
-        Array of gain values. Even indices correspond to the real components of the
-        gains and odd indices correspond to the imaginary components. Shape
-        (2*Nants_unflagged,).
+    params_flattened : array of float
+        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params 
+        and u params. Even indices correspond to the real components of the and odd 
+        indices correspond to the imaginary components.
     caldata_obj : CalData
     ant_inds : array of int
-        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+        Shape (Nants_unflagged,). Indices of unflagged antennas to be calibrated.
     freq_ind : int
         Frequency channel index.
     vis_pol_ind : int
@@ -715,39 +758,63 @@ def hessian_skycal_wrapper(
         Hessian of the cost function, shape (2*Nants_unflagged, 2*Nants_unflagged,).
     """
 
-    Nants_unflagged = len(ant_inds)
-    gains_reshaped = np.reshape(gains_flattened, (Nants_unflagged, 2))
+    # reshape gain params
+    gains_reshaped = np.reshape(params_flattened[:2*Nants_unflagged], (Nants_unflagged, 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
+    # reshape u params
+    u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                   (caldata_obj.Nbls, 2))
+    u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
+    u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
+    u_params[ant_inds] = gains_reshaped  # still do this?
     if caldata_obj.gains_multiply_model:
         (
-            hess_real_real,
-            hess_real_imag,
-            hess_imag_imag,
-        ) = cost_function_calculations.hessian_skycal(
+            gain_hess_real_real,
+            gain_hess_real_imag,
+            gain_hess_imag_imag,
+            u_hess_real_real,
+            u_hess_real_imag,
+            u_hess_imag_imag,
+            u_gain_hess_real_real,
+            u_gain_hess_real_imag,
+            u_gain_hess_imag_imag,
+        ) = cost_function_calculations.hessian_unical(
             gains,
+            u_params,
             caldata_obj.Nants,
             caldata_obj.Nbls,
+            caldata_obj.Ntimes,
             caldata_obj.data_vis_reshaped,
             caldata_obj.model_vis_reshaped,
             caldata_obj.vis_weights_reshaped,
+            caldata_obj.model_weights_reshaped,
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
         )
     else:
         (
-            hess_real_real,
-            hess_real_imag,
-            hess_imag_imag,
-        ) = cost_function_calculations.hessian_skycal(
+            gain_hess_real_real,
+            gain_hess_real_imag,
+            gain_hess_imag_imag,
+            u_hess_real_real,
+            u_hess_real_imag,
+            u_hess_imag_imag,
+            u_gain_hess_real_real,
+            u_gain_hess_real_imag,
+            u_gain_hess_imag_imag,
+        ) = cost_function_calculations.hessian_unical(
             gains,
+            u_params,
             caldata_obj.Nants,
             caldata_obj.Nbls,
+            caldata_obj.Ntimes,
             caldata_obj.model_vis_reshaped,
             caldata_obj.data_vis_reshaped,
             caldata_obj.vis_weights_reshaped,
+            caldata_obj.model_weights_reshaped,
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
@@ -755,11 +822,18 @@ def hessian_skycal_wrapper(
 
     return flatten_hessian(
         [
-            hess_real_real,
-            hess_real_imag,
-            hess_imag_imag,
+            gain_hess_real_real,
+            gain_hess_real_imag,
+            gain_hess_imag_imag,
+            u_hess_real_real,
+            u_hess_real_imag,
+            u_hess_imag_imag,
+            u_gain_hess_real_real,
+            u_gain_hess_real_imag,
+            u_gain_hess_imag_imag
         ],
         Nants_unflagged,
+        Nbls=len(caldata_obj.bl_inds),
     )
 
 def run_skycal_optimization_per_pol_single_freq(
@@ -1063,19 +1137,28 @@ def run_unical_optimization(
     -------
     gains_fit : array of complex
         Fit gain values. Shape (Nants, 1, N_feed_pols,).
+    u_params_fit : array of complex
+        Fit model parameter values. Shape (Nbls, N_feed_pols???)
     """
-
-    print("***NEW CAL***")
 
     gains_fit = np.full(
         (caldata_obj.Nants, caldata_obj.N_feed_pols),
         np.nan + 1j * np.nan,
         dtype=complex,
     )
+    u_params_fit = np.full(
+        (caldata_obj.Nbls, caldata_obj.N_feed_pols),  # is this shape right?
+        np.nan + 1j * np.nan,
+        dtype=complex,
+    )
     if np.max(caldata_obj.visibility_weights[:, :, freq_ind, :]) == 0.0:
         print("ERROR: All data flagged.")
         gains_fit[:, :] = np.nan + 1j * np.nan
-        return gains_fit
+        return gains_fit, u_params_fit
+    if np.max(caldata_obj.model_weights[:, :, freq_ind, :]) == 0.0:
+        print("ERROR: All data flagged.")
+        u_params_fit[:, :] = np.nan + 1j * np.nan
+        return u_params_fit, u_params_fit
 
     for feed_pol_ind, feed_pol in enumerate(caldata_obj.feed_polarization_array):
         vis_pol_ind = np.where(caldata_obj.vis_polarization_array == feed_pol)[0]
@@ -1084,22 +1167,29 @@ def run_unical_optimization(
             np.max(caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
         ):  # All flagged
             gains_fit[:, feed_pol_ind] = np.nan + 1j * np.nan
+        elif (
+            np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
+        ):
+            u_params_fit[:, feed_pol_ind] = np.nan + 1j * np.nan
         else:
             caldata_obj.set_ant_inds(freq_ind, feed_pol_ind)
+            caldata_obj.set_bl_inds(freq_ind, feed_pol_ind)
 
-            gains_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind)
+            params_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind, unical=True)
 
-            caldata_obj.reshape_data(freq_ind, vis_pol_ind)
+            caldata_obj.reshape_data(freq_ind, vis_pol_ind, unical=True)
 
             # Minimize the cost function
             start_optimize = time.time()
             result = scipy.optimize.minimize(
-                cost_skycal_wrapper,
-                gains_init_flattened,
-                args=(caldata_obj, caldata_obj.ant_inds),
+                cost_unical_wrapper,
+                params_init_flattened,
+                args=(caldata_obj, 
+                      caldata_obj.ant_inds, 
+                      len(caldata_obj.ant_inds)),
                 method="Newton-CG",
-                jac=jacobian_skycal_wrapper,
-                hess=hessian_skycal_wrapper,
+                jac=jacobian_unical_wrapper,
+                hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()
@@ -1109,10 +1199,17 @@ def run_unical_optimization(
                     f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
                 )
             sys.stdout.flush()
-            gains_fit_single_pol = np.reshape(result.x, (len(caldata_obj.ant_inds), 2))
+            gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)], 
+                                              (len(caldata_obj.ant_inds), 2))
             gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
                 gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
             )
+            u_params_fit_single_pol = np.reshape(result.x[2*len(caldata_obj.ant_inds):],
+                                                 (caldata_obj.Nbls, 2))
+            u_params_fit[caldata_obj.bl_inds, feed_pol_ind] = (
+                u_params_fit_single_pol[:, 0] + 1j * u_params_fit_single_pol[:, 1]
+            )
+            print("***U PARAMS FIT SHAPE***", u_params_fit.shape)
 
             # Ensure that the phase of the gains is mean-zero
             # This adds should be handled by the phase regularization term, but
@@ -1175,4 +1272,4 @@ def run_unical_optimization(
             gains_fit[:, 0] *= np.exp(-1j * crosspol_phase / 2)
             gains_fit[:, 1] *= np.exp(1j * crosspol_phase / 2)
 
-    return gains_fit
+    return gains_fit, u_params_fit
