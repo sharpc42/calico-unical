@@ -150,6 +150,7 @@ class CalData:
         self.model_vis_reshaped = None
         self.vis_weights_reshaped = None
         self.ant_inds = None
+        self.bl_inds = None
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -385,7 +386,7 @@ class CalData:
             ),
             dtype=complex,
         )
-        self.model_visibilities = np.zeros(
+        self.model_visibilities = np.ones(
             (
                 self.Ntimes,
                 self.Nbls,
@@ -491,14 +492,6 @@ class CalData:
             self.ant2_inds[baseline] = np.where(
                 self.antenna_numbers == metadata_reference.ant_2_array[baseline]
             )[0]
-
-        # baseline indices
-        # this is a hack-y solution but I don't like this
-        # I feel like there are redundancies and so this
-        # would not map to the correct order of ants (does that matter?)
-        self.bl_inds = np.arange(0,len(metadata_reference.baseline_array),1)  
-        # baseline_index_base = 2048 + 1 + 2**16
-        # self.bl_inds = (metadata_reference.baseline_array - baseline_index_base).astype(np.int64)
 
         # Get ordered list of antenna names
         self.antenna_names = np.array(
@@ -652,8 +645,9 @@ class CalData:
         self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
         self.abscal_params[0, :, :] = 1.0
 
-        # Initialize u parameters
-        self.u_params = self.model_visibilities[0,:,:,:]
+        # Initialize unical parameters
+        self.u_params = np.zeros((self.Ntimes, self.Nbls, self.Nfreqs, self.N_feed_pols), dtype=complex)
+        self.u_params = self.model_visibilities
         if u_params_init_stddev != 0.0:
             self.u_params += np.random.normal(
                 0.0,
@@ -683,11 +677,11 @@ class CalData:
             ),
             dtype=float,
         )
-        if np.max(flag_array):  # Apply flagging
-            self.visibility_weights[np.where(flag_array)] = 0.0
+        # if np.max(flag_array):  # Apply flagging
+        #     self.visibility_weights[np.where(flag_array)] = 0.0
 
         # Define model weights (this feels like the user should set)
-        self.model_weights = np.ones(
+        self.model_weights = np.zeros(
             (
                 self.Ntimes,
                 self.Nbls,
@@ -1335,12 +1329,12 @@ class CalData:
         """
         self.gains_real = np.real(self.gains[self.ant_inds, freq_ind, feed_pol_ind])
         self.gains_imag = np.imag(self.gains[self.ant_inds, freq_ind, feed_pol_ind])
-        print("***BL INDS***", self.bl_inds)
-        print("***U PARAMS***", self.u_params.shape)
+        # print("***CALDATA - BL INDS***", self.bl_inds)
+        # print("***CALDATA - U PARAMS***", self.u_params.shape)
         self.u_params_real = np.real(self.u_params[self.bl_inds, freq_ind, feed_pol_ind])
         self.u_params_imag = np.imag(self.u_params[self.bl_inds, freq_ind, feed_pol_ind])
-        print("***U PARAMS REAL***", self.u_params_real.shape)
-        print("***U PARAMS IMAG***", self.u_params_imag.shape)
+        # print("***CALDATA - U PARAMS REAL***", self.u_params_real.shape)
+        # print("***CALDATA - U PARAMS IMAG***", self.u_params_imag.shape)
 
         if unical:
             params_flattened = np.hstack(
@@ -1359,7 +1353,7 @@ class CalData:
                 ),
                 axis=1,
             ).flatten()
-        print("***PARAMS FLATTENED***", params_flattened.shape)
+        print("***CALDATA - PARAMS FLATTENED***", params_flattened.shape)
         return params_flattened
 
     def reshape_data(self, freq_ind, vis_pol_ind,unical=False):
@@ -1396,7 +1390,9 @@ class CalData:
     def set_ant_inds(self, freq_ind, feed_pol_ind):
         """
         This function sets indices of unflagged antennas
-        to be calibrated.
+        to be calibrated by calculating visibility weight
+        per physical antenna and excluding those with zero.
+
         Parameters
         ----------
         freq_ind : int
@@ -1404,9 +1400,11 @@ class CalData:
         feed_pol_ind : int
             Feed polarization index.
         """
+
+        # Sum over times per baseline
         vis_weights_summed = np.sum(
             self.visibility_weights[:, :, freq_ind, feed_pol_ind], axis=0
-        )  # Sum over times
+        )
         weight_per_ant = np.bincount(
             self.ant1_inds,
             weights=vis_weights_summed,
@@ -1419,26 +1417,21 @@ class CalData:
         self.ant_inds = np.where(weight_per_ant > 0.0)[0]
 
     def set_bl_inds(self, freq_ind, feed_pol_ind):
-        model_weights_summed = np.sum(
-            self.model_weights[:, :, freq_ind, feed_pol_ind], axis=0
+        weights_summed = np.sum(
+            (self.model_weights[:, :, freq_ind, feed_pol_ind]
+                + self.visibility_weights[:, :, freq_ind, feed_pol_ind]),
+            axis=0,
         )
-        weight_per_bl = np.bincount(
-            self.bl_inds,
-            weights=model_weights_summed,
-            minlength=self.Nbls,
-        )
-        print("***MODEL WEIGHTS PER BL***", weight_per_bl.shape)
-        print(weight_per_bl)
-        self.bl_inds = np.where(weight_per_bl > 0.0)[0]
+        self.bl_inds = np.where(weights_summed > 0.0)[0]
 
     def write_u_params(self):
-        if not self.ant_inds:
+        if not np.any(self.ant_inds):
             print("WARNING: All data was flagged. No u_cal file could be written.")  # update this later to a proper warning
             return
-        u_params_uvdata = pyuvdata.UVData()
-        u_params_uvdata.data_array = self.u_params
-        u_params_uvdata._Nants_data = len(self.ant_inds)
-        u_params_uvdata.write_uvfits("data/u_param_cal_out.uvfits")
+        # u_params_uvdata = pyuvdata.UVData()
+        # u_params_uvdata.data_array = self.u_params
+        # u_params_uvdata._Nants_data = len(self.ant_inds)
+        # u_params_uvdata.write_uvfits("data/u_param_cal_out.uvfits")
 
     def unified_calibration(
         self,
@@ -1519,33 +1512,44 @@ class CalData:
                 if pool is None:  # Leave things how we found them
                     use_pool.terminate()
             else:
-                freq_ind=0  # testing on just one freq for now
-                gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
-                    self,
-                    xtol,
-                    maxiter,
-                    freq_ind=freq_ind,
-                    verbose=verbose,
-                    get_crosspol_phase=get_crosspol_phase,
-                    crosspol_phase_strategy=crosspol_phase_strategy,
-                )
-                print("***GAINS SHAPE***", self.gains.shape)
-                print("***U PARAMS SHAPE***", self.u_params.shape)
-                self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                self.u_params[:, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
-                self.write_u_params()
+                # freq_ind=0  # testing on just one freq for now
+                # gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
+                #     self,
+                #     xtol,
+                #     maxiter,
+                #     freq_ind=freq_ind,
+                #     verbose=verbose,
+                #     get_crosspol_phase=get_crosspol_phase,
+                #     crosspol_phase_strategy=crosspol_phase_strategy,
+                # )
+                # # print("***CALDATA - GAINS SHAPE***", self.gains.shape)
+                # # print("***CALDATA - U PARAMS SHAPE***", self.u_params.shape)
+                # self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
+                # self.u_params[:, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
+                # print("***CALDATA - GAINS***", self.gains)
+                # print("***CALDATA - U PARAMS***", self.u_params)
+                # self.write_u_params()
                 
-                # for freq_ind in range(self.Nfreqs):
-                #     gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
-                #         self,
-                #         xtol,
-                #         maxiter,
-                #         freq_ind=freq_ind,
-                #         verbose=verbose,
-                #         get_crosspol_phase=get_crosspol_phase,
-                #         crosspol_phase_strategy=crosspol_phase_strategy,
-                #     )
-                #     print("***GAINS SHAPE***", self.gains.shape)
-                #     print("***U PARAMS SHAPE***", self.u_params.shape)
-                #     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                #     self.u_params[:, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
+                # print("***CALDATA - NFREQS***", self.Nfreqs)
+                for freq_ind in range(self.Nfreqs):
+                    # print("***CALDATA - FREQ IND***", freq_ind)
+                    # print("***CALDATA - GAINS BEFORE***", self.gains)
+                    # print("***CALDATA - U PARAMS BEFORE***", self.u_params)
+                    gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
+                        self,
+                        xtol,
+                        maxiter,
+                        freq_ind=freq_ind,
+                        verbose=verbose,
+                        get_crosspol_phase=get_crosspol_phase,
+                        crosspol_phase_strategy=crosspol_phase_strategy,
+                    )
+                    # print("***CALDATA - GAINS FIT***", gains_fit)
+                    # print("***CALDATA - U PARAMS FIT***", u_params_fit)
+                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
+                    # print("***CALDATA - U PARAMS SELECT***", self.u_params[:1, :, [freq_ind], :].shape)
+                    # print("***CALDATA - U PARAMS FIT***", u_params_fit.shape)
+                    self.u_params[:1, :, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
+                    # print("***CALDATA - GAINS AFTER***", self.gains)
+                    # print("***CALDATA - U PARAMS AFTER***", self.u_params)
+                    #self.write_u_params()

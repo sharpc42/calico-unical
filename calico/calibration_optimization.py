@@ -44,20 +44,70 @@ def flatten_hessian(
                 ant_ind_1, ant_ind_2
             ]
     if unical:
-        for ant_ind_1 in range(Nants_unflagged, Nants_unflagged + Nbls):
-            for ant_ind_2 in range(Nants_unflagged, Nants_unflagged + Nbls):
-                hess_flattened[2 * ant_ind_1, 2 * ant_ind_2] = hess_arrays[3][
-                    ant_ind_1, ant_ind_2
-                ]
-                hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2] = hess_arrays[4][
-                    ant_ind_1, ant_ind_2
-                ]
-                hess_flattened[2 * ant_ind_1, 2 * ant_ind_2 + 1] = np.conj(
-                    hess_arrays[4][ant_ind_2, ant_ind_1]
-                )
-                hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2 + 1] = hess_arrays[5][
-                    ant_ind_1, ant_ind_2
-                ]
+        # gains already done, focus on u-only and u-gains mix
+        for hess_row_ind in range(0, Nants_unflagged + Nbls):
+            for hess_col_ind in range(0, Nants_unflagged + Nbls):
+                # in u-only block
+                if hess_row_ind >= Nants_unflagged and hess_col_ind >= Nants_unflagged:
+                    hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = hess_arrays[3][
+                        hess_row_ind - Nants_unflagged, 
+                        hess_col_ind - Nants_unflagged,
+                    ]
+                    hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = hess_arrays[4][
+                        hess_row_ind - Nants_unflagged, 
+                        hess_col_ind - Nants_unflagged,
+                    ]
+                    hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = np.conj(
+                        hess_arrays[4][
+                            hess_col_ind - Nants_unflagged, 
+                            hess_row_ind - Nants_unflagged,
+                        ]
+                    )
+                    hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = hess_arrays[5][
+                        hess_row_ind - Nants_unflagged, 
+                        hess_col_ind - Nants_unflagged,
+                    ]
+                # in the u-gains mix blocks
+                else:
+                    if hess_row_ind >= Nants_unflagged:
+                        hess_flattened[2*hess_row_ind, 2*hess_col_ind] = hess_arrays[6][
+                            hess_row_ind - Nants_unflagged,
+                            hess_col_ind,
+                        ]
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind] = hess_arrays[7][
+                            hess_row_ind - Nants_unflagged,
+                            hess_col_ind,
+                        ]
+                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = np.conj(
+                            hess_arrays[7][
+                                hess_row_ind - Nants_unflagged,
+                                hess_col_ind,
+                            ]
+                        )
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[8][
+                            hess_row_ind - Nants_unflagged,
+                            hess_col_ind,
+                        ]
+                    # transpose (and complex conjugate?) of above block
+                    elif hess_col_ind >= Nants_unflagged:
+                        hess_flattened[2*hess_row_ind, 2*hess_col_ind] = hess_arrays[6][
+                            hess_col_ind - Nants_unflagged,
+                            hess_row_ind,
+                        ]
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind] = hess_arrays[7][
+                            hess_col_ind - Nants_unflagged,
+                            hess_row_ind,
+                        ]
+                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = np.conj(
+                            hess_arrays[7][
+                                hess_col_ind - Nants_unflagged,
+                                hess_row_ind,
+                            ]
+                        )
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[8][
+                            hess_col_ind - Nants_unflagged,
+                            hess_row_ind,
+                        ]
 
     return hess_flattened
 
@@ -246,7 +296,7 @@ def hessian_skycal_wrapper(
             caldata_obj.lambda_val,
         )
 
-    return flatten_hessian(
+    skycal_hess = flatten_hessian(
         [
             hess_real_real,
             hess_real_imag,
@@ -254,6 +304,16 @@ def hessian_skycal_wrapper(
         ],
         Nants_unflagged,
     )
+    print("CAL OPT - SKYCAL HESS***", skycal_hess)
+    return skycal_hess
+    # return flatten_hessian(
+    #     [
+    #         hess_real_real,
+    #         hess_real_imag,
+    #         hess_imag_imag,
+    #     ],
+    #     Nants_unflagged,
+    # )
 
 
 def cost_abscal_wrapper(abscal_parameters, caldata_obj):
@@ -591,6 +651,9 @@ def cost_unical_wrapper(
     caldata_obj,
     ant_inds,
     Nants_unflagged,
+    bl_inds,
+    freq_ind,
+    vis_pol_ind,
 ):
     """
     Wrapper for function cost_unical. Reformats the input gains to be compatible
@@ -622,35 +685,28 @@ def cost_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
-                                   (caldata_obj.Nbls, 2))
-    u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
-    u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
-    u_params[ant_inds] = gains_reshaped  # still do this?
-    if caldata_obj.gains_multiply_model:
-        cost = cost_function_calculations.cost_unical(
-            gains,
-            u_params,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.model_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
-        )
+    if (np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) != 0.0):
+        u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                    (caldata_obj.Nbls, 2))
+        u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
     else:
-        cost = cost_function_calculations.cost_unical(
-            gains,
-            u_params,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.model_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
-        )
+        u_params_reshaped = caldata_obj.u_params[:, [freq_ind], :]
+    # u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
+    # u_params[ant_inds] = gains_reshaped  # still do this?
+    # print("***CAL OPT - DATA VIS***", caldata_obj.data_vis_reshaped.shape)
+    # print("***CAL OPT - MODEL VIS***", caldata_obj.model_vis_reshaped.shape)
+    cost = cost_function_calculations.cost_unical(
+        gains,
+        u_params_reshaped,
+        caldata_obj.data_vis_reshaped[0,:],
+        caldata_obj.model_vis_reshaped[0,:],
+        caldata_obj.vis_weights_reshaped,
+        caldata_obj.model_weights_reshaped,
+        caldata_obj.ant1_inds,
+        caldata_obj.ant2_inds,
+        caldata_obj.lambda_val,
+    )
+    #if caldata_obj.gains_multiply_model:
     return cost
 
 
@@ -659,6 +715,9 @@ def jacobian_unical_wrapper(
     caldata_obj,
     ant_inds,
     Nants_unflagged,
+    bl_inds,
+    freq_ind,
+    vis_pol_ind,
 ):
     """
     Wrapper for function jacobian_skycal. Reformats the input gains and
@@ -693,38 +752,32 @@ def jacobian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
-                                   (caldata_obj.Nbls, 2))
-    u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
-    u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
-    u_params[ant_inds] = gains_reshaped  # still do this?
-    if caldata_obj.gains_multiply_model:
-        jac = cost_function_calculations.jacobian_unical(
-            gains,
-            u_params,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.model_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
-        )
+    if np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) != 0.0:
+        u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                    (caldata_obj.Nbls, 2))
+        u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
     else:
-        jac = cost_function_calculations.jacobian_unical(
-            gains,
-            u_params,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.model_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
-        )
-    jac_flattened = np.stack(
-        (np.real(jac[ant_inds]), np.imag(jac[ant_inds])), axis=1
+        # should be effectively sky-cal so pass in u params init to model vis
+        u_params_reshaped = np.squeeze(caldata_obj.u_params[:, :, freq_ind, vis_pol_ind])
+    jac = cost_function_calculations.jacobian_unical(
+        gains,
+        u_params_reshaped[:1,:],  # just first time for testing
+        caldata_obj.data_vis_reshaped[:1,:],
+        caldata_obj.model_vis_reshaped[:1,:],
+        caldata_obj.vis_weights_reshaped[:1,:],
+        caldata_obj.model_weights_reshaped[:1,:],
+        caldata_obj.ant1_inds,
+        caldata_obj.ant2_inds,
+        caldata_obj.lambda_val,
+    )
+    #if caldata_obj.gains_multiply_model:
+    jac_flattened = np.hstack(
+        (np.real(jac[ant_inds]), 
+         np.imag(jac[ant_inds]),
+         np.real(jac[bl_inds]),
+         np.imag(jac[bl_inds])),
     ).flatten()
+    # print("***CAL OPT - JAC FLATTENED***", jac_flattened)
     return jac_flattened
 
 
@@ -733,6 +786,9 @@ def hessian_unical_wrapper(
     caldata_obj,
     ant_inds,
     Nants_unflagged,
+    bl_inds,
+    freq_ind,
+    vis_pol_ind,
 ):
     """
     Wrapper for function hessian_skycal. Reformats the input gains and
@@ -764,63 +820,41 @@ def hessian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
-                                   (caldata_obj.Nbls, 2))
-    u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
-    u_params = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
-    u_params[ant_inds] = gains_reshaped  # still do this?
-    if caldata_obj.gains_multiply_model:
-        (
-            gain_hess_real_real,
-            gain_hess_real_imag,
-            gain_hess_imag_imag,
-            u_hess_real_real,
-            u_hess_real_imag,
-            u_hess_imag_imag,
-            u_gain_hess_real_real,
-            u_gain_hess_real_imag,
-            u_gain_hess_imag_imag,
-        ) = cost_function_calculations.hessian_unical(
-            gains,
-            u_params,
-            caldata_obj.Nants,
-            caldata_obj.Nbls,
-            caldata_obj.Ntimes,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.model_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
-        )
+    if np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) != 0.0:
+        u_params_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                    (caldata_obj.Nbls, 2))
+        u_params_reshaped = u_params_reshaped[:,0] + 1.0j * u_params_reshaped[:,1]
     else:
-        (
-            gain_hess_real_real,
-            gain_hess_real_imag,
-            gain_hess_imag_imag,
-            u_hess_real_real,
-            u_hess_real_imag,
-            u_hess_imag_imag,
-            u_gain_hess_real_real,
-            u_gain_hess_real_imag,
-            u_gain_hess_imag_imag,
-        ) = cost_function_calculations.hessian_unical(
-            gains,
-            u_params,
-            caldata_obj.Nants,
-            caldata_obj.Nbls,
-            caldata_obj.Ntimes,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.model_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
-        )
+        # should be effectively sky-cal so pass in u params init to model vis
+        u_params_reshaped = np.squeeze(caldata_obj.u_params[:, :, freq_ind, vis_pol_ind])
+    (
+        gain_hess_real_real,
+        gain_hess_real_imag,
+        gain_hess_imag_imag,
+        u_hess_real_real,
+        u_hess_real_imag,
+        u_hess_imag_imag,
+        u_gain_hess_real_real,
+        u_gain_hess_real_imag,
+        u_gain_hess_imag_imag,
+    ) = cost_function_calculations.hessian_unical(
+        gains,
+        u_params_reshaped[:1,:],  # only one time for testing
+        caldata_obj.Nants,
+        caldata_obj.Nbls,
+        caldata_obj.Ntimes,
+        caldata_obj.data_vis_reshaped[:1,:],
+        caldata_obj.model_vis_reshaped[:1,:],
+        caldata_obj.vis_weights_reshaped[:1,:],
+        caldata_obj.model_weights_reshaped[:1,:],
+        caldata_obj.ant1_inds,
+        caldata_obj.ant2_inds,
+        caldata_obj.bl_inds,
+        caldata_obj.lambda_val,
+    )
+    #if caldata_obj.gains_multiply_model:
 
-    return flatten_hessian(
+    hess_unical = flatten_hessian(
         [
             gain_hess_real_real,
             gain_hess_real_imag,
@@ -830,11 +864,13 @@ def hessian_unical_wrapper(
             u_hess_imag_imag,
             u_gain_hess_real_real,
             u_gain_hess_real_imag,
-            u_gain_hess_imag_imag
+            u_gain_hess_imag_imag,
         ],
         Nants_unflagged,
         Nbls=len(caldata_obj.bl_inds),
     )
+    print("***CAL OPT - HESS***", hess_unical)
+    return hess_unical
 
 def run_skycal_optimization_per_pol_single_freq(
     caldata_obj,
@@ -1151,14 +1187,14 @@ def run_unical_optimization(
         np.nan + 1j * np.nan,
         dtype=complex,
     )
-    if np.max(caldata_obj.visibility_weights[:, :, freq_ind, :]) == 0.0:
-        print("ERROR: All data flagged.")
-        gains_fit[:, :] = np.nan + 1j * np.nan
-        return gains_fit, u_params_fit
-    if np.max(caldata_obj.model_weights[:, :, freq_ind, :]) == 0.0:
-        print("ERROR: All data flagged.")
-        u_params_fit[:, :] = np.nan + 1j * np.nan
-        return u_params_fit, u_params_fit
+    # if np.max(caldata_obj.visibility_weights[:, :, freq_ind, :]) == 0.0:
+    #     print("ERROR: All data flagged.")
+    #     gains_fit[:, :] = np.nan + 1j * np.nan
+    #     return gains_fit, u_params_fit
+    # if np.max(caldata_obj.model_weights[:, :, freq_ind, :]) == 0.0:
+    #     print("ERROR: All data flagged.")
+    #     u_params_fit[:, :] = np.nan + 1j * np.nan
+    #     return u_params_fit, u_params_fit
 
     for feed_pol_ind, feed_pol in enumerate(caldata_obj.feed_polarization_array):
         vis_pol_ind = np.where(caldata_obj.vis_polarization_array == feed_pol)[0]
@@ -1166,18 +1202,26 @@ def run_unical_optimization(
         if (
             np.max(caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
         ):  # All flagged
+            # print("***CAL OPT - VIS WEIGHTS FLAGGED***")
             gains_fit[:, feed_pol_ind] = np.nan + 1j * np.nan
         elif (
-            np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
+            np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) == -1.0
         ):
+            # print("***CAL OPT - MODEL WEIGHTS FLAGGED***")
             u_params_fit[:, feed_pol_ind] = np.nan + 1j * np.nan
         else:
             caldata_obj.set_ant_inds(freq_ind, feed_pol_ind)
             caldata_obj.set_bl_inds(freq_ind, feed_pol_ind)
+            Nants_unflagged = len(caldata_obj.ant_inds)
+
+            #print("***CAL OPT - GAINS***", caldata_obj.gains)
 
             params_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind, unical=True)
 
             caldata_obj.reshape_data(freq_ind, vis_pol_ind, unical=True)
+
+            # print("***CAL OPT - PARAMS FLATTENED***", params_init_flattened)
+            print("***CAL OPT - BL INDS SHAPE***", caldata_obj.bl_inds.shape)
 
             # Minimize the cost function
             start_optimize = time.time()
@@ -1186,7 +1230,10 @@ def run_unical_optimization(
                 params_init_flattened,
                 args=(caldata_obj, 
                       caldata_obj.ant_inds, 
-                      len(caldata_obj.ant_inds)),
+                      Nants_unflagged,
+                      caldata_obj.bl_inds + Nants_unflagged,
+                      freq_ind,
+                      vis_pol_ind),
                 method="Newton-CG",
                 jac=jacobian_unical_wrapper,
                 hess=hessian_unical_wrapper,
@@ -1199,6 +1246,7 @@ def run_unical_optimization(
                     f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
                 )
             sys.stdout.flush()
+            print("***CAL OPT - OPTIMIZE OUTPUT***", result.x.shape)
             gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)], 
                                               (len(caldata_obj.ant_inds), 2))
             gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
@@ -1209,7 +1257,7 @@ def run_unical_optimization(
             u_params_fit[caldata_obj.bl_inds, feed_pol_ind] = (
                 u_params_fit_single_pol[:, 0] + 1j * u_params_fit_single_pol[:, 1]
             )
-            print("***U PARAMS FIT SHAPE***", u_params_fit.shape)
+            # print("***CAL OPT - U PARAMS FIT SHAPE***", u_params_fit.shape)
 
             # Ensure that the phase of the gains is mean-zero
             # This adds should be handled by the phase regularization term, but
