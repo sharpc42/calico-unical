@@ -1157,7 +1157,7 @@ def cost_unical(
     #     regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
     #     cost += regularization_term
 
-    return -cost
+    return cost
 
 def jacobian_unical(
     gains,
