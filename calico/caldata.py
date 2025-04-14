@@ -14,8 +14,8 @@ class CalData:
     -------
     gains : array of complex
         Shape (Nants, Nfreqs, N_feed_pols,).
-    u_params : array of complex
-        Shape ().
+    fit_vis : array of complex
+        Shape (Ntimes, Nbls,  Nfreqs, N_vis_pols).
     abscal_params : array of float
         Shape (3, Nfreqs, N_feed_pols). abscal_params[0, :, :] are the overall amplitudes,
         abscal_params[1, :, :] are the x-phase gradients in units 1/m, and abscal_params[2, :, :]
@@ -94,10 +94,10 @@ class CalData:
         Shape (Nants,). Real part of gains per frequency and per polarization.
     gains_imag : array of float
         Shape (Nants,). Imaginary part of gains per frequency and per polarization.
-    u_params_real : array of 
-        Shape (). Real part of model parameters per frequency and per polarization.
-    u_params_imag : array of float
-        Shape (). Imaginary part of model parameters per frequency and per polarization.
+    fit_vis_real : array of float
+        Shape (). Real part of fitted visibilities per frequency and per polarization.
+    fit_vis_imag : array of float
+        Shape (). Imaginary part of fitted visibilities per frequency and per polarization.
     data_vis_reshaped : array of complex
         Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
     model_vis_reshaped : array of complex
@@ -111,7 +111,7 @@ class CalData:
     def __init__(self):
         self.gains = None
         self.abscal_params = None
-        self.u_params = None
+        self.fit_vis = None
         self.Nants = 0
         self.Nbls = 0
         self.Ntimes = 0
@@ -144,13 +144,15 @@ class CalData:
         self.lambda_val = None
         self.gains_real = None
         self.gains_imag = None
-        self.u_params_real = None
-        self.u_params_imag = None
+        self.fit_vis_real = None
+        self.fit_vis_imag = None
         self.data_vis_reshaped = None
         self.model_vis_reshaped = None
         self.vis_weights_reshaped = None
         self.ant_inds = None
         self.bl_inds = None
+        self.gain_init_stddev = 0.0
+        self.fit_vis_init_stddev = 0.0
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -202,7 +204,7 @@ class CalData:
         gain_init_to_vis_ratio=True,
         gains_multiply_model=False,
         gain_init_stddev=0.0,
-        u_params_init_stddev=0.0,
+        fit_vis_init_stddev=0.0,
         N_feed_pols=None,
         feed_polarization_array=None,
         min_cal_baseline_m=None,
@@ -239,9 +241,9 @@ class CalData:
         gain_init_stddev : float
             Default 0.0. Standard deviation of a random complex Gaussian
             perturbation to the initial gains.
-        u_params_init_stddev : float
+        fit_vis_init_stddev : float
             Default 0.0. Standard deviation of a random complex Gaussian
-            perturbation to the initial u-parameter values.
+            perturbation to the initial fitted visibility values.
         N_feed_pols : int
             Default min(2, N_vis_pols). Number of feed polarizations, equal to
             the number of gain values to be calculated per antenna.
@@ -386,7 +388,7 @@ class CalData:
             ),
             dtype=complex,
         )
-        self.model_visibilities = np.ones(
+        self.model_visibilities = np.zeros(
             (
                 self.Ntimes,
                 self.Nbls,
@@ -622,6 +624,7 @@ class CalData:
         metadata_reference = None
 
         # Random perturbation of initial gains
+        self.gain_init_stddev = gain_init_stddev
         if gain_init_stddev != 0.0:
             self.gains += np.random.normal(
                 0.0,
@@ -632,6 +635,7 @@ class CalData:
                     self.N_feed_pols,
                 ),
             ) + 1.0j * np.random.normal(
+            # self.gains += 1.0j * np.random.normal(
                 0.0,
                 gain_init_stddev,
                 size=(
@@ -639,19 +643,29 @@ class CalData:
                     self.Nfreqs,
                     self.N_feed_pols,
                 ),
+            # self.gains.imag += np.random.normal(
+            #     0.0,
+            #     gain_init_stddev,
+            #     size=(
+            #         self.Nants,
+            #         self.Nfreqs,
+            #         self.N_feed_pols,
+            #     ),
             )
 
         # Initialize abscal parameters
         self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
         self.abscal_params[0, :, :] = 1.0
 
-        # Initialize unical parameters
-        self.u_params = np.zeros((self.Ntimes, self.Nbls, self.Nfreqs, self.N_feed_pols), dtype=complex)
-        self.u_params = self.model_visibilities
-        if u_params_init_stddev != 0.0:
-            self.u_params += np.random.normal(
+        # Initialize unical fitted visibility parameters
+        # self.fit_vis = np.zeros((self.Ntimes, self.Nbls, self.Nfreqs, self.N_feed_pols), dtype=complex)
+        self.fit_vis = self.model_visibilities
+        # Random perturbation with stddev passed by user
+        self.fit_vis_init_stddev = fit_vis_init_stddev
+        if fit_vis_init_stddev != 0.0:
+            self.fit_vis += np.random.normal(
                 0.0,
-                u_params_init_stddev,
+                fit_vis_init_stddev,
                 size=(
                     self.Nbls,
                     self.Nfreqs,
@@ -659,7 +673,7 @@ class CalData:
                 ),
             ) + 1.0j * np.random.normal(
                 0.0,
-                u_params_init_stddev,
+                fit_vis_init_stddev,
                 size=(
                     self.Nbls,
                     self.Nfreqs,
@@ -1327,22 +1341,19 @@ class CalData:
         unical : bool
             Whether to do unified calibration
         """
-        self.gains_real = np.real(self.gains[self.ant_inds, freq_ind, feed_pol_ind])
-        self.gains_imag = np.imag(self.gains[self.ant_inds, freq_ind, feed_pol_ind])
-        # print("***CALDATA - BL INDS***", self.bl_inds)
-        # print("***CALDATA - U PARAMS***", self.u_params.shape)
-        self.u_params_real = np.real(self.u_params[self.bl_inds, freq_ind, feed_pol_ind])
-        self.u_params_imag = np.imag(self.u_params[self.bl_inds, freq_ind, feed_pol_ind])
-        # print("***CALDATA - U PARAMS REAL***", self.u_params_real.shape)
-        # print("***CALDATA - U PARAMS IMAG***", self.u_params_imag.shape)
+        self.gains_real = self.gains[self.ant_inds, freq_ind, feed_pol_ind].real
+        self.gains_imag = self.gains[self.ant_inds, freq_ind, feed_pol_ind].imag
+        # first time only for now, slice all times eventually
+        self.fit_vis_real = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].real
+        self.fit_vis_imag = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].imag
 
         if unical:
             params_flattened = np.hstack(
                 (
                     np.ravel(self.gains_real),
                     np.ravel(self.gains_imag),
-                    np.ravel(self.u_params_real),
-                    np.ravel(self.u_params_imag),
+                    np.ravel(self.fit_vis_real),
+                    np.ravel(self.fit_vis_imag),
                 )
             )
         else:
@@ -1353,7 +1364,7 @@ class CalData:
                 ),
                 axis=1,
             ).flatten()
-        print("***CALDATA - PARAMS FLATTENED***", params_flattened.shape)
+        # print("***CALDATA - PARAMS FLATTENED***", params_flattened.shape)
         return params_flattened
 
     def reshape_data(self, freq_ind, vis_pol_ind,unical=False):
@@ -1369,6 +1380,9 @@ class CalData:
         vis_pol_ind : int
             Visibility polarization index.
         """
+        print("***CALDATA - DATA VIS SHAPE***", self.data_visibilities.shape)
+        print("***CALDATA - FREQ IND***", freq_ind)
+        print("***CALDATA - VIS POL IND***", vis_pol_ind)
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
@@ -1377,15 +1391,21 @@ class CalData:
             self.model_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
         )
+        # self.model_vis_reshaped = np.zeros((1,self.Nbls))
+        # self.model_vis_reshaped[0,:] = self.model_visibilities
         self.vis_weights_reshaped = np.reshape(
             self.visibility_weights[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
         )
+        # self.vis_weights_reshaped = np.zeros((1,self.Nbls))
+        # self.vis_weights_reshaped[0,:] = self.visibility_weights
         if unical:
             self.model_weights_reshaped = np.reshape(
                 self.model_weights[:, :, freq_ind, vis_pol_ind],
                 (self.Ntimes, self.Nbls),
             )
+            # self.model_weights_reshaped = np.zeros((1,self.Nbls))
+            # self.model_weights_reshaped = self.model_weights
     
     def set_ant_inds(self, freq_ind, feed_pol_ind):
         """
@@ -1424,14 +1444,85 @@ class CalData:
         )
         self.bl_inds = np.where(weights_summed > 0.0)[0]
 
-    def write_u_params(self):
+    def write_fit_vis(self):
         if not np.any(self.ant_inds):
             print("WARNING: All data was flagged. No u_cal file could be written.")  # update this later to a proper warning
             return
-        # u_params_uvdata = pyuvdata.UVData()
-        # u_params_uvdata.data_array = self.u_params
-        # u_params_uvdata._Nants_data = len(self.ant_inds)
-        # u_params_uvdata.write_uvfits("data/u_param_cal_out.uvfits")
+        # fit_vis_uvdata = pyuvdata.UVData()
+        # fit_vis_uvdata.data_array = self.fit_vis
+        # fit_vis_uvdata._Nants_data = len(self.ant_inds)
+        # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
+
+    def temp_test(self, before_arr_gains, before_arr_u):
+        import matplotlib.pyplot as plt
+        import subprocess
+
+        print("***CALDATA - GAINS ERROR MIN***", np.min(np.abs(self.gains - 1)))
+        print("***CALDATA - GAINS ERROR MAX***", np.max(np.abs(self.gains - 1)))
+        print("***CALDATA - U PARAMS ERROR MIN***", np.min(self.fit_vis - self.model_visibilities))
+        print("***CALDATA - U PARAMS ERROR MAX***", np.max(self.fit_vis - self.model_visibilities))
+        print("***CALDATA - GAINS REAL TRAJECTORY***", before_arr_gains.real - self.gains.real)
+        print("***CALDATA - GAINS IMAG TRAJECTORY***", before_arr_gains.imag - self.gains.real)
+
+        # plot gains parameters trajectory
+        fig1, ax1 = plt.subplots()
+        for i in range(self.Nants):
+            ax1.annotate("",
+                        xytext=(
+                            before_arr_gains.real[i],
+                            before_arr_gains.imag[i],
+                        ),
+                        xy=(
+                            self.gains.real[i],
+                            self.gains.imag[i]
+                        ),
+                        arrowprops=dict(arrowstyle="->"),
+                        )
+        ax1.set_xlabel("Real")
+        ax1.set_ylabel("Imag")
+        ax1.set_title("Gains Trajectory Plot")
+        ax1.set_xlim(-10,15)
+        ax1.set_ylim(-5,10)
+        ax1.set_xlim(-1,2)
+        ax1.set_ylim(-1,1)
+        # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
+        #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
+        #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
+        #             bbox_inches=0,)
+        fig1.savefig('images/gains_'
+                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                     +'.png',
+                     bbox_inches=0,)
+        plt.close()
+
+        # plot fitted visibility parameters trajectory
+        fig2, ax2 = plt.subplots()
+        for i in range(self.Nbls):
+            ax2.annotate("",
+                        xytext=(
+                            before_arr_u.real[i],
+                            before_arr_u.imag[i],
+                        ),
+                        xy=(
+                            self.fit_vis.real[i,:1,0],
+                            self.fit_vis.imag[i,:1,0]
+                        ),
+                        arrowprops=dict(arrowstyle="->"),
+                        )
+        ax2.set_xlabel("Real")
+        ax2.set_ylabel("Imag")
+        ax2.set_title("Fitted Visibilities Trajectory Plot")
+        ax2.set_xlim(-1,3)
+        ax2.set_ylim(-1,1)
+        # fig2.savefig("images/fit-vis-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
+        #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
+        #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
+        #             bbox_inches=0,)
+        fig2.savefig('images/fit-vis_'
+                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                     +'.png',
+                     bbox_inches=0,)
+        plt.close()
 
     def unified_calibration(
         self,
@@ -1513,7 +1604,7 @@ class CalData:
                     use_pool.terminate()
             else:
                 # freq_ind=0  # testing on just one freq for now
-                # gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
+                # gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
                 #     self,
                 #     xtol,
                 #     maxiter,
@@ -1522,20 +1613,14 @@ class CalData:
                 #     get_crosspol_phase=get_crosspol_phase,
                 #     crosspol_phase_strategy=crosspol_phase_strategy,
                 # )
-                # # print("***CALDATA - GAINS SHAPE***", self.gains.shape)
-                # # print("***CALDATA - U PARAMS SHAPE***", self.u_params.shape)
                 # self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                # self.u_params[:, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
-                # print("***CALDATA - GAINS***", self.gains)
-                # print("***CALDATA - U PARAMS***", self.u_params)
-                # self.write_u_params()
+                # self.fit_vis[:, [freq_ind], :] = fit_vis_fit[:, np.newaxis, :]
+                # self.write_fit_vis()
                 
-                # print("***CALDATA - NFREQS***", self.Nfreqs)
                 for freq_ind in range(self.Nfreqs):
-                    # print("***CALDATA - FREQ IND***", freq_ind)
-                    # print("***CALDATA - GAINS BEFORE***", self.gains)
-                    # print("***CALDATA - U PARAMS BEFORE***", self.u_params)
-                    gains_fit, u_params_fit = calibration_optimization.run_unical_optimization(
+                    before_arr_gains = self.gains[:, [freq_ind], :]
+                    before_arr_u = self.fit_vis[:, :1, [freq_ind], :]
+                    gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
                         self,
                         xtol,
                         maxiter,
@@ -1544,12 +1629,7 @@ class CalData:
                         get_crosspol_phase=get_crosspol_phase,
                         crosspol_phase_strategy=crosspol_phase_strategy,
                     )
-                    # print("***CALDATA - GAINS FIT***", gains_fit)
-                    # print("***CALDATA - U PARAMS FIT***", u_params_fit)
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                    # print("***CALDATA - U PARAMS SELECT***", self.u_params[:1, :, [freq_ind], :].shape)
-                    # print("***CALDATA - U PARAMS FIT***", u_params_fit.shape)
-                    self.u_params[:1, :, [freq_ind], :] = u_params_fit[:, np.newaxis, :]
-                    # print("***CALDATA - GAINS AFTER***", self.gains)
-                    # print("***CALDATA - U PARAMS AFTER***", self.u_params)
-                    #self.write_u_params()
+                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[:, np.newaxis, :]
+                    self.temp_test(before_arr_gains, before_arr_u)
+                    #self.write_fit_vis()
