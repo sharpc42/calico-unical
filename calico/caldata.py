@@ -1371,6 +1371,9 @@ class CalData:
         vis_pol_ind : int
             Visibility polarization index.
         """
+        print("***CALDATA - DATA VIS SHAPE***", self.data_visibilities.shape)
+        print("***CALDATA - FREQ IND***", freq_ind)
+        print("***CALDATA - VIS POL IND***", vis_pol_ind)
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),

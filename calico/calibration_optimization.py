@@ -689,13 +689,17 @@ def cost_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    # NOTE: THIS RESHAPE SEEMS TO BE GOING WRONG
-    # fit_vis_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
-    #                             (caldata_obj.Nbls, 2))
-    fit_vis_real = params_flattened[2*Nants_unflagged:(2*Nants_unflagged + caldata_obj.Nbls)]
-    fit_vis_imag = params_flattened[(2*Nants_unflagged + caldata_obj.Nbls):]
-    fit_vis_reshaped = fit_vis_real + 1.0j * fit_vis_imag
-
+    # if (np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) != 0.0):
+    #     fit_vis_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+    #                                 (caldata_obj.Nbls, 2))
+    #     fit_vis_reshaped = fit_vis_reshaped[:,0] + 1.0j * fit_vis_reshaped[:,1]
+    # else:
+    #     fit_vis_reshaped = caldata_obj.fit_vis[:, :, freq_ind, vis_pol_ind]
+    fit_vis_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
+                                (caldata_obj.Nbls, 2))
+    fit_vis_reshaped = fit_vis_reshaped[:,0] + 1.0j * fit_vis_reshaped[:,1]
+    # fit_vis = np.ones((caldata_obj.Nbls), dtype=complex)  # set these to model vis
+    # fit_vis[ant_inds] = gains_reshaped  # still do this?
     cost = cost_function_calculations.cost_unical(
         gains,
         fit_vis_reshaped,
