@@ -1380,9 +1380,6 @@ class CalData:
         vis_pol_ind : int
             Visibility polarization index.
         """
-        print("***CALDATA - DATA VIS SHAPE***", self.data_visibilities.shape)
-        print("***CALDATA - FREQ IND***", freq_ind)
-        print("***CALDATA - VIS POL IND***", vis_pol_ind)
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
@@ -1481,10 +1478,8 @@ class CalData:
         ax1.set_xlabel("Real")
         ax1.set_ylabel("Imag")
         ax1.set_title("Gains Trajectory Plot")
-        ax1.set_xlim(-10,15)
-        ax1.set_ylim(-5,10)
-        ax1.set_xlim(-1,2)
-        ax1.set_ylim(-1,1)
+        ax1.set_xlim(0.5,1.5)
+        ax1.set_ylim(-0.25,0.25)
         # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
         #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
         #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
