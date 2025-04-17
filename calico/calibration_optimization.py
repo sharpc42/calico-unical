@@ -1236,10 +1236,10 @@ def run_unical_optimization(
                       caldata_obj.bl_inds + Nants_unflagged,
                       freq_ind,
                       vis_pol_ind),
-                # method="Powell",
-                method="Newton-CG",
-                jac=jacobian_unical_wrapper,
-                hess=hessian_unical_wrapper,
+                method="Powell",
+                # method="Newton-CG",
+                # jac=jacobian_unical_wrapper,
+                # hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()
@@ -1249,7 +1249,6 @@ def run_unical_optimization(
                     f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
                 )
             sys.stdout.flush()
-            # print("***CAL OPT - OPTIMIZE OUTPUT***", result.x.shape)
             gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)], 
                                               (len(caldata_obj.ant_inds), 2))
             gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (

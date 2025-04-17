@@ -635,7 +635,6 @@ class CalData:
                     self.N_feed_pols,
                 ),
             ) + 1.0j * np.random.normal(
-            # self.gains += 1.0j * np.random.normal(
                 0.0,
                 gain_init_stddev,
                 size=(
@@ -643,14 +642,6 @@ class CalData:
                     self.Nfreqs,
                     self.N_feed_pols,
                 ),
-            # self.gains.imag += np.random.normal(
-            #     0.0,
-            #     gain_init_stddev,
-            #     size=(
-            #         self.Nants,
-            #         self.Nfreqs,
-            #         self.N_feed_pols,
-            #     ),
             )
 
         # Initialize abscal parameters
@@ -1499,16 +1490,16 @@ class CalData:
                             before_arr_u.imag[i],
                         ),
                         xy=(
-                            self.fit_vis.real[i,:1,0],
-                            self.fit_vis.imag[i,:1,0]
+                            self.fit_vis.real[:1,i,0,0],
+                            self.fit_vis.imag[:1,i,0,0]
                         ),
                         arrowprops=dict(arrowstyle="->"),
                         )
         ax2.set_xlabel("Real")
         ax2.set_ylabel("Imag")
         ax2.set_title("Fitted Visibilities Trajectory Plot")
-        ax2.set_xlim(-1,3)
-        ax2.set_ylim(-1,1)
+        # ax2.set_xlim(-1,3)
+        # ax2.set_ylim(-1,1)
         # fig2.savefig("images/fit-vis-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
         #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
         #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
