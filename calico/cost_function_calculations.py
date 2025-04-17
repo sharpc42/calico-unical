@@ -1153,9 +1153,9 @@ def cost_unical(
     res_vec_2 = fit_vis - model_vis
     cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
 
-    # if lambda_val > 0:
-    #     regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
-    #     cost += regularization_term
+    if lambda_val > 0:
+        regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
+        cost += regularization_term
 
     return cost
 
