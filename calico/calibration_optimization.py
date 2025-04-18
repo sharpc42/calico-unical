@@ -757,13 +757,9 @@ def jacobian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    if np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) != 0.0:
-        fit_vis_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
-                                    (caldata_obj.Nbls, 2))
-        fit_vis_reshaped = fit_vis_reshaped[:,0] + 1.0j * fit_vis_reshaped[:,1]
-    else:
-        # should be effectively sky-cal so pass in u params init to model vis
-        fit_vis_reshaped = np.squeeze(caldata_obj.fit_vis[:, :, freq_ind, vis_pol_ind])
+    fit_vis_real = params_flattened[2*Nants_unflagged:(2*Nants_unflagged + caldata_obj.Nbls)]
+    fit_vis_imag = params_flattened[(2*Nants_unflagged + caldata_obj.Nbls):]
+    fit_vis_reshaped = fit_vis_real + 1.0j * fit_vis_imag
     # print("***CAL OPT - U PARAMS RESHAPE***", fit_vis_reshaped.shape)
     jac = cost_function_calculations.jacobian_unical(
         gains,
@@ -829,13 +825,9 @@ def hessian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    if np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) != 0.0:
-        fit_vis_reshaped = np.reshape(params_flattened[2*Nants_unflagged:], 
-                                    (caldata_obj.Nbls, 2))
-        fit_vis_reshaped = fit_vis_reshaped[:,0] + 1.0j * fit_vis_reshaped[:,1]
-    else:
-        # should be effectively sky-cal so pass in u params init to model vis
-        fit_vis_reshaped = np.squeeze(caldata_obj.fit_vis[:, :, freq_ind, vis_pol_ind])
+    fit_vis_real = params_flattened[2*Nants_unflagged:(2*Nants_unflagged + caldata_obj.Nbls)]
+    fit_vis_imag = params_flattened[(2*Nants_unflagged + caldata_obj.Nbls):]
+    fit_vis_reshaped = fit_vis_real + 1.0j * fit_vis_imag
     (
         gain_hess_real_real,
         gain_hess_real_imag,
@@ -954,6 +946,7 @@ def run_skycal_optimization_per_pol_single_freq(
                 cost_skycal_wrapper,
                 gains_init_flattened,
                 args=(caldata_obj, caldata_obj.ant_inds),
+                # method="Powell",
                 method="Newton-CG",
                 jac=jacobian_skycal_wrapper,
                 hess=hessian_skycal_wrapper,
