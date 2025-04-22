@@ -1490,10 +1490,10 @@ class CalData:
         ax1.set_xlabel("Real")
         ax1.set_ylabel("Imag")
         ax1.set_title("Gains Trajectory Plot")
-        # ax1.set_xlim(-2.5,2.5)
-        # ax1.set_ylim(-0.25,0.25)
-        ax1.set_xlim(-20,20)
-        ax1.set_ylim(-20,20)
+        ax1.set_xlim(-2.5,2.5)
+        ax1.set_ylim(-0.25,0.25)
+        # ax1.set_xlim(-20,20)
+        # ax1.set_ylim(-20,20)
         # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
         #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
         #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
