@@ -431,6 +431,7 @@ class CalData:
                 data_copy.data_array,
                 (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
             )
+
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(
                     [
@@ -1454,12 +1455,14 @@ class CalData:
         import matplotlib.pyplot as plt
         import subprocess
 
-        print("***CALDATA - GAINS ERROR MIN***", np.min(np.abs(self.gains - 1)))
-        print("***CALDATA - GAINS ERROR MAX***", np.max(np.abs(self.gains - 1)))
-        print("***CALDATA - U PARAMS ERROR MIN***", np.min(self.fit_vis - self.model_visibilities))
-        print("***CALDATA - U PARAMS ERROR MAX***", np.max(self.fit_vis - self.model_visibilities))
-        print("***CALDATA - GAINS REAL TRAJECTORY***", before_arr_gains.real - self.gains.real)
-        print("***CALDATA - GAINS IMAG TRAJECTORY***", before_arr_gains.imag - self.gains.real)
+        print("***FIT TESTS***")
+        print("\tGains Error, Min -", np.min(np.abs(self.gains - 1)))
+        print("\tGains Error, Max -", np.max(np.abs(self.gains - 1)))
+        print("\tFit Vis Error, Min -", np.min(self.fit_vis - self.model_visibilities))
+        print("\tFit Vis Error, Max -", np.max(self.fit_vis - self.model_visibilities))
+        # print("\tGains Trajectory, Real -", before_arr_gains.real - self.gains.real)
+        # print("\tGains Trajectory, Imag -", before_arr_gains.imag - self.gains.real)
+        print("\t(GAINS FINAL MIN MAX DIFF) -", np.max(self.gains.real) - np.min(self.gains.real) - 1)
 
         # plot gains parameters trajectory
         fig1, ax1 = plt.subplots()
