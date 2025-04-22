@@ -1151,7 +1151,7 @@ def cost_unical(
     gains_expanded = (gains[ant1_inds] * np.conj(gains[ant2_inds]))[np.newaxis, :]
     res_vec_1 = data_vis - gains_expanded * fit_vis
     res_vec_2 = fit_vis - model_vis
-    cost = np.sum(-vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
+    cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
 
     # print("***COST FUNC CALCS***")
     # print("\tMax|v-m| =", np.max(np.abs(data_vis - model_vis)))
