@@ -1348,25 +1348,32 @@ class CalData:
         self.fit_vis_real = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].real
         self.fit_vis_imag = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].imag
 
-        if unical:
-            params_flattened = np.hstack(
-                (
-                    np.ravel(self.gains_real),
-                    np.ravel(self.gains_imag),
-                    np.ravel(self.fit_vis_real),
-                    np.ravel(self.fit_vis_imag),
-                )
-            )
-        else:
-            params_flattened = np.stack(
+        # interweave real and imaginary parts of gains
+        gains_flattened = np.stack(
                 (
                     self.gains_real,
                     self.gains_imag,
                 ),
                 axis=1,
             ).flatten()
-        # print("***CALDATA - PARAMS FLATTENED***", params_flattened.shape)
-        return params_flattened
+        if not unical:
+            return gains_flattened
+        else:
+            # interweave real and imaginary parts of u's
+            fit_vis_flattened = np.stack(
+                (
+                    self.fit_vis_real,
+                    self.fit_vis_imag,
+                ),
+                axis=1,
+            ).flatten()
+            params_flattened = np.hstack(
+                (
+                    gains_flattened,
+                    fit_vis_flattened,
+                )
+            )
+            return params_flattened
 
     def reshape_data(self, freq_ind, vis_pol_ind,unical=False):
         """
@@ -1462,7 +1469,9 @@ class CalData:
         print("\tFit Vis Error, Max -", np.max(self.fit_vis - self.model_visibilities))
         # print("\tGains Trajectory, Real -", before_arr_gains.real - self.gains.real)
         # print("\tGains Trajectory, Imag -", before_arr_gains.imag - self.gains.real)
-        print("\t(GAINS FINAL MIN MAX DIFF) -", np.max(self.gains.real) - np.min(self.gains.real) - 1)
+        print("\tFinal Gains, Real -", self.gains.real)
+        print("\tFinal Gains, Imag -", self.gains.imag)
+        # print("\t(GAINS FINAL MIN MAX DIFF) -", np.max(self.gains.real) - np.min(self.gains.real) - 1)
 
         # plot gains parameters trajectory
         fig1, ax1 = plt.subplots()
@@ -1481,8 +1490,10 @@ class CalData:
         ax1.set_xlabel("Real")
         ax1.set_ylabel("Imag")
         ax1.set_title("Gains Trajectory Plot")
-        ax1.set_xlim(0.0,2.5)
-        ax1.set_ylim(-0.25,0.25)
+        # ax1.set_xlim(-2.5,2.5)
+        # ax1.set_ylim(-0.25,0.25)
+        ax1.set_xlim(-20,20)
+        ax1.set_ylim(-20,20)
         # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
         #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
         #                 "_model-weight_"+str(np.max(self.model_weights))+".png",

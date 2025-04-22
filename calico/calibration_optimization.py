@@ -684,7 +684,7 @@ def cost_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*Nants_unflagged], (Nants_unflagged, 2))
+    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
@@ -1273,55 +1273,55 @@ def run_unical_optimization(
             gains_fit[:, feed_pol_ind] *= np.cos(avg_angle) - 1j * np.sin(avg_angle)
 
     # Constrain crosspol phase
-    if (
-        get_crosspol_phase
-        and caldata_obj.N_feed_pols == 2
-        and caldata_obj.N_vis_pols == 4
-    ):
-        if (
-            caldata_obj.feed_polarization_array[0] == -5
-            and caldata_obj.feed_polarization_array[1] == -6
-        ):
-            crosspol_polarizations = [-7, -8]
-        elif (
-            caldata_obj.feed_polarization_array[0] == -6
-            and caldata_obj.feed_polarization_array[1] == -5
-        ):
-            crosspol_polarizations = [-8, -7]
-        crosspol_indices = np.array(
-            [
-                np.where(caldata_obj.vis_polarization_array == pol)[0][0]
-                for pol in crosspol_polarizations
-            ]
-        )
-        if crosspol_phase_strategy.lower() == "pseudo stokes v":
-            crosspol_phase = cost_function_calculations.set_crosspol_phase_pseudoV(
-                gains_fit,
-                caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
-                caldata_obj.visibility_weights[:, :, freq_ind, crosspol_indices],
-                caldata_obj.ant1_inds,
-                caldata_obj.ant2_inds,
-            )
-        elif crosspol_phase_strategy.lower() == "crosspol model":
-            crosspol_phase = cost_function_calculations.set_crosspol_phase(
-                gains_fit,
-                caldata_obj.model_visibilities[:, :, freq_ind, crosspol_indices],
-                caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
-                caldata_obj.visibility_weights[:, :, freq_ind, crosspol_indices],
-                caldata_obj.ant1_inds,
-                caldata_obj.ant2_inds,
-            )
-        else:
-            print(
-                "WARNING: Unknown crosspol_phase_strategy. Skipping fitting crosspol phase."
-            )
-            crosspol_phase = 0.0
+    # if (
+    #     get_crosspol_phase
+    #     and caldata_obj.N_feed_pols == 2
+    #     and caldata_obj.N_vis_pols == 4
+    # ):
+    #     if (
+    #         caldata_obj.feed_polarization_array[0] == -5
+    #         and caldata_obj.feed_polarization_array[1] == -6
+    #     ):
+    #         crosspol_polarizations = [-7, -8]
+    #     elif (
+    #         caldata_obj.feed_polarization_array[0] == -6
+    #         and caldata_obj.feed_polarization_array[1] == -5
+    #     ):
+    #         crosspol_polarizations = [-8, -7]
+    #     crosspol_indices = np.array(
+    #         [
+    #             np.where(caldata_obj.vis_polarization_array == pol)[0][0]
+    #             for pol in crosspol_polarizations
+    #         ]
+    #     )
+    #     if crosspol_phase_strategy.lower() == "pseudo stokes v":
+    #         crosspol_phase = cost_function_calculations.set_crosspol_phase_pseudoV(
+    #             gains_fit,
+    #             caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
+    #             caldata_obj.visibility_weights[:, :, freq_ind, crosspol_indices],
+    #             caldata_obj.ant1_inds,
+    #             caldata_obj.ant2_inds,
+    #         )
+    #     elif crosspol_phase_strategy.lower() == "crosspol model":
+    #         crosspol_phase = cost_function_calculations.set_crosspol_phase(
+    #             gains_fit,
+    #             caldata_obj.model_visibilities[:, :, freq_ind, crosspol_indices],
+    #             caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
+    #             caldata_obj.visibility_weights[:, :, freq_ind, crosspol_indices],
+    #             caldata_obj.ant1_inds,
+    #             caldata_obj.ant2_inds,
+    #         )
+    #     else:
+    #         print(
+    #             "WARNING: Unknown crosspol_phase_strategy. Skipping fitting crosspol phase."
+    #         )
+    #         crosspol_phase = 0.0
 
-        if caldata_obj.gains_multiply_model:
-            gains_fit[:, 0] /= np.exp(-1j * crosspol_phase / 2)
-            gains_fit[:, 1] /= np.exp(1j * crosspol_phase / 2)
-        else:
-            gains_fit[:, 0] *= np.exp(-1j * crosspol_phase / 2)
-            gains_fit[:, 1] *= np.exp(1j * crosspol_phase / 2)
+    #     if caldata_obj.gains_multiply_model:
+    #         gains_fit[:, 0] /= np.exp(-1j * crosspol_phase / 2)
+    #         gains_fit[:, 1] /= np.exp(1j * crosspol_phase / 2)
+    #     else:
+    #         gains_fit[:, 0] *= np.exp(-1j * crosspol_phase / 2)
+    #         gains_fit[:, 1] *= np.exp(1j * crosspol_phase / 2)
 
     return gains_fit, fit_vis_fit
