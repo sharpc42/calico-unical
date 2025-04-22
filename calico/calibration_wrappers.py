@@ -920,6 +920,9 @@ def unified_calibration_wrapper(
         else:
             data.read(data_file_path)
         print_data_read_time = True
+        print("***CAL WRAPPER***")
+        print("\tAnt Pairs", data.get_antpairs())
+        # print("\tOriginal Data", data.data_array[0,0, 0])
     if isinstance(model, str):  # Read model
         model_file_path = model
         model = pyuvdata.UVData()
