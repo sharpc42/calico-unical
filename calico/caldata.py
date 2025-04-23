@@ -1469,8 +1469,8 @@ class CalData:
         print("\tFit Vis Error, Max -", np.max(self.fit_vis - self.model_visibilities))
         # print("\tGains Trajectory, Real -", before_arr_gains.real - self.gains.real)
         # print("\tGains Trajectory, Imag -", before_arr_gains.imag - self.gains.real)
-        # print("\tFinal Gains, Real -", self.gains.real)
-        # print("\tFinal Gains, Imag -", self.gains.imag)
+        print("\tFinal Gains, Real -", self.gains.real)
+        print("\tFinal Gains, Imag -", self.gains.imag)
         # print("\t(GAINS FINAL MIN MAX DIFF) -", np.max(self.gains.real) - np.min(self.gains.real) - 1)
 
         # plot gains parameters trajectory
