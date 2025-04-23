@@ -683,20 +683,14 @@ def cost_unical_wrapper(
         Value of the cost function.
     """
 
-    # reshape gain params - THIS ALSO NOT CORRECTLY SHAPED?
+    # reshape gain params
     gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
-    # print("***CAL OPT - COST WRAPPER***")
-    # print("\tGains (After) -", gains_reshaped)
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    # NOTE: THIS RESHAPE STILL SEEMS TO BE GOING WRONG - BECAUSE IT'S STILL NOT INTERWEAVING
-    # fit_vis_real = params_flattened[2*Nants_unflagged:(2*Nants_unflagged + caldata_obj.Nbls)]
-    # fit_vis_imag = params_flattened[(2*Nants_unflagged + caldata_obj.Nbls):]
     fit_vis_flat = np.reshape(params_flattened[2*Nants_unflagged:], (len(bl_inds), 2))
     fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
-    # print("\tFit Vis (After) -", fit_vis_reshaped)
 
     cost = cost_function_calculations.cost_unical(
         gains,
@@ -759,10 +753,8 @@ def jacobian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    fit_vis_real = params_flattened[2*Nants_unflagged:(2*Nants_unflagged + caldata_obj.Nbls)]
-    fit_vis_imag = params_flattened[(2*Nants_unflagged + caldata_obj.Nbls):]
-    fit_vis_reshaped = fit_vis_real + 1.0j * fit_vis_imag
-    # print("***CAL OPT - U PARAMS RESHAPE***", fit_vis_reshaped.shape)
+    fit_vis_flat = np.reshape(params_flattened[2*Nants_unflagged:], (len(bl_inds), 2))
+    fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
     jac = cost_function_calculations.jacobian_unical(
         gains,
         fit_vis_reshaped,  # just first time for testing
@@ -827,9 +819,8 @@ def hessian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     # reshape u params
-    fit_vis_real = params_flattened[2*Nants_unflagged:(2*Nants_unflagged + caldata_obj.Nbls)]
-    fit_vis_imag = params_flattened[(2*Nants_unflagged + caldata_obj.Nbls):]
-    fit_vis_reshaped = fit_vis_real + 1.0j * fit_vis_imag
+    fit_vis_flat = np.reshape(params_flattened[2*Nants_unflagged:], (len(bl_inds), 2))
+    fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
     (
         gain_hess_real_real,
         gain_hess_real_imag,
@@ -1217,9 +1208,6 @@ def run_unical_optimization(
             Nants_unflagged = len(caldata_obj.ant_inds)
 
             params_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind, unical=True)
-            # print("***CAL OPT - UNICAL WRAPPER***")
-            # print("\tGains (Before)", params_init_flattened[:2*Nants_unflagged])
-            # print("\tFit Vis (Before) -", params_init_flattened[2*Nants_unflagged:])
 
             caldata_obj.reshape_data(freq_ind, vis_pol_ind, unical=True)
 
