@@ -304,16 +304,7 @@ def hessian_skycal_wrapper(
         ],
         Nants_unflagged,
     )
-    print("CAL OPT - SKYCAL HESS***", skycal_hess)
     return skycal_hess
-    # return flatten_hessian(
-    #     [
-    #         hess_real_real,
-    #         hess_real_imag,
-    #         hess_imag_imag,
-    #     ],
-    #     Nants_unflagged,
-    # )
 
 
 def cost_abscal_wrapper(abscal_parameters, caldata_obj):
@@ -939,10 +930,10 @@ def run_skycal_optimization_per_pol_single_freq(
                 cost_skycal_wrapper,
                 gains_init_flattened,
                 args=(caldata_obj, caldata_obj.ant_inds),
-                # method="Powell",
-                method="Newton-CG",
-                jac=jacobian_skycal_wrapper,
-                hess=hessian_skycal_wrapper,
+                method="Powell",
+                # method="Newton-CG",
+                # jac=jacobian_skycal_wrapper,
+                # hess=hessian_skycal_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()

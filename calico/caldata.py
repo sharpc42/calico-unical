@@ -1013,6 +1013,7 @@ class CalData:
                     use_pool.terminate()
             else:
                 for freq_ind in range(self.Nfreqs):
+                    before_gains_arr = self.gains[:, [freq_ind], :]
                     gains_fit = calibration_optimization.run_skycal_optimization_per_pol_single_freq(
                         self,
                         xtol,
@@ -1023,6 +1024,7 @@ class CalData:
                         crosspol_phase_strategy=crosspol_phase_strategy,
                     )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
+                    self.temp_test(before_gains_arr, self.model_visibilities[0, :, freq_ind, :])
 
     def abscal(self, xtol=1e-5, maxiter=200, verbose=False):
         """
