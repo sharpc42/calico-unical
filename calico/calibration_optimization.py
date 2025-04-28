@@ -1221,9 +1221,10 @@ def run_unical_optimization(
                       freq_ind,
                       vis_pol_ind),
                 # method="Powell",
-                method="Newton-CG",
+                method="BFGS",
+                # method="Newton-CG",
                 jac=jacobian_unical_wrapper,
-                hess=hessian_unical_wrapper,
+                # hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()
