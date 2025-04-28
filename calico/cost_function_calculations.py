@@ -1210,16 +1210,12 @@ def jacobian_unical(
     gains_exp_1 = gains[np.newaxis, ant1_inds]              # shape (1,Nbls)
     gains_exp_2 = gains[np.newaxis, ant2_inds]              # shape (1,Nbls)
 
+    # NOTE: Check that order of subtracted terms correct
     res_vec_1 = (                                           # shape (Ntimes, Nbls)
-        data_vis -
-        gains_exp_1 * np.conj(gains_exp_2) * fit_vis
-    )
-    conj_res_vec_1 = (
-        np.conj(data_vis) -
-        np.conj(gains_exp_2) * gains_exp_1 * np.conj(fit_vis)
+        gains_exp_1 * np.conj(gains_exp_2) * fit_vis - data_vis
     )
     gains_term1 = np.sum(                                   # shape (Nbls)
-        vis_weights * gains_exp_2 * np.conj(data_vis) * res_vec_1,
+        vis_weights * gains_exp_2 * np.conj(fit_vis) * res_vec_1,
         axis=0,
     )
     gains_term1 = utils.bincount_multidim(                  # shape (Nants)
@@ -1227,8 +1223,16 @@ def jacobian_unical(
         weights=gains_term1,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
+    # conj_res_vec_1 = (
+    #     np.conj(data_vis) -
+    #     np.conj(gains_exp_2) * gains_exp_1 * np.conj(fit_vis)
+    # )
+    # gains_term2 = np.sum(                                   # shape (Nbls)
+    #     vis_weights * gains_exp_1 * data_vis * conj_res_vec_1,
+    #     axis=0,
+    # )
     gains_term2 = np.sum(                                   # shape (Nbls)
-        vis_weights * gains_exp_1 * data_vis * conj_res_vec_1,
+        vis_weights * gains_exp_1 * data_vis * np.conj(res_vec_1),
         axis=0,
     )
     gains_term2 = utils.bincount_multidim(                  # shape (Nants)
@@ -1236,25 +1240,24 @@ def jacobian_unical(
         weights=gains_term2,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
-
     jac_gains = 2 * (gains_term1 + gains_term2)             # shape (Nants)
 
     # u params jacobian
     gains_multiply = np.conj(gains_exp_1) * gains_exp_2     # shape (1, Nbls)
-    res_vec_vis2 = data_vis - gains_multiply * fit_vis     # shape (Ntimes, Nbls)
+    res_vec_vis2 = gains_multiply * fit_vis - data_vis      # shape (Ntimes, Nbls)
     vis_term_1 = np.sum(                                    # shape (Nbls)                            
-        vis_weights * gains_exp_2 * fit_vis * res_vec_vis2,
+        vis_weights * np.conj(gains_multiply) * res_vec_vis2,
         axis=0,
     )
     vis_term_2 = np.sum(                                    # shape (Nbls)
-        model_weights * gains_exp_1 * fit_vis * np.conj(res_vec_vis2),
+        vis_weights * gains_multiply * np.conj(res_vec_vis2),
         axis=0,
     )
-    res_vec_model = np.sum(                                 # shape (Nbls)
-        model_weights * (np.conj(model_vis) - fit_vis),
+    model_term = np.sum(                                 # shape (Nbls)
+        model_weights * (fit_vis - np.conj(model_vis)),
         axis=0,
     )
-    jac_vis = 2 * (vis_term_1 + vis_term_2 - res_vec_model)
+    jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)
     jac = np.concatenate((jac_gains, jac_vis))
 
     # if lambda_val > 0:
