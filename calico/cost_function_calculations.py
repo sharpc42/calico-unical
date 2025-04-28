@@ -1260,11 +1260,11 @@ def jacobian_unical(
     jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)
     jac = np.concatenate((jac_gains, jac_vis))
 
-    # if lambda_val > 0:
-    #     regularization_term = (
-    #         lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
-    #     )
-    #     jac += 2 * regularization_term
+    if lambda_val > 0:
+        regularization_term = (
+            lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
+        )
+        jac[:len(gains)] += 2 * regularization_term
 
     return jac
 
