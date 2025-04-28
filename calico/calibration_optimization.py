@@ -757,12 +757,32 @@ def jacobian_unical_wrapper(
         caldata_obj.ant2_inds,
         caldata_obj.lambda_val,
     )
-    jac_flattened = np.hstack(
-        (jac[ant_inds].real, 
-         jac[ant_inds].imag,
-         jac[bl_inds].real,
-         jac[bl_inds].imag),
+    # print("***JACOBIAN***")
+    # print("\tFull -", jac)
+    # print("\tAnt Inds -", jac[ant_inds])
+    # print("\tBL Inds -", jac[bl_inds])
+    jac_gains = np.stack(
+        (
+            jac[ant_inds].real,
+            jac[ant_inds].imag,
+        ),
+        axis=1,
     ).flatten()
+    jac_fits = np.stack(
+        (
+            jac[bl_inds].real,
+            jac[bl_inds].imag,
+        ),
+        axis=1,
+    ).flatten()
+    # NOTE: This isn't interweaving real and imag
+    jac_flattened = np.hstack(
+        (
+            jac_gains,
+            jac_fits,
+        ),
+    )
+    # print("***JAC SHAPE, AFTER***", jac_flattened.shape)
     return jac_flattened
 
 
@@ -928,7 +948,6 @@ def run_skycal_optimization_per_pol_single_freq(
                 cost_skycal_wrapper,
                 gains_init_flattened,
                 args=(caldata_obj, caldata_obj.ant_inds),
-                # method="Powell",
                 method="Newton-CG",
                 jac=jacobian_skycal_wrapper,
                 hess=hessian_skycal_wrapper,

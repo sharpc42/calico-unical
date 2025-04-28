@@ -1157,6 +1157,11 @@ def cost_unical(
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
 
+    print("***COST FUNCTION***")
+    print("\t|u-m| -", np.max(np.abs(fit_vis - model_vis)))
+    print("\t|u-v| -", np.max(np.abs(fit_vis - data_vis)))
+    print("\t|m-v| -", np.max(np.abs(model_vis - data_vis)))
+
     return cost
 
 def jacobian_unical(
@@ -1241,6 +1246,13 @@ def jacobian_unical(
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
     jac_gains = 2 * (gains_term1 + gains_term2)             # shape (Nants)
+    # regularization term
+    if lambda_val > 0:
+        regularization_term = (
+            lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
+        )
+        jac_gains += 2 * regularization_term
+
 
     # u params jacobian
     gains_multiply = np.conj(gains_exp_1) * gains_exp_2     # shape (1, Nbls)
@@ -1253,18 +1265,12 @@ def jacobian_unical(
         vis_weights * gains_multiply * np.conj(res_vec_vis2),
         axis=0,
     )
-    model_term = np.sum(                                 # shape (Nbls)
+    model_term = np.sum(                                    # shape (Nbls)
         model_weights * (fit_vis - np.conj(model_vis)),
         axis=0,
     )
-    jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)
-    jac = np.concatenate((jac_gains, jac_vis))
-
-    if lambda_val > 0:
-        regularization_term = (
-            lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
-        )
-        jac[:len(gains)] += 2 * regularization_term
+    jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)    # shape (Nbls)
+    jac = np.concatenate((jac_gains, 0*jac_vis))
 
     return jac
 
