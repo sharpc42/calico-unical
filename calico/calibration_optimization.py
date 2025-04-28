@@ -694,7 +694,7 @@ def cost_unical_wrapper(
         caldata_obj.ant2_inds,
         caldata_obj.lambda_val,
     )
-    #if caldata_obj.gains_multiply_model:
+
     return cost
 
 
@@ -757,7 +757,6 @@ def jacobian_unical_wrapper(
         caldata_obj.ant2_inds,
         caldata_obj.lambda_val,
     )
-    #if caldata_obj.gains_multiply_model:
     jac_flattened = np.hstack(
         (jac[ant_inds].real, 
          jac[ant_inds].imag,
@@ -854,7 +853,6 @@ def hessian_unical_wrapper(
         Nants_unflagged,
         Nbls=len(caldata_obj.bl_inds),
     )
-    # print("***CAL OPT - HESS***", hess_unical)
     return hess_unical
 
 def run_skycal_optimization_per_pol_single_freq(
@@ -930,10 +928,10 @@ def run_skycal_optimization_per_pol_single_freq(
                 cost_skycal_wrapper,
                 gains_init_flattened,
                 args=(caldata_obj, caldata_obj.ant_inds),
-                method="Powell",
-                # method="Newton-CG",
-                # jac=jacobian_skycal_wrapper,
-                # hess=hessian_skycal_wrapper,
+                # method="Powell",
+                method="Newton-CG",
+                jac=jacobian_skycal_wrapper,
+                hess=hessian_skycal_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()
@@ -1222,10 +1220,10 @@ def run_unical_optimization(
                       caldata_obj.bl_inds + Nants_unflagged,
                       freq_ind,
                       vis_pol_ind),
-                # method="Powell",
-                method="Newton-CG",
-                jac=jacobian_unical_wrapper,
-                hess=hessian_unical_wrapper,
+                method="Powell",
+                # method="Newton-CG",
+                # jac=jacobian_unical_wrapper,
+                # hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()

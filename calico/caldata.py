@@ -705,6 +705,7 @@ class CalData:
             ),
             dtype=float,
         )
+        self.model_weights += 100  # constrain u's to be well known
 
         self.lambda_val = lambda_val
 
@@ -1493,7 +1494,7 @@ class CalData:
         ax1.set_ylabel("Imag")
         ax1.set_title("Gains Trajectory Plot")
         ax1.set_xlim(0.75,1.25)
-        ax1.set_ylim(-0.3,0.3)
+        ax1.set_ylim(-0.25,0.25)
         # ax1.set_xlim(-20,20)
         # ax1.set_ylim(-20,20)
         # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \

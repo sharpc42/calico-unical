@@ -1153,17 +1153,9 @@ def cost_unical(
     res_vec_2 = fit_vis - model_vis
     cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
 
-    print("***COST FUNC CALCS***")
-    print("\tMax|v-m| =", np.max(np.abs(data_vis - model_vis)))
-    print("\tMax|u-m| =", np.max(np.abs(fit_vis - model_vis)))
-    print("\tMax|v-u| =", np.max(np.abs(data_vis - fit_vis)))
-    # print("\tData Min", np.min(np.abs(data_vis)))
-    # print("\tModel Min", np.min(np.abs(model_vis)))
-    # print("\tFit Vis Min", np.min(np.abs(fit_vis)))
-
-    # if lambda_val > 0:
-    #     regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
-    #     cost += regularization_term
+    if lambda_val > 0:
+        regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
+        cost += regularization_term
 
     return cost
 
