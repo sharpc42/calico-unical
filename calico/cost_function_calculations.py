@@ -1266,11 +1266,11 @@ def jacobian_unical(
         axis=0,
     )
     model_term = np.sum(                                    # shape (Nbls)
-        model_weights * (fit_vis - np.conj(model_vis)),
+        model_weights * (fit_vis - model_vis),
         axis=0,
     )
     jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)    # shape (Nbls)
-    jac = np.concatenate((jac_gains, 0*jac_vis))
+    jac = np.hstack((jac_gains, jac_vis))
 
     return jac
 
