@@ -1157,11 +1157,6 @@ def cost_unical(
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
 
-    print("***COST FUNCTION***")
-    print("\t|u-m| -", np.max(np.abs(fit_vis - model_vis)))
-    print("\t|u-v| -", np.max(np.abs(fit_vis - data_vis)))
-    print("\t|m-v| -", np.max(np.abs(model_vis - data_vis)))
-
     return cost
 
 def jacobian_unical(
@@ -1228,14 +1223,6 @@ def jacobian_unical(
         weights=gains_term1,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
-    # conj_res_vec_1 = (
-    #     np.conj(data_vis) -
-    #     np.conj(gains_exp_2) * gains_exp_1 * np.conj(fit_vis)
-    # )
-    # gains_term2 = np.sum(                                   # shape (Nbls)
-    #     vis_weights * gains_exp_1 * data_vis * conj_res_vec_1,
-    #     axis=0,
-    # )
     gains_term2 = np.sum(                                   # shape (Nbls)
         vis_weights * gains_exp_1 * data_vis * np.conj(res_vec_1),
         axis=0,
@@ -1338,7 +1325,7 @@ def hessian_unical(
     )
 
     # Calculate the antenna off-diagonal components
-    gain_hess_components = np.zeros((Nbls, 4), dtype=complex)             # shape (Nbls, 4)
+    gain_hess_components = np.zeros((Nbls, 4), dtype=float)             # shape (Nbls, 4)
     # Real-real Hessian component for gains:
     gain_hess_components[:, 0] = (
         4 * gains_exp_1.real * gains_exp_2.real * fit_squared
@@ -1417,9 +1404,9 @@ def hessian_unical(
 
     # Fill the fitted visibility only matrix with zeros; all off-diagnoal
     # entries will remain zero
-    fit_hess_real_real = np.zeros((2*Nbls, 2*Nbls), dtype=complex)
-    fit_hess_imag_imag = np.zeros((2*Nbls, 2*Nbls), dtype=complex)
-    fit_hess_real_imag = np.zeros((2*Nbls, 2*Nbls), dtype=complex)
+    fit_hess_real_real = np.zeros((2*Nbls, 2*Nbls), dtype=float)
+    fit_hess_imag_imag = np.zeros((2*Nbls, 2*Nbls), dtype=float)
+    fit_hess_real_imag = np.zeros((2*Nbls, 2*Nbls), dtype=float)
 
     # Calculate the fitted visibilities diagonals
     fit_hess_diag = 2 * (
@@ -1436,7 +1423,7 @@ def hessian_unical(
     # Calculate the antenna off-diagonal components 
     # for both antennas in baseline
     fit_gain_hess_vectors = np.zeros((Nbls, 4), dtype=float)       # shape: (Nbls, 4)
-    fit_gain_hess_components = np.zeros((Nbls, Nants, 4), dtype=complex)     # shape: (Nbls, Nants, 4)
+    fit_gain_hess_components = np.zeros((Nbls, Nants, 4), dtype=float)     # shape: (Nbls, Nants, 4)
 
     """U params/antenna 1 gains Hessian components"""
     # Real-real
