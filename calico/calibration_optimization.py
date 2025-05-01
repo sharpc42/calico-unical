@@ -775,14 +775,12 @@ def jacobian_unical_wrapper(
         ),
         axis=1,
     ).flatten()
-    # NOTE: This isn't interweaving real and imag
     jac_flattened = np.hstack(
         (
             jac_gains,
             jac_fits,
         ),
     )
-    # print("***JAC SHAPE, AFTER***", jac_flattened.shape)
     return jac_flattened
 
 
@@ -1240,10 +1238,10 @@ def run_unical_optimization(
                       freq_ind,
                       vis_pol_ind),
                 # method="Powell",
-                method="BFGS",
-                # method="Newton-CG",
+                # method="BFGS",
+                method="Newton-CG",
                 jac=jacobian_unical_wrapper,
-                # hess=hessian_unical_wrapper,
+                hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()
