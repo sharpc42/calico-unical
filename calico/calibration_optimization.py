@@ -686,8 +686,8 @@ def cost_unical_wrapper(
     cost = cost_function_calculations.cost_unical(
         gains,
         fit_vis_reshaped,
-        caldata_obj.data_vis_reshaped[0,:],
-        caldata_obj.model_vis_reshaped[0,:],
+        caldata_obj.data_vis_reshaped,
+        caldata_obj.model_vis_reshaped,
         caldata_obj.vis_weights_reshaped,
         caldata_obj.model_weights_reshaped,
         caldata_obj.ant1_inds,
@@ -748,19 +748,15 @@ def jacobian_unical_wrapper(
     fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
     jac = cost_function_calculations.jacobian_unical(
         gains,
-        fit_vis_reshaped,  # just first time for testing
-        caldata_obj.data_vis_reshaped[:1,:],
-        caldata_obj.model_vis_reshaped[:1,:],
-        caldata_obj.vis_weights_reshaped[:1,:],
-        caldata_obj.model_weights_reshaped[:1,:],
+        fit_vis_reshaped,
+        caldata_obj.data_vis_reshaped,
+        caldata_obj.model_vis_reshaped,
+        caldata_obj.vis_weights_reshaped,
+        caldata_obj.model_weights_reshaped,
         caldata_obj.ant1_inds,
         caldata_obj.ant2_inds,
         caldata_obj.lambda_val,
     )
-    # print("***JACOBIAN***")
-    # print("\tFull -", jac)
-    # print("\tAnt Inds -", jac[ant_inds])
-    # print("\tBL Inds -", jac[bl_inds])
     jac_gains = np.stack(
         (
             jac[ant_inds].real,
@@ -845,10 +841,10 @@ def hessian_unical_wrapper(
         caldata_obj.Nants,
         caldata_obj.Nbls,
         caldata_obj.Ntimes,
-        caldata_obj.data_vis_reshaped[:1,:],
-        caldata_obj.model_vis_reshaped[:1,:],
-        caldata_obj.vis_weights_reshaped[:1,:],
-        caldata_obj.model_weights_reshaped[:1,:],
+        caldata_obj.data_vis_reshaped,
+        caldata_obj.model_vis_reshaped,
+        caldata_obj.vis_weights_reshaped,
+        caldata_obj.model_weights_reshaped,
         caldata_obj.ant1_inds,
         caldata_obj.ant2_inds,
         caldata_obj.bl_inds,
@@ -947,6 +943,8 @@ def run_skycal_optimization_per_pol_single_freq(
                 gains_init_flattened,
                 args=(caldata_obj, caldata_obj.ant_inds),
                 method="Newton-CG",
+                # method="BFGS",
+                # method="Powell",
                 jac=jacobian_skycal_wrapper,
                 hess=hessian_skycal_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
@@ -1242,7 +1240,7 @@ def run_unical_optimization(
                 method="Newton-CG",
                 jac=jacobian_unical_wrapper,
                 hess=hessian_unical_wrapper,
-                options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
+                options={"disp": verbose, "xtol": xtol, "gtol": 1e-3, "maxiter": maxiter},
             )
             end_optimize = time.time()
             if verbose:

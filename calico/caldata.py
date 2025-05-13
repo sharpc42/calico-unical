@@ -624,6 +624,13 @@ class CalData:
         # Free memory
         metadata_reference = None
 
+        # Seed randomizer
+        import time
+        # seed = int(time.time())
+        seed = 1746678215  # generates problematic run
+        np.random.seed(seed)
+        print("***SEED***",seed)
+
         # Random perturbation of initial gains
         self.gain_init_stddev = gain_init_stddev
         if gain_init_stddev != 0.0:
@@ -659,7 +666,6 @@ class CalData:
         self.abscal_params[0, :, :] = 1.0
 
         # Initialize unical fitted visibility parameters
-        # self.fit_vis = np.zeros((self.Ntimes, self.Nbls, self.Nfreqs, self.N_feed_pols), dtype=complex)
         self.fit_vis = self.model_visibilities
         # Random perturbation with stddev passed by user
         self.fit_vis_init_stddev = fit_vis_init_stddev
@@ -1478,7 +1484,7 @@ class CalData:
 
         # plot gains parameters trajectory
         fig1, ax1 = plt.subplots()
-        for i in range(self.Nants):
+        for i in range(len(self.ant_inds)):
             ax1.annotate("",
                         xytext=(
                             before_arr_gains.real[i],
@@ -1501,6 +1507,8 @@ class CalData:
         #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
         #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
         #             bbox_inches=0,)
+        # fig1.savefig('images/gains_full-data.png')
+        # plt.show()
         fig1.savefig('images/gains_'
                      +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
                      +'.png',
@@ -1508,32 +1516,32 @@ class CalData:
         plt.close()
 
         # plot fitted visibility parameters trajectory
-        fig2, ax2 = plt.subplots()
-        for i in range(self.Nbls):
-            ax2.annotate("",
-                        xytext=(
-                            before_arr_u.real[i],
-                            before_arr_u.imag[i],
-                        ),
-                        xy=(
-                            self.fit_vis.real[i,:1,0],
-                            self.fit_vis.imag[i,:1,0]
-                        ),
-                        arrowprops=dict(arrowstyle="->"),
-                        )
-        ax2.set_xlabel("Real")
-        ax2.set_ylabel("Imag")
-        ax2.set_title("Fitted Visibilities Trajectory Plot")
-        ax2.set_xlim(-1,3)
-        ax2.set_ylim(-1,1)
+        # fig2, ax2 = plt.subplots()
+        # for i in range(len(self.bl_inds)):
+        #     ax2.annotate("",
+        #                 xytext=(
+        #                     before_arr_u.real[i],
+        #                     before_arr_u.imag[i],
+        #                 ),
+        #                 xy=(
+        #                     self.fit_vis.real[i,:1,0],
+        #                     self.fit_vis.imag[i,:1,0]
+        #                 ),
+        #                 arrowprops=dict(arrowstyle="->"),
+        #                 )
+        # ax2.set_xlabel("Real")
+        # ax2.set_ylabel("Imag")
+        # ax2.set_title("Fitted Visibilities Trajectory Plot")
+        # ax2.set_xlim(-1,3)
+        # ax2.set_ylim(-1,1)
         # fig2.savefig("images/fit-vis-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
         #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
         #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
         #             bbox_inches=0,)
-        fig2.savefig('images/fit-vis_'
-                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                     +'.png',
-                     bbox_inches=0,)
+        # fig2.savefig('images/fit-vis_'
+        #              +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+        #              +'.png',
+        #              bbox_inches=0,)
         plt.close()
 
     def unified_calibration(

@@ -1157,6 +1157,13 @@ def cost_unical(
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
 
+    # print("***COST FUNC***")
+    # print("\tCost -", cost)
+    # print("\tGains, Ant 1 -", gains[ant1_inds])
+    # print("\tGains, Ant 2 -", gains[ant2_inds])
+    # print("\tData -", data_vis)
+    # print("\tFitted -", fit_vis)
+    # print("\tModel -", model_vis)
     return cost
 
 def jacobian_unical(
@@ -1210,29 +1217,28 @@ def jacobian_unical(
     gains_exp_1 = gains[np.newaxis, ant1_inds]              # shape (1,Nbls)
     gains_exp_2 = gains[np.newaxis, ant2_inds]              # shape (1,Nbls)
 
-    # NOTE: Check that order of subtracted terms correct
     res_vec_1 = (                                           # shape (Ntimes, Nbls)
         gains_exp_1 * np.conj(gains_exp_2) * fit_vis - data_vis
     )
-    gains_term1 = np.sum(                                   # shape (Nbls)
+    gains_term1_bls = np.sum(                                   # shape (Nbls)
         vis_weights * gains_exp_2 * np.conj(fit_vis) * res_vec_1,
         axis=0,
     )
-    gains_term1 = utils.bincount_multidim(                  # shape (Nants)
+    gains_term1_ants = utils.bincount_multidim(                  # shape (Nants)
         ant1_inds,
-        weights=gains_term1,
+        weights=gains_term1_bls,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
-    gains_term2 = np.sum(                                   # shape (Nbls)
+    gains_term2_bls = np.sum(                                   # shape (Nbls)
         vis_weights * gains_exp_1 * data_vis * np.conj(res_vec_1),
         axis=0,
     )
-    gains_term2 = utils.bincount_multidim(                  # shape (Nants)
+    gains_term2_ants = utils.bincount_multidim(                  # shape (Nants)
         ant2_inds,
-        weights=gains_term2,
+        weights=gains_term2_bls,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
-    jac_gains = 2 * (gains_term1 + gains_term2)             # shape (Nants)
+    jac_gains = 2 * (gains_term1_ants + gains_term2_ants)             # shape (Nants)
     # regularization term
     if lambda_val > 0:
         regularization_term = (
@@ -1240,16 +1246,15 @@ def jacobian_unical(
         )
         jac_gains += 2 * regularization_term
 
-
     # u params jacobian
     gains_multiply = np.conj(gains_exp_1) * gains_exp_2     # shape (1, Nbls)
-    res_vec_vis2 = gains_multiply * fit_vis - data_vis      # shape (Ntimes, Nbls)
+    res_vec_2 = gains_multiply * fit_vis - data_vis      # shape (Ntimes, Nbls)
     vis_term_1 = np.sum(                                    # shape (Nbls)                            
-        vis_weights * np.conj(gains_multiply) * res_vec_vis2,
+        vis_weights * np.conj(gains_multiply) * res_vec_2,
         axis=0,
     )
     vis_term_2 = np.sum(                                    # shape (Nbls)
-        vis_weights * gains_multiply * np.conj(res_vec_vis2),
+        vis_weights * gains_multiply * np.conj(res_vec_2),
         axis=0,
     )
     model_term = np.sum(                                    # shape (Nbls)
@@ -1258,6 +1263,15 @@ def jacobian_unical(
     )
     jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)    # shape (Nbls)
     jac = np.hstack((jac_gains, jac_vis))
+
+    # print("***JACOBIAN***")
+    # print("\tGains, Ant 1 -", gains_exp_1[0,0])
+    # print("\tGains, Ant 2 -", gains_exp_2[0,0])
+    # print("\tData -", data_vis[0,0])
+    # print("\tFitted Vis -", fit_vis[0])
+    # print("\tModel -", model_vis)
+    # print("\tJacobian, Gains -", (2* gains_term1_bls)[0])
+    # print("\tJacobian, Vis -", jac_vis)
 
     return jac
 
