@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 from calico import utils
-
+import time
 
 def cost_skycal(
     gains,
@@ -87,6 +87,8 @@ def jacobian_skycal(
         imaginary part of the gains.
     """
 
+    start_jac = time.time()
+
     # Convert gains to visibility space
     # Add time axis
     gains_expanded_1 = gains[np.newaxis, ant1_inds]  # shape (1,Nbls)
@@ -122,6 +124,9 @@ def jacobian_skycal(
             lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
         )
         jac += 2 * regularization_term
+
+    end_jac = time.time()
+    print("***JACOBIAN TIME***", (end_jac - start_jac)/60.)
 
     return jac
 
@@ -223,6 +228,8 @@ def hessian_skycal(
         function. Shape (Nants, Nants,).
     """
 
+    start_hess = time.time()
+
     gains_expanded_1 = gains[ant1_inds]
     gains_expanded_2 = gains[ant2_inds]
     data_squared = np.sum(visibility_weights * np.abs(data_visibilities) ** 2.0, axis=0)
@@ -307,6 +314,9 @@ def hessian_skycal(
         hess_imag_imag -= np.diag(
             4 * lambda_val * arg_sum * np.imag(gains_weighted) * np.real(gains_weighted)
         )
+
+    end_hess = time.time()
+    print("***HESSIAN TIME***", (end_hess - start_hess)/60.)
 
     return hess_real_real, hess_real_imag, hess_imag_imag
 
@@ -1134,7 +1144,7 @@ def cost_unical(
     vis_weights : array of float
         Shape (Ntimes, Nbls,).
     model_weights : array of float
-        Shape (Ntimes, Nbls,).  <<<< IS THAT RIGHT
+        Shape (Ntimes, Nbls,).
     ant1_inds : array of int
         Shape (Nbls,).
     ant2_inds : array of int
@@ -1157,13 +1167,6 @@ def cost_unical(
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
 
-    # print("***COST FUNC***")
-    # print("\tCost -", cost)
-    # print("\tGains, Ant 1 -", gains[ant1_inds])
-    # print("\tGains, Ant 2 -", gains[ant2_inds])
-    # print("\tData -", data_vis)
-    # print("\tFitted -", fit_vis)
-    # print("\tModel -", model_vis)
     return cost
 
 def jacobian_unical(
@@ -1211,6 +1214,8 @@ def jacobian_unical(
         the imaginary part corresponds to derivatives with respect to the
         imaginary part of the gains.
     """
+
+    start_jac = time.time()
 
     # Convert gains to row vector with unit
     # dimension extended along the time axis
@@ -1262,16 +1267,10 @@ def jacobian_unical(
         axis=0,
     )
     jac_vis = 2 * (vis_term_1 + vis_term_2 + model_term)    # shape (Nbls)
-    jac = np.hstack((jac_gains, jac_vis))
 
-    # print("***JACOBIAN***")
-    # print("\tGains, Ant 1 -", gains_exp_1[0,0])
-    # print("\tGains, Ant 2 -", gains_exp_2[0,0])
-    # print("\tData -", data_vis[0,0])
-    # print("\tFitted Vis -", fit_vis[0])
-    # print("\tModel -", model_vis)
-    # print("\tJacobian, Gains -", (2* gains_term1_bls)[0])
-    # print("\tJacobian, Vis -", jac_vis)
+    end_jac = time.time()
+    # print("***JACOBIAN TIME***", (end_jac - start_jac)/60.)
+    jac = np.hstack((jac_gains, jac_vis))
 
     return jac
 
@@ -1330,6 +1329,8 @@ def hessian_unical(
         Imaginary-imaginary derivative components of the Hessian of the cost
         function. Shape (Nants, Nants,).
     """
+
+    start_hess = time.time()
 
     gains_exp_1 = gains[ant1_inds]                                      # shape (Nbls)
     gains_exp_2 = gains[ant2_inds]                                      # shape (Nbls)
@@ -1417,10 +1418,10 @@ def hessian_unical(
         )
 
     # Fill the fitted visibility only matrix with zeros; all off-diagnoal
-    # entries will remain zero
-    fit_hess_real_real = np.zeros((2*Nbls, 2*Nbls), dtype=float)
-    fit_hess_imag_imag = np.zeros((2*Nbls, 2*Nbls), dtype=float)
-    fit_hess_real_imag = np.zeros((2*Nbls, 2*Nbls), dtype=float)
+    # entries will remain zero (NOTE: Should be Nbls not 2*NBls yes?)
+    fit_hess_real_real = np.zeros((Nbls, Nbls), dtype=float)
+    fit_hess_imag_imag = np.zeros((Nbls, Nbls), dtype=float)
+    fit_hess_real_imag = np.zeros((Nbls, Nbls), dtype=float)
 
     # Calculate the fitted visibilities diagonals
     fit_hess_diag = 2 * (
@@ -1436,7 +1437,7 @@ def hessian_unical(
 
     # Calculate the antenna off-diagonal components 
     # for both antennas in baseline
-    fit_gain_hess_vectors = np.zeros((Nbls, 4), dtype=float)       # shape: (Nbls, 4)
+    fit_gain_hess_vectors = np.zeros((Nbls, 4), dtype=float)               # shape: (Nbls, 4)
     fit_gain_hess_components = np.zeros((Nbls, Nants, 4), dtype=float)     # shape: (Nbls, Nants, 4)
 
     """U params/antenna 1 gains Hessian components"""
@@ -1499,6 +1500,9 @@ def hessian_unical(
     fit_gain_hess_real_real = fit_gain_hess_components[:, :, 0]
     fit_gain_hess_real_imag = fit_gain_hess_components[:, :, 1]
     fit_gain_hess_imag_imag = fit_gain_hess_components[:, :, 3]
+
+    end_hess = time.time()
+    # print("***HESSIAN TIME***", (end_hess - start_hess)/60.)
 
     return gain_hess_real_real, gain_hess_real_imag, gain_hess_imag_imag, \
         fit_hess_real_real, fit_hess_real_imag, fit_hess_imag_imag, \

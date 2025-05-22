@@ -993,25 +993,23 @@ def unified_calibration_wrapper(
         sys.stdout.flush()
         optimization_start_time = time.time()
 
-    # print("***CAL WRAP - ITERATIONS***", antenna_flagging_iterations)
     # for ant_flag_iter in range(antenna_flagging_iterations):
-    #     print("***CAL WRAP - INSIDE ANT FLAG ITERATION LOOP***")
-    #     caldata_obj.unified_calibration(
-    #         xtol=xtol / 10,  # Lower tolerance for antenna flagging
-    #         maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
-    #         get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
-    #         parallel=parallel,
-    #         verbose=verbose,
-    #         pool=pool,
-    #     )
-    #     if verbose:
-    #         print(
-    #             f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
-    #         )
-    #         print(
-    #             f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
-    #         )
-    #         sys.stdout.flush()
+        # caldata_obj.unified_calibration(
+        #     xtol=xtol / 10,  # Lower tolerance for antenna flagging
+        #     maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
+        #     get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
+        #     parallel=parallel,
+        #     verbose=verbose,
+        #     pool=pool,
+        # )
+        # if verbose:
+        #     print(
+        #         f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
+        #     )
+        #     print(
+        #         f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
+        #     )
+        #     sys.stdout.flush()
         # caldata_obj.flag_antennas_from_per_ant_cost(
         #     flagging_threshold=antenna_flagging_threshold,
         #     parallel=parallel,
@@ -1019,7 +1017,6 @@ def unified_calibration_wrapper(
         #     verbose=verbose,
         # )
 
-    # print("***CAL WRAP - OUTSIDE OF ITERATION LOOP***")
     caldata_obj.unified_calibration(
         xtol=xtol,
         maxiter=maxiter,

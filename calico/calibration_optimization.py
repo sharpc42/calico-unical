@@ -943,8 +943,6 @@ def run_skycal_optimization_per_pol_single_freq(
                 gains_init_flattened,
                 args=(caldata_obj, caldata_obj.ant_inds),
                 method="Newton-CG",
-                # method="BFGS",
-                # method="Powell",
                 jac=jacobian_skycal_wrapper,
                 hess=hessian_skycal_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
@@ -1235,12 +1233,11 @@ def run_unical_optimization(
                       caldata_obj.bl_inds + Nants_unflagged,
                       freq_ind,
                       vis_pol_ind),
-                # method="Powell",
-                # method="BFGS",
                 method="Newton-CG",
+                # method="BFGS",
                 jac=jacobian_unical_wrapper,
                 hess=hessian_unical_wrapper,
-                options={"disp": verbose, "xtol": xtol, "gtol": 1e-3, "maxiter": maxiter},
+                options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()
             if verbose:
@@ -1249,16 +1246,15 @@ def run_unical_optimization(
                     f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
                 )
             sys.stdout.flush()
-            # print("***CAL OPT - OPTIMIZE OUTPUT***", result.x.shape)
             gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)], 
                                               (len(caldata_obj.ant_inds), 2))
             gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
                 gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
             )
             fit_vis_fit_single_pol = np.reshape(result.x[2*len(caldata_obj.ant_inds):],
-                                                 (caldata_obj.Nbls, 2))
+                                                 (caldata_obj.Nbls, 2)).copy()
             fit_vis_fit[caldata_obj.bl_inds, feed_pol_ind] = (
-                fit_vis_fit_single_pol[:, 0] + 1j * fit_vis_fit_single_pol[:, 1]
+                fit_vis_fit_single_pol[:, 0].copy() + 1j * fit_vis_fit_single_pol[:, 1].copy()
             )
 
             # Ensure that the phase of the gains is mean-zero

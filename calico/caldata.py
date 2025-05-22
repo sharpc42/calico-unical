@@ -643,7 +643,6 @@ class CalData:
                     self.N_feed_pols,
                 ),
             ) + 1.0j * np.random.normal(
-            # self.gains += 1.0j * np.random.normal(
                 0.0,
                 gain_init_stddev,
                 size=(
@@ -651,14 +650,6 @@ class CalData:
                     self.Nfreqs,
                     self.N_feed_pols,
                 ),
-            # self.gains.imag += np.random.normal(
-            #     0.0,
-            #     gain_init_stddev,
-            #     size=(
-            #         self.Nants,
-            #         self.Nfreqs,
-            #         self.N_feed_pols,
-            #     ),
             )
 
         # Initialize abscal parameters
@@ -666,25 +657,27 @@ class CalData:
         self.abscal_params[0, :, :] = 1.0
 
         # Initialize unical fitted visibility parameters
-        self.fit_vis = self.model_visibilities
+        self.fit_vis = self.model_visibilities.copy()
         # Random perturbation with stddev passed by user
         self.fit_vis_init_stddev = fit_vis_init_stddev
         if fit_vis_init_stddev != 0.0:
             self.fit_vis += np.random.normal(
                 0.0,
-                fit_vis_init_stddev,
+                self.fit_vis_init_stddev,
                 size=(
+                    self.Ntimes,
                     self.Nbls,
-                    self.Nfreqs,
-                    self.N_feed_pols,
+                    1,
+                    1,
                 ),
             ) + 1.0j * np.random.normal(
                 0.0,
-                fit_vis_init_stddev,
+                self.fit_vis_init_stddev,
                 size=(
+                    self.Ntimes,
                     self.Nbls,
-                    self.Nfreqs,
-                    self.N_feed_pols,
+                    1,
+                    1,
                 ),
             )
 
@@ -711,7 +704,7 @@ class CalData:
             ),
             dtype=float,
         )
-        self.model_weights += 100  # constrain u's to be well known
+        self.model_weights += 1
 
         self.lambda_val = lambda_val
 
@@ -1474,13 +1467,8 @@ class CalData:
         print("***FIT TESTS***")
         print("\tGains Error, Min -", np.min(np.abs(self.gains - 1)))
         print("\tGains Error, Max -", np.max(np.abs(self.gains - 1)))
-        print("\tFit Vis Error, Min -", np.min(self.fit_vis - self.model_visibilities))
-        print("\tFit Vis Error, Max -", np.max(self.fit_vis - self.model_visibilities))
-        # print("\tGains Trajectory, Real -", before_arr_gains.real - self.gains.real)
-        # print("\tGains Trajectory, Imag -", before_arr_gains.imag - self.gains.real)
-        # print("\tFinal Gains, Real -", self.gains.real)
-        # print("\tFinal Gains, Imag -", self.gains.imag)
-        # print("\t(GAINS FINAL MIN MAX DIFF) -", np.max(self.gains.real) - np.min(self.gains.real) - 1)
+        print("\t|u-m|, Min -", np.min(np.abs(self.fit_vis - self.model_visibilities)))
+        print("\t|u-m|, Max -", np.max(np.abs(self.fit_vis - self.model_visibilities)))
 
         # plot gains parameters trajectory
         fig1, ax1 = plt.subplots()
@@ -1501,14 +1489,6 @@ class CalData:
         ax1.set_title("Gains Trajectory Plot")
         ax1.set_xlim(0.75,1.25)
         ax1.set_ylim(-0.25,0.25)
-        # ax1.set_xlim(-20,20)
-        # ax1.set_ylim(-20,20)
-        # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
-        #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
-        #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
-        #             bbox_inches=0,)
-        # fig1.savefig('images/gains_full-data.png')
-        # plt.show()
         fig1.savefig('images/gains_'
                      +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
                      +'.png',
@@ -1516,32 +1496,28 @@ class CalData:
         plt.close()
 
         # plot fitted visibility parameters trajectory
-        # fig2, ax2 = plt.subplots()
-        # for i in range(len(self.bl_inds)):
-        #     ax2.annotate("",
-        #                 xytext=(
-        #                     before_arr_u.real[i],
-        #                     before_arr_u.imag[i],
-        #                 ),
-        #                 xy=(
-        #                     self.fit_vis.real[i,:1,0],
-        #                     self.fit_vis.imag[i,:1,0]
-        #                 ),
-        #                 arrowprops=dict(arrowstyle="->"),
-        #                 )
-        # ax2.set_xlabel("Real")
-        # ax2.set_ylabel("Imag")
-        # ax2.set_title("Fitted Visibilities Trajectory Plot")
-        # ax2.set_xlim(-1,3)
-        # ax2.set_ylim(-1,1)
-        # fig2.savefig("images/fit-vis-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
-        #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
-        #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
-        #             bbox_inches=0,)
-        # fig2.savefig('images/fit-vis_'
-        #              +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-        #              +'.png',
-        #              bbox_inches=0,)
+        fig2, ax2 = plt.subplots()
+        for i in range(len(self.bl_inds)):
+            ax2.annotate("",
+                        xytext=(
+                            before_arr_u.real[:1,i,0] - self.model_visibilities.real[:1,i,0],
+                            before_arr_u.imag[:1,i,0] - self.model_visibilities.imag[:1,i,0],
+                        ),
+                        xy=(
+                            self.fit_vis.real[:1,i,0] - self.model_visibilities.real[:1,i,0],
+                            self.fit_vis.imag[:1,i,0] - self.model_visibilities.imag[:1,i,0],
+                        ),
+                        arrowprops=dict(arrowstyle="->"),
+                        )
+        ax2.set_xlabel("Real")
+        ax2.set_ylabel("Imag")
+        ax2.set_title("|u-m| Trajectory Plot")
+        ax2.set_xlim(-5,5)
+        ax2.set_ylim(-5,5)
+        fig2.savefig('images/fit-vis_'
+                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                     +'.png',
+                     bbox_inches=0,)
         plt.close()
 
     def unified_calibration(
@@ -1638,8 +1614,8 @@ class CalData:
                 # self.write_fit_vis()
                 
                 for freq_ind in range(self.Nfreqs):
-                    before_arr_gains = self.gains[:, [freq_ind], :]
-                    before_arr_u = self.fit_vis[:, :1, [freq_ind], :]
+                    before_arr_gains = self.gains[:, [freq_ind], :].copy()
+                    before_arr_u = self.fit_vis[:, :, [freq_ind], :].copy()
                     gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
                         self,
                         xtol,
@@ -1649,7 +1625,7 @@ class CalData:
                         get_crosspol_phase=get_crosspol_phase,
                         crosspol_phase_strategy=crosspol_phase_strategy,
                     )
-                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[:, np.newaxis, :]
+                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
+                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
                     self.temp_test(before_arr_gains, before_arr_u)
                     #self.write_fit_vis()
