@@ -44,30 +44,39 @@ def flatten_hessian(
                 ant_ind_1, ant_ind_2
             ]
     if unical:
-        # gains already done, focus on u-only and u-gains mix
+        # Gains already done, focus on u-only and u-gains mix
         for hess_row_ind in range(0, Nants_unflagged + Nbls):
             for hess_col_ind in range(0, Nants_unflagged + Nbls):
                 # in u-only block
                 if hess_row_ind >= Nants_unflagged and hess_col_ind >= Nants_unflagged:
+                    # real-real
                     hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = hess_arrays[3][
                         hess_row_ind - Nants_unflagged, 
                         hess_col_ind - Nants_unflagged,
                     ]
+                    # imag-real
                     hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = hess_arrays[4][
                         hess_row_ind - Nants_unflagged, 
                         hess_col_ind - Nants_unflagged,
                     ]
+                    # real-imag
                     hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = np.conj(
                         hess_arrays[4][
                             hess_col_ind - Nants_unflagged, 
                             hess_row_ind - Nants_unflagged,
                         ]
                     )
+                    # imag-imag
                     hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = hess_arrays[5][
                         hess_row_ind - Nants_unflagged, 
                         hess_col_ind - Nants_unflagged,
                     ]
-                # in the u-gains mix blocks
+                # In the u-gains mix blocks
+                # Index Ordering:
+                #   6: Re(u) Re(g)
+                #   7: Im(u) Re(g)
+                #   8: Re(u) Im(g)
+                #   9: Im(u) Im(g)
                 else:
                     if hess_row_ind >= Nants_unflagged:
                         hess_flattened[2*hess_row_ind, 2*hess_col_ind] = hess_arrays[6][
@@ -78,13 +87,11 @@ def flatten_hessian(
                             hess_row_ind - Nants_unflagged,
                             hess_col_ind,
                         ]
-                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = np.conj(
-                            hess_arrays[7][
-                                hess_row_ind - Nants_unflagged,
-                                hess_col_ind,
-                            ]
-                        )
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[8][
+                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = hess_arrays[8][
+                            hess_row_ind - Nants_unflagged,
+                            hess_col_ind,
+                        ]
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[9][
                             hess_row_ind - Nants_unflagged,
                             hess_col_ind,
                         ]
@@ -94,17 +101,15 @@ def flatten_hessian(
                             hess_col_ind - Nants_unflagged,
                             hess_row_ind,
                         ]
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind] = hess_arrays[7][
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind] = hess_arrays[8][
                             hess_col_ind - Nants_unflagged,
                             hess_row_ind,
                         ]
-                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = np.conj(
-                            hess_arrays[7][
-                                hess_col_ind - Nants_unflagged,
-                                hess_row_ind,
-                            ]
-                        )
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[8][
+                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = hess_arrays[7][
+                            hess_col_ind - Nants_unflagged,
+                            hess_row_ind,
+                        ]
+                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[9][
                             hess_col_ind - Nants_unflagged,
                             hess_row_ind,
                         ]
@@ -833,6 +838,7 @@ def hessian_unical_wrapper(
         u_hess_real_imag,
         u_hess_imag_imag,
         u_gain_hess_real_real,
+        u_gain_hess_imag_real,
         u_gain_hess_real_imag,
         u_gain_hess_imag_imag,
     ) = cost_function_calculations.hessian_unical(
@@ -861,6 +867,7 @@ def hessian_unical_wrapper(
             u_hess_real_imag,
             u_hess_imag_imag,
             u_gain_hess_real_real,
+            u_gain_hess_imag_real,
             u_gain_hess_real_imag,
             u_gain_hess_imag_imag,
         ],
@@ -1221,8 +1228,6 @@ def run_unical_optimization(
                                       caldata_obj.bl_inds + Nants_unflagged,
                                       freq_ind,
                                       vis_pol_ind,))
-
-            # Minimize the cost function
             start_optimize = time.time()
             result = scipy.optimize.minimize(
                 cost_unical_wrapper,
@@ -1235,6 +1240,7 @@ def run_unical_optimization(
                       vis_pol_ind),
                 method="Newton-CG",
                 # method="BFGS",
+                # method="Powell",
                 jac=jacobian_unical_wrapper,
                 hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
