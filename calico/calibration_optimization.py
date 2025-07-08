@@ -641,7 +641,6 @@ def hessian_dw_abscal_wrapper(
     )
     return hess
 
-
 def cost_unical_wrapper(
     params_flattened,
     caldata_obj,
@@ -1142,6 +1141,7 @@ def run_unical_optimization(
     caldata_obj,
     xtol,
     maxiter,
+    dev,
     freq_ind=0,
     verbose=True,
     get_crosspol_phase=True,
@@ -1220,14 +1220,15 @@ def run_unical_optimization(
 
             caldata_obj.reshape_data(freq_ind, vis_pol_ind, unical=True)
 
-            print("***STARTING FUNCTION VALUE***", 
-                  cost_unical_wrapper(params_init_flattened,
-                                      caldata_obj,
-                                      caldata_obj.ant_inds,
-                                      Nants_unflagged,
-                                      caldata_obj.bl_inds + Nants_unflagged,
-                                      freq_ind,
-                                      vis_pol_ind,))
+            # analysis tools for development
+            dev.set_params_init_flattened(params_init_flattened)
+            dev.set_caldata_obj(caldata_obj)
+            dev.set_Nants_unflagged(Nants_unflagged)
+            dev.set_freq_ind(freq_ind)
+            dev.set_vis_pol_ind(vis_pol_ind)
+            dev.get_starting_cost_func_val()
+            # dev.compare_analytic_and_numeric_jacobians()
+
             start_optimize = time.time()
             result = scipy.optimize.minimize(
                 cost_unical_wrapper,

@@ -1235,6 +1235,7 @@ def jacobian_unical(
         weights=gains_term1_bls,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
+    # must add antenna permutations
     gains_term2_bls = np.mean(                                   # shape (Nbls)
         2 * vis_weights * (gains_exp_2 * np.abs(gains_exp_1)**2.0 * np.abs(fit_vis)**2.0 - (
             np.conj(data_vis) * gains_exp_1 * fit_vis)
@@ -1250,7 +1251,7 @@ def jacobian_unical(
     jac_gains = gains_term1_ants + gains_term2_ants;             # shape (Nants)
 
     # model vis params terms
-    vis_term_1 = np.mean(                                    # shape (Nbls)
+    vis_term = np.mean(                                    # shape (Nbls)
         2 * vis_weights * (np.abs(gains_exp_1)**2.0 * np.abs(gains_exp_2)**2.0 * fit_vis
                            - gains_exp_1 * np.conj(gains_exp_2) * data_vis),
         axis=0,
@@ -1260,7 +1261,7 @@ def jacobian_unical(
         axis=0,
     )
 
-    jac_vis = vis_term_1 + model_term    # shape (Nbls)
+    jac_vis = vis_term + model_term    # shape (Nbls)
 
     jac = np.hstack((jac_gains, jac_vis))
 

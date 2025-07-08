@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import pyuvdata
 from astropy.units import Quantity
-from calico import calibration_qa, calibration_optimization
+from calico import calibration_qa, calibration_optimization, dev_tools
 import multiprocessing
 
 
@@ -1460,66 +1460,6 @@ class CalData:
         # fit_vis_uvdata._Nants_data = len(self.ant_inds)
         # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
 
-    def temp_test(self, before_arr_gains, before_arr_u):
-        import matplotlib.pyplot as plt
-        import subprocess
-
-        print("***FIT TESTS***")
-        print("\tGains Error, Min -", np.min(np.abs(self.gains - 1)))
-        print("\tGains Error, Max -", np.max(np.abs(self.gains - 1)))
-        print("\t|u-m|, Min -", np.min(np.abs(self.fit_vis - self.model_visibilities)))
-        print("\t|u-m|, Max -", np.max(np.abs(self.fit_vis - self.model_visibilities)))
-
-        # plot gains parameters trajectory
-        fig1, ax1 = plt.subplots()
-        for i in range(len(self.ant_inds)):
-            ax1.annotate("",
-                        xytext=(
-                            before_arr_gains.real[i],
-                            before_arr_gains.imag[i],
-                        ),
-                        xy=(
-                            self.gains.real[i],
-                            self.gains.imag[i]
-                        ),
-                        arrowprops=dict(arrowstyle="->"),
-                        )
-        ax1.set_xlabel("Real")
-        ax1.set_ylabel("Imag")
-        ax1.set_title("Gains Trajectory Plot")
-        ax1.set_xlim(0.75,1.25)
-        ax1.set_ylim(-0.25,0.25)
-        fig1.savefig('images/gains_'
-                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                     +'.png',
-                     bbox_inches=0,)
-        plt.close()
-
-        # plot fitted visibility parameters trajectory
-        fig2, ax2 = plt.subplots()
-        for i in range(len(self.bl_inds)):
-            ax2.annotate("",
-                        xytext=(
-                            before_arr_u.real[:1,i,0] - self.model_visibilities.real[:1,i,0],
-                            before_arr_u.imag[:1,i,0] - self.model_visibilities.imag[:1,i,0],
-                        ),
-                        xy=(
-                            self.fit_vis.real[:1,i,0] - self.model_visibilities.real[:1,i,0],
-                            self.fit_vis.imag[:1,i,0] - self.model_visibilities.imag[:1,i,0],
-                        ),
-                        arrowprops=dict(arrowstyle="->"),
-                        )
-        ax2.set_xlabel("Real")
-        ax2.set_ylabel("Imag")
-        ax2.set_title("|u-m| Trajectory Plot")
-        ax2.set_xlim(-5,5)
-        ax2.set_ylim(-5,5)
-        fig2.savefig('images/fit-vis_'
-                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                     +'.png',
-                     bbox_inches=0,)
-        plt.close()
-
     def unified_calibration(
         self,
         xtol=1e-5,
@@ -1616,10 +1556,12 @@ class CalData:
                 for freq_ind in range(self.Nfreqs):
                     before_arr_gains = self.gains[:, [freq_ind], :].copy()
                     before_arr_u = self.fit_vis[:, :, [freq_ind], :].copy()
+                    dev = dev_tools.DevTools()
                     gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
                         self,
                         xtol,
                         maxiter,
+                        dev,
                         freq_ind=freq_ind,
                         verbose=verbose,
                         get_crosspol_phase=get_crosspol_phase,
@@ -1627,5 +1569,9 @@ class CalData:
                     )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
                     self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
-                    self.temp_test(before_arr_gains, before_arr_u)
+                    # plot param changes
+                    dev.plot_change_in_gain_and_model_params(
+                        before_arr_gains, 
+                        before_arr_u,
+                    )
                     #self.write_fit_vis()
