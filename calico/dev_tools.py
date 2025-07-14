@@ -214,36 +214,38 @@ class DevTools:
 
     def plot_change_in_gain_and_model_params(
         self, 
-        before_arr_gains, 
-        before_arr_u,
+        gains_array, 
+        models_array,
+        type="trajectory",
     ):
         print("***FIT TESTS***")
         print("\tGains Error, Min -", np.min(np.abs(self.caldata_obj.gains - 1)))
         print("\tGains Error, Max -", np.max(np.abs(self.caldata_obj.gains - 1)))
         print("\t|u-m|, Min -", np.min(np.abs(self.caldata_obj.fit_vis - self.caldata_obj.model_visibilities)))
         print("\t|u-m|, Max -", np.max(np.abs(self.caldata_obj.fit_vis - self.caldata_obj.model_visibilities)))
-        # plot gains parameters trajectory
-        self.complex_trajectory_plot(
-            before_arr_gains,
-            self.caldata_obj.gains,
-            len(self.caldata_obj.ant_inds),
-            "Gains Trajectory Plot",
-            (0.75, 1.25),
-            (-0.25, 0.25),
-            "change_gains_",
-        )
-        # plot fitted visibility parameters trajectory
-        u_minus_m_before = before_arr_u[:1,:,0] - self.caldata_obj.model_visibilities[:1,:,0]
-        u_minus_m_after = self.caldata_obj.fit_vis[:1,:,0] - self.caldata_obj.model_visibilities[:1,:,0]
-        self.complex_trajectory_plot(
-            u_minus_m_before[0],
-            u_minus_m_after[0],
-            len(self.caldata_obj.bl_inds),
-            "|u-m| Trajectory Plot",
-            (-5,5),
-            (-5,5),
-            "change_fit-vis_",
-        )
+        if type is "trajectory" or type is "both":
+            # plot gains parameters trajectory
+            self.complex_trajectory_plot(
+                gains_array,
+                self.caldata_obj.gains,
+                len(self.caldata_obj.ant_inds),
+                "Gains Trajectory Plot",
+                (0.75, 1.25),
+                (-0.25, 0.25),
+                "change_gains_",
+            )
+            # plot fitted visibility parameters trajectory
+            u_minus_m_before = models_array[:1,:,0] - self.caldata_obj.model_visibilities[:1,:,0]
+            u_minus_m_after = self.caldata_obj.fit_vis[:1,:,0] - self.caldata_obj.model_visibilities[:1,:,0]
+            self.complex_trajectory_plot(
+                u_minus_m_before[0],
+                u_minus_m_after[0],
+                len(self.caldata_obj.bl_inds),
+                "|u-m| Trajectory Plot",
+                (-5,5),
+                (-5,5),
+                "change_fit-vis_",
+            )
     
     """getters and setters"""
     # params_init_flattened
