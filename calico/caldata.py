@@ -153,6 +153,10 @@ class CalData:
         self.bl_inds = None
         self.gain_init_stddev = 0.0
         self.fit_vis_init_stddev = 0.0
+        # dev
+        self.data_vis_orig = None
+        self.fit_vis_orig = None
+        self.gains_orig = None
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -708,6 +712,11 @@ class CalData:
 
         self.lambda_val = lambda_val
 
+        # DEV: make copies of original data vis, fit vis, and gains
+        self.data_vis_orig = self.data_visibilities.copy() 
+        self.fit_vis_orig = self.fit_vis.copy()
+        self.gains_orig = self.gains.copy()
+        
     def expand_in_frequency(self):
         """
         Converts a caldata object into a list of caldata objects each
