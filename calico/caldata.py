@@ -1563,25 +1563,70 @@ class CalData:
                 # self.write_fit_vis()
                 
                 for freq_ind in range(self.Nfreqs):
-                    before_arr_gains = self.gains[:, [freq_ind], :].copy()
-                    before_arr_u = self.fit_vis[:, :, [freq_ind], :].copy()
-                    dev = dev_tools.DevTools()
-                    gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
-                        self,
-                        xtol,
-                        maxiter,
-                        dev,
-                        freq_ind=freq_ind,
-                        verbose=verbose,
-                        get_crosspol_phase=get_crosspol_phase,
-                        crosspol_phase_strategy=crosspol_phase_strategy,
-                    )
-                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
-                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
+                    gain_params_realizations = np.array([])
+                    gains_for_average = []
+                    model_params_realizations = np.array([])
+                    models_for_average = []
+                    # DEV: do 100 realizations of thermal noise
+                    #      to see how routine responds
+                    realizations = 100
+                    for i in range(realizations):
+                        # reset arrays
+                        self.gains = self.gains_orig
+                        self.data_visibilities = self.data_vis_orig
+                        self.fit_vis = self.fit_vis_orig
+                        # reset seed
+                        import time
+                        np.random.seed(int(time.time()))
+                        # simulate thermal noise
+                        if self.gain_init_stddev != 0.0:
+                            self.data_visibilities += np.random.normal(
+                                0.0,
+                                self.gain_init_stddev,
+                                size=(
+                                    self.Ntimes,
+                                    self.Nbls,
+                                    1,
+                                    1,
+                                ),
+                            ) + 1.0j * np.random.normal(
+                                0.0,
+                                self.gain_init_stddev,
+                                size=(
+                                    self.Ntimes,
+                                    self.Nbls,
+                                    1,
+                                    1,
+                                )
+                            )
+                        # main unical code
+                        before_arr_gains = self.gains[:, [freq_ind], :].copy()
+                        before_arr_u = self.fit_vis[:, :, [freq_ind], :].copy()
+                        dev = dev_tools.DevTools()
+                        gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
+                            self,
+                            xtol,
+                            maxiter,
+                            dev,
+                            freq_ind=freq_ind,
+                            verbose=verbose,
+                            get_crosspol_phase=get_crosspol_phase,
+                            crosspol_phase_strategy=crosspol_phase_strategy,
+                        )
+                        self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
+                        self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
+                        # combine arrays
+                        gain_params_realizations = np.concatenate((gain_params_realizations, self.gains[:,0,0]))
+                        model_params_realizations = np.concatenate((model_params_realizations, self.fit_vis[0,:,0,0] - self.model_visibilities[0,:,0,0]))
                     # plot param changes
                     dev.plot_change_in_gain_and_model_params(
-                        before_arr_gains, 
-                        before_arr_u,
+                        gain_params_realizations,
+                        model_params_realizations,
                         type="histogram"
                     )
+                    # dev.plot_change_in_gain_and_model_params(
+                    #     self.gains[:, [freq_ind], :], 
+                    #     self.fit_vis[:1, :, [freq_ind], :],
+                    #     type="scatter"
+                    # )
                     #self.write_fit_vis()
