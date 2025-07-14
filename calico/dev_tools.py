@@ -246,6 +246,31 @@ class DevTools:
                 (-5,5),
                 "change_fit-vis_",
             )
+        if type is "scatter":
+            # gains
+            plt.scatter(gains_array.real - 1, gains_array.imag)
+            plt.xlim(-1,1)
+            plt.ylim(-1,1)
+            plt.title("Final Gains")
+            plt.xlabel("Real - 1")
+            plt.ylabel("Imag")
+            plt.savefig('images/' + "final_gains_"
+                 + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                 + '.png',
+                 bbox_inches=0,)
+            plt.close()
+            # models
+            plt.scatter(models_array.real, models_array.imag)
+            plt.xlim(-15,15)
+            plt.ylim(-15,15)
+            plt.title("Final u-m")
+            plt.xlabel("Real")
+            plt.ylabel("Imag")
+            plt.savefig('images/' + "final_models_"
+                 + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                 + '.png',
+                 bbox_inches=0,)
+            plt.close()            
     
     """getters and setters"""
     # params_init_flattened
