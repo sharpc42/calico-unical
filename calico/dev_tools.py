@@ -270,7 +270,41 @@ class DevTools:
                  + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
                  + '.png',
                  bbox_inches=0,)
-            plt.close()            
+            plt.close()
+
+        # add in 2D probability density later, starting with scatter plot
+        if type is "histogram" or type is "both":
+            fig1, ax1 = plt.subplots()
+            # gains plot
+            # hh1 = ax1.hist2d(gains_array.real - 1, gains_array.imag, bins=50, cmap="inferno")
+            plt.scatter(self.caldata_obj.gains.real - 1, self.caldata_obj.gains.imag)
+            # ax1.set_xlim(-0.1, 0.1)
+            # ax1.set_ylim(-0.05, 0.05)
+            ax1.set_title("Final Gains")
+            ax1.set_xlabel("Real - 1")
+            ax1.set_ylabel("Imag")
+            # fig1.colorbar(hh1[3], ax=ax1)
+            plt.savefig('images/' + "final_gains_"
+                 + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                 + '.png',
+                 bbox_inches=0,)
+            plt.close()
+            # models plot
+            u_minus_m_after = models_array - self.caldata_obj.model_visibilities[:1,:,0]
+            fig2, ax2 = plt.subplots()
+            # hh2 = ax2.hist2d(models_array.real, models_array.imag, bins=50, cmap="inferno")
+            plt.scatter(u_minus_m_after.real, u_minus_m_after.imag)
+            # plt.xlim(-15, 15)
+            # plt.ylim(-15, 15)
+            ax2.set_title("Final u-m")
+            ax2.set_xlabel("Real")
+            ax2.set_ylabel("Imag")
+            # fig2.colorbar(hh2[3], ax=ax2)
+            plt.savefig('images/' + "final_fit-vis_"
+                 + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+                 + '.png',
+                 bbox_inches=0,)
+            plt.close()
     
     """getters and setters"""
     # params_init_flattened

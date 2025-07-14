@@ -716,7 +716,7 @@ class CalData:
         self.data_vis_orig = self.data_visibilities.copy() 
         self.fit_vis_orig = self.fit_vis.copy()
         self.gains_orig = self.gains.copy()
-        
+
     def expand_in_frequency(self):
         """
         Converts a caldata object into a list of caldata objects each
@@ -1582,5 +1582,6 @@ class CalData:
                     dev.plot_change_in_gain_and_model_params(
                         before_arr_gains, 
                         before_arr_u,
+                        type="histogram"
                     )
                     #self.write_fit_vis()
