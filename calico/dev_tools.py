@@ -260,9 +260,10 @@ class DevTools:
                  bbox_inches=0,)
             plt.close()
             # models
-            plt.scatter(models_array.real, models_array.imag)
-            plt.xlim(-15,15)
-            plt.ylim(-15,15)
+            u_minus_m_after = self.caldata_obj.fit_vis[:1,:,0] - self.caldata_obj.model_visibilities[:1,:,0]
+            plt.scatter(u_minus_m_after.real, u_minus_m_after.imag)
+            # plt.xlim(-15,15)
+            # plt.ylim(-15,15)
             plt.title("Final u-m")
             plt.xlabel("Real")
             plt.ylabel("Imag")
