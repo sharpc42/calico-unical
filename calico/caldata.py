@@ -157,6 +157,16 @@ class CalData:
         self.data_vis_orig = None
         self.fit_vis_orig = None
         self.gains_orig = None
+        self.gain_params_realizations = None
+        self.model_params_realizations = None
+        self.glim = None
+        self.ulim = None
+        self.sigma_t = None
+        self.sigma_m = None
+        self.sigma_n = None
+        self.sigma_e = None
+        self.gain_realizations = None
+        self.model_realizations = None
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -216,6 +226,10 @@ class CalData:
         min_cal_baseline_lambda=None,
         max_cal_baseline_lambda=None,
         lambda_val=100,
+        glim=(-1,1),
+        ulim=(-10,10),
+        gain_realizations=100,
+        model_realizations=1,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -427,13 +441,53 @@ class CalData:
 
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
-            self.model_visibilities[time_ind, :, :, :] = np.reshape(
-                model_copy.data_array,
-                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+            # self.model_visibilities[time_ind, :, :, :] = np.reshape(
+            #     model_copy.data_array,
+            #     (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+            # )
+            # self.data_visibilities[time_ind, :, :, :] = np.reshape(
+            #     data_copy.data_array,
+            #     (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+            # )
+            # DEV
+            np.random.seed(42)
+            self.model_visibilities[time_ind, :, :, :] = np.random.normal(
+                0,
+                14,
+                size=(
+                    1,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
+            ) + 1.0j * np.random.normal(
+                0,
+                14,
+                size=(
+                    1,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
             )
-            self.data_visibilities[time_ind, :, :, :] = np.reshape(
-                data_copy.data_array,
-                (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+            self.data_visibilities[time_ind, :, :, :] = np.random.normal(
+                0,
+                14,
+                size=(
+                    1,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
+            ) + 1.0j * np.random.normal(
+                0,
+                14,
+                size=(
+                    1,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
             )
 
             flag_array[time_ind, :, :, :] = np.max(
@@ -628,33 +682,26 @@ class CalData:
         # Free memory
         metadata_reference = None
 
-        # Seed randomizer
-        import time
-        # seed = int(time.time())
-        seed = 1746678215  # generates problematic run
-        np.random.seed(seed)
-        print("***SEED***",seed)
-
         # Random perturbation of initial gains
         self.gain_init_stddev = gain_init_stddev
-        if gain_init_stddev != 0.0:
-            self.gains += np.random.normal(
-                0.0,
-                gain_init_stddev,
-                size=(
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            ) + 1.0j * np.random.normal(
-                0.0,
-                gain_init_stddev,
-                size=(
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            )
+        # if gain_init_stddev != 0.0:
+        #     self.gains += np.random.normal(
+        #         0.0,
+        #         gain_init_stddev,
+        #         size=(
+        #             self.Nants,
+        #             self.Nfreqs,
+        #             self.N_feed_pols,
+        #         ),
+        #     ) + 1.0j * np.random.normal(
+        #         0.0,
+        #         gain_init_stddev,
+        #         size=(
+        #             self.Nants,
+        #             self.Nfreqs,
+        #             self.N_feed_pols,
+        #         ),
+        #     )
 
         # Initialize abscal parameters
         self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
@@ -664,26 +711,26 @@ class CalData:
         self.fit_vis = self.model_visibilities.copy()
         # Random perturbation with stddev passed by user
         self.fit_vis_init_stddev = fit_vis_init_stddev
-        if fit_vis_init_stddev != 0.0:
-            self.fit_vis += np.random.normal(
-                0.0,
-                self.fit_vis_init_stddev,
-                size=(
-                    self.Ntimes,
-                    self.Nbls,
-                    1,
-                    1,
-                ),
-            ) + 1.0j * np.random.normal(
-                0.0,
-                self.fit_vis_init_stddev,
-                size=(
-                    self.Ntimes,
-                    self.Nbls,
-                    1,
-                    1,
-                ),
-            )
+        # if fit_vis_init_stddev != 0.0:
+        #     self.fit_vis += np.random.normal(
+        #         0.0,
+        #         self.fit_vis_init_stddev,
+        #         size=(
+        #             self.Ntimes,
+        #             self.Nbls,
+        #             1,
+        #             1,
+        #         ),
+        #     ) + 1.0j * np.random.normal(
+        #         0.0,
+        #         self.fit_vis_init_stddev,
+        #         size=(
+        #             self.Ntimes,
+        #             self.Nbls,
+        #             1,
+        #             1,
+        #         ),
+        #     )
 
         # Define visibility weights
         self.visibility_weights = np.ones(
@@ -695,11 +742,12 @@ class CalData:
             ),
             dtype=float,
         )
+        self.visibility_weights /= self.sigma_t**2
         # if np.max(flag_array):  # Apply flagging
         #     self.visibility_weights[np.where(flag_array)] = 0.0
 
         # Define model weights (this feels like the user should set)
-        self.model_weights = np.zeros(
+        self.model_weights = np.ones(
             (
                 self.Ntimes,
                 self.Nbls,
@@ -708,7 +756,7 @@ class CalData:
             ),
             dtype=float,
         )
-        self.model_weights += 1
+        self.model_weights /= self.sigma_m**2
 
         self.lambda_val = lambda_val
 
@@ -716,6 +764,12 @@ class CalData:
         self.data_vis_orig = self.data_visibilities.copy() 
         self.fit_vis_orig = self.fit_vis.copy()
         self.gains_orig = self.gains.copy()
+
+        self.glim = glim
+        self.ulim = ulim
+
+        self.gain_realizations = gain_realizations
+        self.model_realizations = model_realizations
 
     def expand_in_frequency(self):
         """
@@ -1469,6 +1523,54 @@ class CalData:
         # fit_vis_uvdata._Nants_data = len(self.ant_inds)
         # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
 
+    """
+        Set thermal noise according to baseline
+        (hard or soft cuttoffs)
+        * fraction_cutoff_start - Which percentage of baselines on the shorter end
+                                  should be cut off (float)
+        * cutoff_type - Hard or soft (string)
+
+    """
+    def sigma_t(self, fraction_cutoff_start, cutoff_type):
+        return self.sigma_t  # placeholder
+    
+    """
+        Set model error according to baesline
+        (hard or soft cutoffs)
+        * fraction_cutoff_start - Which percentage of baselines on the shorter end
+                                  should be cut off (float)
+        * cutoff_type - Hard or soft (string)
+    """
+    def sigma_m(self, fraction_cutoff_start, cutoff_type):
+        sigma_m = np.zeros(self.Ntimes, self.Nbls)  # just Nbls or also Ntimes?
+        # if cutoff_type == "hard":
+            
+        return self.sigma_m  # placeholder
+
+    """
+        Set thermal noise and model errors for simulation.
+        * sigma_t - True thermal noise passed to the cost function
+        * sigma_m - True model error passed to the cost function
+        * sigma_n - Effective thermal noise determining number of iterated realizations of thermal
+                    noise; defaults to sigma_t; zero turns off realizations for thermal noise
+        * sigma_e - Effective model error determining number of iterated realizations of model
+                    error; defaults to sigma_m; zero turns off realizations for model error
+    """
+    def set_simulation_errors(self, sigma_t, sigma_m, sigma_n=None, sigma_e=None):
+        # true noise and error
+        self.sigma_t = sigma_t
+        self.sigma_m = sigma_m
+        # default effective thermal noise to true model noise
+        if sigma_n == None:
+            self.sigma_n = sigma_t
+        else:
+            self.sigma_n = sigma_n
+        # default effective model error to true model error
+        if sigma_e == None:
+            self.sigma_e = sigma_m
+        else:
+            self.sigma_e = sigma_e
+
     def unified_calibration(
         self,
         xtol=1e-5,
@@ -1548,57 +1650,125 @@ class CalData:
                 if pool is None:  # Leave things how we found them
                     use_pool.terminate()
             else:
-                # freq_ind=0  # testing on just one freq for now
-                # gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
-                #     self,
-                #     xtol,
-                #     maxiter,
-                #     freq_ind=freq_ind,
-                #     verbose=verbose,
-                #     get_crosspol_phase=get_crosspol_phase,
-                #     crosspol_phase_strategy=crosspol_phase_strategy,
-                # )
-                # self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                # self.fit_vis[:, [freq_ind], :] = fit_vis_fit[:, np.newaxis, :]
-                # self.write_fit_vis()
-                
+                if self.sigma_n != 0.0:
+                    # initial thermal noise
+                    try:
+                        self.data_visibilities += np.random.normal(
+                            0.0,
+                            self.sigma_t,
+                            size=(
+                                self.Ntimes,
+                                self.Nbls,
+                                1,
+                                1,
+                            ),
+                        ) + 1.0j * np.random.normal(
+                            0.0,
+                            self.sigma_t,
+                            size=(
+                                self.Ntimes,
+                                self.Nbls,
+                                1,
+                                1,
+                            ),
+                        )
+                    except Exception as e:
+                        print(type(e))
+                        print("Initial thermal noise failed. Was sigma_t set correctly?")
+                if self.sigma_e != 0.0:
+                    # initial model error
+                    try:
+                        self.model_visibilities += np.random.normal(
+                            0.0,
+                            self.sigma_m,
+                            size=(
+                                self.Ntimes,
+                                self.Nbls,
+                                1,
+                                1,
+                            ),
+                        ) + 1.0j * np.random.normal(
+                            0.0,
+                            self.sigma_m,
+                            size=(
+                                self.Ntimes,
+                                self.Nbls,
+                                1,
+                                1,
+                            ),
+                        )
+                    except Exception as e:
+                        print(type(e))
+                        print("Initial model error failed. Was sigma_m set correctly?")
                 for freq_ind in range(self.Nfreqs):
-                    gain_params_realizations = np.array([])
-                    gains_for_average = []
-                    model_params_realizations = np.array([])
-                    models_for_average = []
-                    # DEV: do 100 realizations of thermal noise
-                    #      to see how routine responds
-                    realizations = 100
+                    self.gain_params_realizations = np.array([])
+                    self.model_params_realizations = np.array([])
+                    gain_error_per_realization = []
+                    realizations = self.gain_realizations if self.gain_realizations >= self.model_realizations else self.model_realizations
+                    actual_gain_realizations = 0
+                    actual_model_realizations = 0
+                    outlier_ants_1 = set()
+                    outlier_ants_2 = set()
                     for i in range(realizations):
                         # reset arrays
-                        self.gains = self.gains_orig
-                        self.data_visibilities = self.data_vis_orig
-                        self.fit_vis = self.fit_vis_orig
+                        self.gains = self.gains_orig.copy()
+                        self.data_visibilities = self.data_vis_orig.copy()
+                        self.fit_vis = self.fit_vis_orig.copy()
                         # reset seed
                         import time
-                        np.random.seed(int(time.time()))
-                        # simulate thermal noise
-                        if self.gain_init_stddev != 0.0:
-                            self.data_visibilities += np.random.normal(
-                                0.0,
-                                self.gain_init_stddev,
-                                size=(
-                                    self.Ntimes,
-                                    self.Nbls,
-                                    1,
-                                    1,
-                                ),
-                            ) + 1.0j * np.random.normal(
-                                0.0,
-                                self.gain_init_stddev,
-                                size=(
-                                    self.Ntimes,
-                                    self.Nbls,
-                                    1,
-                                    1,
+                        np.random.seed(i)
+                        if i % (realizations / self.gain_realizations) == 0 and self.sigma_n != 0.0:
+                            # simulate thermal noise
+                            try:
+                                actual_gain_realizations += 1
+                                self.data_visibilities += np.random.normal(
+                                    0.0,
+                                    self.sigma_t,
+                                    size=(
+                                        self.Ntimes,
+                                        self.Nbls,
+                                        1,
+                                        1,
+                                    ),
+                                ) + 1.0j * np.random.normal(
+                                    0.0,
+                                    self.sigma_t,
+                                    size=(
+                                        self.Ntimes,
+                                        self.Nbls,
+                                        1,
+                                        1,
+                                    ),
                                 )
-                            )
+                            except Exception as e:
+                                print(type(e))
+                                print(f"Thermal noise realization {i} failed. Was sigma_t set correctly?")
+                        # simulate model error
+                        if i % (realizations / self.model_realizations) == 0 and self.sigma_e != 0.0:
+                            try:
+                                actual_model_realizations += 1
+                                self.model_visibilities += np.random.normal(
+                                    0.0,
+                                    self.sigma_m,
+                                    size=(
+                                        self.Ntimes,
+                                        self.Nbls,
+                                        1,
+                                        1,
+                                    ),
+                                ) + 1.0j * np.random.normal(
+                                    0.0,
+                                    self.sigma_m,
+                                    size=(
+                                        self.Ntimes,
+                                        self.Nbls,
+                                        1,
+                                        1,
+                                    ),
+                                )
+                            except Exception as e:
+                                print(type(e))
+                                print(f"Model error realization {i} failed. Was sigma_m set correctly?")
                         # main unical code
                         before_arr_gains = self.gains[:, [freq_ind], :].copy()
                         before_arr_u = self.fit_vis[:, :, [freq_ind], :].copy()
@@ -1615,18 +1785,145 @@ class CalData:
                         )
                         self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
                         self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
+                        
+                        # identify biggest gain and model errors over time
+                        gains_error = self.gains[:,0,0].copy()
+                        gains_error.real -= 1
+                        models_error = self.fit_vis[0,:,0,0].copy()
+                        models_error -= self.model_visibilities[0,:,0,0]
+                        # biggest_miss_gains.append(np.max(np.abs(gains_error)))
+                        # biggest_miss_models.append(np.max(np.abs(models_error)))
+                        # dg = 0.005
+                        # gains_error_bls = gains_error[self.ant1_inds]
+                        # big_gain_misses = np.concatenate((big_gain_misses, gains_error_bls[np.abs(gains_error_bls) > dg]))
+                        # big_gain_misses_m_minus_u = np.concatenate((big_gain_misses_m_minus_u, models_error[np.abs(gains_error_bls) > dg]))
+                        # big_gain_misses_m = np.concatenate((big_gain_misses_m, self.model_visibilities[0,:,0,0][np.abs(gains_error_bls) > dg]))
+                        # big_gain_misses_u = np.concatenate((big_gain_misses_u, self.fit_vis[0,:,0,0][np.abs(gains_error_bls) > dg]))
                         # combine arrays
-                        gain_params_realizations = np.concatenate((gain_params_realizations, self.gains[:,0,0]))
-                        model_params_realizations = np.concatenate((model_params_realizations, self.fit_vis[0,:,0,0] - self.model_visibilities[0,:,0,0]))
-                    # plot param changes
-                    dev.plot_change_in_gain_and_model_params(
-                        gain_params_realizations,
-                        model_params_realizations,
-                        type="histogram"
-                    )
-                    # dev.plot_change_in_gain_and_model_params(
-                    #     self.gains[:, [freq_ind], :], 
-                    #     self.fit_vis[:1, :, [freq_ind], :],
-                    #     type="scatter"
+                        self.gain_params_realizations = np.concatenate((self.gain_params_realizations, gains_error))
+                        self.model_params_realizations = np.concatenate((self.model_params_realizations, models_error))
+                        outlier_ants_1.update(self.ant1_inds[np.nonzero(np.abs(gains_error) > 1)])
+                        outlier_ants_2.update(self.ant2_inds[np.nonzero(np.abs(gains_error) > 2)])
+
+                        gain_error_per_realization.append(gains_error)
+
+                        # see how calculation changes across realizations
+                        # average_gains[i] = np.mean(self.gains[:,0,0])
+                        # variance_per_realization.append((np.std(self.gains[:,0,0]))**2)
+                        # model_params_realizations = np.concatenate((model_params_realizations, self.fit_vis[0,:,0,0] - self.model_visibilities[0,:,0,0]))
+                        
+
+
+                        # import utils
+                        
+                        # minlength = np.max([np.max(self.ant1_inds), np.max(self.ant2_inds)]) + 1
+                        # ant1_bincount = utils.bincount_multidim(self.ant1_inds, minlength=minlength)
+                        # ant2_bincount = utils.bincount_multidim(self.ant2_inds, minlength=minlength)
+
+                        # true_vis_ant1_avg = utils.bincount_multidim(
+                        #     self.ant1_inds,
+                        #     weights=np.abs(self.data_visibilities[0,:,0,0]),  # should be generalized to any time, pol, or freq
+                        #     minlength=minlength,
+                        # ) / ant1_bincount
+                        # true_vis_ant2_avg = utils.bincount_multidim(
+                        #     self.ant2_inds,
+                        #     weights=np.abs(self.data_visibilities[0,:,0,0]),  # should be generalized to any time, pol, or freq
+                        #     minlength=minlength,
+                        # ) / ant2_bincount
+                        # true_vis_ants = (true_vis_ant1_avg + true_vis_ant2_avg) / 2
+
+                        # model_vis_ant1_avg = utils.bincount_multidim(
+                        #     self.ant1_inds,
+                        #     weights=np.abs(self.model_visibilities[0,:,0,0]),  # should be generalized to any time, pol, or freq
+                        #     minlength=minlength,
+                        # ) / ant1_bincount
+                        # model_vis_ant2_avg = utils.bincount_multidim(
+                        #     self.ant2_inds,
+                        #     weights=np.abs(self.model_visibilities[0,:,0,0]),  # should be generalized to any time, pol, or freq
+                        #     minlength=minlength,
+                        # ) / ant2_bincount
+                        # model_vis_ants = (model_vis_ant1_avg + model_vis_ant2_avg) / 2
+
+                        # u_minus_v_ant1_avg = utils.bincount_multidim(
+                        #     self.ant1_inds,
+                        #     weights=np.abs(self.fit_vis[0,:,0,0] - self.data_visibilities[0,:,0,0]),  # should be generalized to any time, pol, or freq
+                        #     minlength=minlength,
+                        # ) / ant1_bincount
+                        # u_minus_v_ant2_avg = utils.bincount_multidim(
+                        #     self.ant2_inds,
+                        #     weights=np.abs(self.fit_vis[0,:,0,0] - self.data_visibilities[0,:,0,0]),  # should be generalized to any time, pol, or freq
+                        #     minlength=np.max([np.max(self.ant1_inds), np.max(self.ant2_inds)]) + 1,
+                        # ) / ant2_bincount
+                        # u_minus_v_ants = (u_minus_v_ant1_avg + u_minus_v_ant2_avg) / 2
+
+                        # import matplotlib.pyplot as plt
+                        # import math
+
+                        # plt.scatter(true_vis_ants, np.abs(self.gains[:,0,0]), color="blue")
+                        # # plt.plot(range(math.ceil(np.max(true_vis_ants))), [1 for i in range(math.ceil(np.max(true_vis_ants)))], color="red")
+                        # plt.xlabel("<|v|>")
+                        # plt.ylabel("|g|")
+                        # plt.title("Gains vs Avg Data Vis per Ant")
+                        # plt.show()
+                        
+                        # plt.scatter(model_vis_ants, np.abs(self.gains[:,0,0]), color="blue")
+                        # # plt.plot(range(math.ceil((np.max(model_vis_ants)))), [1 for i in range(math.ceil(np.max(model_vis_ants)))], color="red")
+                        # plt.xlabel("<|m|>")
+                        # plt.ylabel("|g|")
+                        # plt.title("Gains vs Avg Model Vis per Ant")
+                        # plt.show()
+
+                        # plt.scatter(u_minus_v_ants, np.abs(self.gains[:,0,0]), color="blue")
+                        # # plt.plot(range(math.ceil(np.max(u_minus_v_ants))), [1 for i in range(math.ceil(np.max(u_minus_v_ants)))], color="red")
+                        # plt.xlabel("<|u-v|>")
+                        # plt.ylabel("|g|")
+                        # plt.title("Gains vs Avg Fitted Vis Minus Data Vis per Ant")
+                        # plt.show()
+                    
+                    # dev.plot_gain_error_per_realization(
+                    #     gain_error_per_realization,
+                    #     plot_type="outlier"
                     # )
+
+                    # plot param changes
+                    def sim_error_type():
+                        if self.sigma_e == 0.0:
+                            return "thermal"
+                        elif self.sigma_n == 0.0:
+                            return "model"
+                        else:
+                            return "both"
+                    dev.plot_change_in_gain_and_model_params(
+                        self.gain_params_realizations,
+                        self.model_params_realizations,
+                        type="histogram",
+                        glim=self.glim,
+                        ulim=self.ulim,
+                        error_type=sim_error_type(),
+                        stddev_thermal=self.sigma_t,
+                        stddev_model=self.sigma_m,
+                    )
+
+                    # num_vis_total = utils.bincount_multidim(self.ant1_inds) + utils.bincount_multidim(self.ant2_inds)
+                    # outlier_ants_1 = np.array(list(outlier_ants_1))
+                    # outlier_ants_2 = np.array(list(outlier_ants_2))
+                    # num_vis_outliers = np.zeros(self.Nants)
+                    # num_vis_total = np.zeros(self.Nants)
+                    # for ant in np.unique(np.concatenate((self.ant1_inds, self.ant2_inds))):
+                    #     num_vis_total[ant] = np.size(np.nonzero(self.ant1_inds == ant)) + np.size(np.nonzero(self.ant2_inds == ant))
+                    #     num_vis_outliers[ant] = np.size(np.nonzero(outlier_ants_1 == ant)) + np.size(np.nonzero(outlier_ants_2 == ant))
+                    
+                    # # plot biggest gain and model errors over time
+                    # import matplotlib.pyplot as plt
+                    # import subprocess
+
+                    # fig, ax = plt.subplots()
+                    # plt.bar(range(self.Nants), num_vis_total, color="blue", alpha=0.5, label="total", width=1.0)
+                    # plt.bar(range(self.Nants), num_vis_outliers, color="red", alpha=0.5, label="outliers", width=1.0, bottom=num_vis_total)
+                    # plt.title("Baselines per antenna")
+                    # plt.xlabel("Ant #")
+                    # plt.ylabel("# of Visibilities")
+                    # plt.legend(loc="upper right")
+                    # plt.show()
+
                     #self.write_fit_vis()

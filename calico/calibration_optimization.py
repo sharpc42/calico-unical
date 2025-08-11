@@ -1226,7 +1226,7 @@ def run_unical_optimization(
             dev.set_Nants_unflagged(Nants_unflagged)
             dev.set_freq_ind(freq_ind)
             dev.set_vis_pol_ind(vis_pol_ind)
-            dev.get_starting_cost_func_val()
+            # dev.get_starting_cost_func_val()
             # dev.compare_analytic_and_numeric_jacobians()
 
             start_optimize = time.time()
@@ -1239,11 +1239,11 @@ def run_unical_optimization(
                       caldata_obj.bl_inds + Nants_unflagged,
                       freq_ind,
                       vis_pol_ind),
-                method="Newton-CG",
+                # method="Newton-CG",
                 # method="BFGS",
-                # method="Powell",
-                jac=jacobian_unical_wrapper,
-                hess=hessian_unical_wrapper,
+                method="Powell",
+                # jac=jacobian_unical_wrapper,
+                # hess=hessian_unical_wrapper,
                 options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
             )
             end_optimize = time.time()

@@ -782,6 +782,15 @@ def unified_calibration_wrapper(
     max_processes=40,
     verbose=False,
     log_file_path=None,
+    # dev
+    glim=(-1,1),
+    ulim=(-10,10),
+    sigma_t=1,
+    sigma_m=1,
+    sigma_n=None,
+    sigma_e=None,
+    gain_realizations=100,
+    model_realizations=1,
 ):
     """
     Top-level wrapper for running unified calibration per polarization. Function 
@@ -920,9 +929,6 @@ def unified_calibration_wrapper(
         else:
             data.read(data_file_path)
         print_data_read_time = True
-        print("***CAL WRAPPER***")
-        print("\tAnt Pairs", data.get_antpairs())
-        # print("\tOriginal Data", data.data_array[0,0, 0])
     if isinstance(model, str):  # Read model
         model_file_path = model
         model = pyuvdata.UVData()
@@ -962,6 +968,13 @@ def unified_calibration_wrapper(
         data_format_start_time = time.time()
 
     caldata_obj = caldata.CalData()
+    # Dev for now
+    caldata_obj.set_simulation_errors(
+        sigma_t,
+        sigma_m,
+        sigma_n=sigma_n,
+        sigma_e=sigma_e,
+    )
     caldata_obj.load_data(
         data,
         model,
@@ -977,6 +990,10 @@ def unified_calibration_wrapper(
         min_cal_baseline_lambda=min_cal_baseline_lambda,
         max_cal_baseline_lambda=max_cal_baseline_lambda,
         lambda_val=lambda_val,
+        glim=glim,
+        ulim=ulim,
+        gain_realizations=gain_realizations,
+        model_realizations=model_realizations,
     )
 
     if caldata_obj.Nfreqs < 2:
@@ -1016,7 +1033,6 @@ def unified_calibration_wrapper(
         #     pool=pool,
         #     verbose=verbose,
         # )
-
     caldata_obj.unified_calibration(
         xtol=xtol,
         maxiter=maxiter,
@@ -1048,4 +1064,4 @@ def unified_calibration_wrapper(
         sys.stderr = stderr_orig
         log_file_new.close()
 
-    return uvcal
+    return uvcal, caldata_obj.gain_params_realizations, caldata_obj.model_params_realizations
