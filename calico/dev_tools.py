@@ -692,7 +692,7 @@ class DevTools:
 
         number_sigma_combos = len(sigma_combinations)
         i = 0
-        fig, ax = plt.subplots(number_sigma_combos, 8, figsize=(27,3*number_sigma_combos))
+        fig, ax = plt.subplots(number_sigma_combos, 8, figsize=(27,3*number_sigma_combos), squeeze=False, sharex=False, sharey=False)
         for sigma_dict in sigma_combinations:
             calibration_start_time = time.perf_counter()
             uvc, g_arr, u_arr = calwrap.unified_calibration_wrapper(
@@ -740,13 +740,13 @@ class DevTools:
             # for plot limits for outlier plot (we want a square plot so same for real and imag)
             g_max_lo = np.max([np.min(g_center.real - u_arr.real), np.min(g_center.imag - g_arr.imag)])
             g_max_hi = np.max([np.max(g_center.real + u_arr.real), np.max(g_center.imag + g_arr.imag)])
-            g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
+            # g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
             u_max_lo = np.max([np.min(u_center.real - u_arr.real), np.min(u_center.imag - u_arr.imag)])
             u_max_hi = np.max([np.max(u_center.real + u_arr.real), np.max(u_center.imag + u_arr.imag)])
-            u_boundary = np.max([np.abs(u_max_lo), np.abs(u_max_hi)])
+            # u_boundary = np.max([np.abs(u_max_lo), np.abs(u_max_hi)])
 
             # get histograms
-            gains_hist, gains_imag, gains_real = np.histogram2d(g_arr.real, g_arr.imag, bins=g_bins, density=True)
+            gains_hist, gains_imag, gains_real = np.histogram2d(g_arr.real-1, g_arr.imag, bins=g_bins, density=True)
             models_hist, models_imag, models_real = np.histogram2d(u_arr.real, u_arr.imag, bins=u_bins, density=True)
 
             # render LaTeX math
@@ -754,17 +754,17 @@ class DevTools:
 
             # text output run types
             ax[i,0].set_axis_off()
-            ax[i,0].text(0.4,0.7,rf"$\sigma_t$: {sigma_dict["sigma_t"]}", fontsize="20")
+            ax[i,0].text(0.4,0.7,rf"$\sigma_t$: {sigma_dict['sigma_t']}", fontsize="20")
             ax[i,0].set_axis_off()
             if sigma_dict["sigma_n"] == None:
-                ax[i,0].text(0.4,0.3,rf"$\sigma_n$: {sigma_dict["sigma_t"]}", fontsize="20")
+                ax[i,0].text(0.4,0.3,rf"$\sigma_n$: {sigma_dict['sigma_t']}", fontsize="20")
             else:
                 ax[i,0].text(0.4,0.3,r"$\sigma_n$: 0", fontsize="20")
             ax[i,1].set_axis_off()
-            ax[i,1].text(0.4,0.7,rf"$\sigma_m$: {sigma_dict["sigma_m"]}", fontsize="20")
+            ax[i,1].text(0.4,0.7,rf"$\sigma_m$: {sigma_dict['sigma_m']}", fontsize="20")
             ax[i,1].set_axis_off()
             if sigma_dict["sigma_e"] == None:
-                ax[i,1].text(0.4,0.3,rf"$\sigma_e$: {sigma_dict["sigma_m"]}",fontsize="20")
+                ax[i,1].text(0.4,0.3,rf"$\sigma_e$: {sigma_dict['sigma_m']}",fontsize="20")
             else:
                 ax[i,1].text(0.4,0.3,r"$\sigma_e$: 0", fontsize="20")
 
@@ -773,57 +773,58 @@ class DevTools:
             if sigma_dict["sigma_n"] == 0:
                 ax[i,2].text(0.0,0.7,"Thermal Rolls: 0", fontsize="20")
             else:
-                ax[i,2].text(0.0,0.7,f"Thermal Rolls: {sigma_dict["gain_realizations"]}", fontsize="20")
+                ax[i,2].text(0.0,0.7,f"Thermal Rolls: {sigma_dict['gain_realizations']}", fontsize="20")
             ax[i,3].set_axis_off()
             if sigma_dict["sigma_e"] == 0:
                 ax[i,2].text(0.0,0.3,"Model Rolls: 0", fontsize="20")
             else:
-                ax[i,2].text(0.0,0.3,f"Model Rolls: {sigma_dict["model_realizations"]}", fontsize="20")
+                ax[i,2].text(0.0,0.3,f"Model Rolls: {sigma_dict['model_realizations']}", fontsize="20")
 
             # initial gains
+            ax[i,3].set_axis_on()
             ax[i,3].pcolormesh(gains_real, gains_imag, gains_hist, cmap="inferno")
-            ax[i,3].add_patch(plt.Circle((g_center.real, g_center.imag), radius=g_var, fill=False, color="white"))  # std dev of gain errors
-            ax[i,3].add_patch(plt.Circle((0,0), radius=sigma_dict["sigma_t"], fill=False, color="white", linestyle="dashed"))  # expected std ddev
-            ax[i,3].plot(g_center.real, g_center.imag, 'wx')
+            ax[i,3].add_patch(plt.Circle((g_center.real-1,g_center.imag), radius=g_var, fill=False, color="white"))  # std dev of gain errors
+            ax[i,3].add_patch(plt.Circle((0,0), radius=sigma_dict['sigma_t'], fill=False, color="white", linestyle="dashed"))  # expected variation
+            ax[i,3].plot(g_center.real - 1, g_center.imag, 'wx')
             ax[i,3].set_ylabel("Imag")
             ax[i,3].set_xlabel("Real - 1")
-            ax[i,3].set_xlim(-g_boundary, g_boundary)
-            ax[i,3].set_ylim(-g_boundary, g_boundary)
+            ax[i,3].set_xlim(g_center.real-1-g_boundary, g_center.real-1+g_boundary)
+            ax[i,3].set_ylim(g_center.imag-g_boundary, g_center.imag+g_boundary)
             ax[i,3].set_title(f"Final Gains Error", fontsize="15")
             ax[i,3].tick_params(labelbottom=True, labelleft=True)
 
             # standard deviation for gains
             ax[i,4].set_axis_off()
             if variation == "stddev":
-                ax[i,4].text(0.2,0.8,rf"$\sigma_g$: {(g_var / sigma_dict["sigma_t"]):.2f} $\sigma_t$", fontsize="15")
-                ax[i,4].text(0.2,0.6,rf"$\sigma^2_g$: {(g_var**2 / sigma_dict["sigma_t"]**2):.2f} $\sigma_t^2$", fontsize="15")
+                ax[i,4].text(0.2,0.8,rf"$\sigma_g$: {(g_var / sigma_dict['sigma_t']):.2f} $\sigma_t$", fontsize="15")
+                ax[i,4].text(0.2,0.6,rf"$\sigma^2_g$: {(g_var**2 / sigma_dict['sigma_t']**2):.2f} $\sigma_t^2$", fontsize="15")
                 ax[i,4].text(0.2,0.4,f"Max g err: {np.max(np.abs(g_arr)):.2f}", fontsize="15")
                 ax[i,4].text(0.2,0.2,f"Min g err: {np.min(np.abs(g_arr)):.2f}", fontsize="15")
             elif variation == "iqr":
-                ax[i,4].text(0.2,0.7,rf"IQR: {(g_var / sigma_dict["sigma_t"]):.2f} $\sigma_t$", fontsize="17")
-                ax[i,4].text(0.2,0.5,f"Max g err: {np.max(np.abs(g_arr)):.2f}", fontsize="17")
-                ax[i,4].text(0.2,0.3,f"Min g err: {np.min(np.abs(g_arr)):.2f}", fontsize="17")
+                ax[i,4].text(0.2,0.7,rf"IQR: {(g_var / sigma_dict['sigma_t']):.2f} $\sigma_t$", fontsize="17")
+                ax[i,4].text(0.2,0.5,f"Max g err: {np.max(np.abs(g_arr)):.2f}", fontsize="15")
+                ax[i,4].text(0.2,0.3,f"Min g err: {np.min(np.abs(g_arr)):.2f}", fontsize="15")
 
             # initial models
             ax[i,5].pcolormesh(models_real, models_imag, models_hist, cmap="inferno")
             ax[i,5].add_patch(plt.Circle((u_center.real,u_center.imag), radius=u_var, fill=False, color="white"))  # std dev of u-m errors
-            ax[i,5].add_patch(plt.Circle((0,0), radius=sigma_dict["sigma_m"], fill=False, color="white", linestyle="dashed"))
+            ax[i,5].add_patch(plt.Circle((0,0), radius=sigma_dict['sigma_m'], fill=False, color="white", linestyle="dashed"))
             ax[i,5].plot(u_center.real, u_center.imag, 'wx')
             ax[i,5].set_ylabel("Imag")
             ax[i,5].set_xlabel("Real")
-            ax[i,5].set_xlim(-u_boundary, u_boundary)
-            ax[i,5].set_ylim(-u_boundary, u_boundary)
+            ax[i,5].set_xlim(u_center.real-u_boundary, u_center.real+u_boundary)
+            ax[i,5].set_ylim(u_center.imag-u_boundary, u_center.imag+u_boundary)
             ax[i,5].set_title(f"Final u-m Error", fontsize="15")
 
             # standard deviation for models
             ax[i,6].set_axis_off()
             if variation == "stddev":
-                ax[i,6].text(0.2,0.8,rf"$\sigma_u$: {(u_var / sigma_dict["sigma_m"]):.2f} $\sigma_m$", fontsize="15")
-                ax[i,6].text(0.2,0.6,rf"$\sigma_u^2$: {(u_var**2 / sigma_dict["sigma_m"]**2):.2f} $\sigma_m^2$", fontsize="15")
+                ax[i,6].text(0.2,0.8,rf"$\sigma_u$: {(u_var / sigma_dict['sigma_m']):.2f} $\sigma_m$", fontsize="15")
+                ax[i,6].text(0.2,0.6,rf"$\sigma_u^2$: {(u_var**2 / sigma_dict['sigma_m']**2):.2f} $\sigma_m^2$", fontsize="15")
                 ax[i,6].text(0.2,0.4,f"Max u-m: {np.max(np.abs(u_arr)):.2f}", fontsize="15")
                 ax[i,6].text(0.2,0.2,f"Min u-m: {np.min(np.abs(u_arr)):.2f}", fontsize="15")
             elif variation == "iqr":
-                ax[i,6].text(0.2,0.7,rf"IQR: {(u_var / sigma_dict["sigma_m"]):.2f} $\sigma_m$", fontsize="17")
+                ax[i,6].text(0.2,0.7,rf"IQR: {(u_var / sigma_dict['sigma_m']):.2f} $\sigma_m$", fontsize="17")
                 ax[i,6].text(0.2,0.5,f"Max u-m: {np.max(np.abs(u_arr)):.2f}", fontsize="17")
                 ax[i,6].text(0.2,0.3,f"Min u-m: {np.min(np.abs(u_arr)):.2f}", fontsize="17")
 
@@ -832,7 +833,7 @@ class DevTools:
             ax[i,7].text(0.0,0.6,f"Time to Complete", fontsize="15")
             ax[i,7].text(0.0,0.4,rf"{total_time:.2f} s", fontsize="15")
             
-            # fig.tight_layout()
+            fig.tight_layout()
             i += 1
         plt.savefig('images/' + str(max_realizations) + '-realizations_' + variation + '_'
                 + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
@@ -841,36 +842,45 @@ class DevTools:
 
     # plot gain errors across realizations for one antenna at a time at two
     # scales: one set to "var" (stddev/IQR), the other to "max" (outliers)
-    def plot_gains_one_ant_on_all_ones(self, num_realizations=20, variation="stddev", plot_type="variation"):
-        import itertools 
+    def plot_gains_one_ant_same_noise_and_error(self, 
+                                                num_realizations=20, 
+                                                sigma=1,
+                                                variation="stddev", 
+                                                plot_type="variation",
+                                                data_path='data/tutorial_medium_onetime.uvfits'):
 
-        uvc, g_arr, u_arr = calwrap.unified_calibration_wrapper('data/tutorial_medium_onetime.uvfits',
-                                                                'data/tutorial_medium_onetime.uvfits',
+        uvc, g_arr, u_arr = calwrap.unified_calibration_wrapper(data_path,
+                                                                data_path,
                                                                 parallel=False,
                                                                 gain_init_stddev=0.2,
                                                                 fit_vis_init_stddev=0.4,
                                                                 verbose=False,
                                                                 glim=None,
                                                                 ulim=None,
-                                                                sigma_t=1,
-                                                                sigma_m=10,
+                                                                sigma_t=sigma,
+                                                                sigma_m=sigma,
                                                                 sigma_n=None,
                                                                 sigma_e=None,
                                                                 gain_realizations=num_realizations,
                                                                 model_realizations=num_realizations)
         Nants = np.size(g_arr) // num_realizations
-        fig, ax = plt.subplots(Nants, 1, figsize=(5, 5*Nants))
+        fig, ax = plt.subplots(Nants, 2, figsize=(13, 5*Nants), squeeze=False)
         
         # render LaTeX math
         plt.rcParams['text.usetex'] = True
 
+        # track average of centers
+        antenna_gain_error_centers = np.zeros(Nants, dtype=complex)
+
+        ant_array = np.zeros(num_realizations, dtype=complex)
+
         # plot realizations per antenna
         for ant in range(Nants):
-            ant_array = np.zeros(num_realizations, dtype=complex)
+            
             for i in range(num_realizations):
                 index = i * Nants + ant
                 ant_array[i] = g_arr[index]
-            
+
             # set constants
             if variation == "stddev":
                 g_var = np.std(ant_array)
@@ -884,66 +894,92 @@ class DevTools:
                 g_center = np.mean(ant_array)
             elif variation == "iqr":
                 g_center = np.median(ant_array)
+            antenna_gain_error_centers[ant] = g_center
 
-            if plot_type=="variation":
+            g_offset_lo = np.min([np.min(g_center.real - g_var.real), np.min(g_center.imag - g_var.imag)])
+            g_offset_hi = np.max([np.max(g_center.real + g_var.real), np.max(g_center.imag + g_var.imag)])
+            g_boundary = np.max([np.abs(g_offset_lo), np.abs(g_offset_hi)])
 
-                g_offset_lo = np.min([np.min(g_center.real - g_var.real), np.min(g_center.imag - g_var.imag)])
-                g_offset_hi = np.max([np.max(g_center.real + g_var.real), np.max(g_center.imag + g_var.imag)])
-                g_boundary = np.max([np.abs(g_offset_lo), np.abs(g_offset_hi)])
-
-                # plot scatter of realizations for this antenna scaled to "var" (stddev/IQR)
-                ax[ant].scatter(ant_array.real, ant_array.imag)
-                ax[ant].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Var)", fontsize="7.5")
-                ax[ant].set_xlabel("Real - 1", fontsize = "7.5")
-                ax[ant].set_ylabel("Imag", fontsize = "7.5")
-                ax[ant].plot(g_center.real, g_center.imag, 'bx')
-                ax[ant].add_patch(plt.Circle((g_center.real, g_center.imag), radius=g_var, fill=False, color="black"))
-                ax[ant].set_xlim(-g_boundary, g_boundary)
-                ax[ant].set_ylim(-g_boundary, g_boundary)
+            # plot scatter of realizations for this antenna scaled to "var" (stddev/IQR)
+            ax[ant,0].scatter(ant_array.real - 1, ant_array.imag)
+            ax[ant,0].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Var) Powell", fontsize="7.5")
+            ax[ant,0].set_xlabel("Real - 1", fontsize = "7.5")
+            ax[ant,0].set_ylabel("Imag", fontsize = "7.5")
+            ax[ant,0].plot(g_center.real - 1, g_center.imag, 'bx')
+            ax[ant,0].plot(0,0,'rx')
+            ax[ant,0].add_patch(plt.Circle((g_center.real-1, g_center.imag), radius=g_var, fill=False, color="black"))
+            ax[ant,0].set_xlim(g_center.real-1-g_boundary, g_center.real-1+g_boundary)
+            ax[ant,0].set_ylim(g_center.imag-g_boundary, g_center.imag+g_boundary)
             
-            elif plot_type=="outlier":
+        for ant in range(Nants):
 
-                # for plot limits for outlier plot (we want a square plot so same for real and imag)
-                g_max_lo = np.max([np.min(g_center.real - ant_array.real), np.min(g_center.imag - ant_array.imag)])
-                g_max_hi = np.max([np.max(g_center.real + ant_array.real), np.max(g_center.imag + ant_array.imag)])
-                g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
+            for i in range(num_realizations):
+                index = i * Nants + ant
+                ant_array[i] = g_arr[index]
 
-                # plot scatter of realizations for this antenna scaled to "max" (outliers)
-                ax[ant].scatter(ant_array.real, ant_array.imag)
-                ax[ant].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Max)", fontsize="7.5")
-                ax[ant].set_xlabel("Real - 1", fontsize = "7.5")
-                ax[ant].set_ylabel("Imag", fontsize = "7.5")
-                ax[ant].plot(g_center.real, g_center.imag, 'bx')
-                ax[ant].add_patch(plt.Circle((g_center.real, g_center.imag), radius=g_var, fill=False, color="black"))
-                ax[ant].set_xlim(-1.2*g_boundary, 1.2*g_boundary)
-                ax[ant].set_ylim(-1.2*g_boundary, 1.2*g_boundary)
+            # set constants
+            if variation == "stddev":
+                g_var = np.std(ant_array)
+            elif variation == "iqr":
+                g_var_real = np.percentile(ant_array.real, 75) - np.percentile(ant_array.real, 25)
+                g_var_imag = np.percentile(ant_array.imag, 75) - np.percentile(ant_array.imag, 25)
+                g_var = np.sqrt(g_var_real**2 + g_var_imag**2)
+
+            # calculate centers
+            if variation == "stddev":
+                g_center = np.mean(ant_array)
+            elif variation == "iqr":
+                g_center = np.median(ant_array)
+            antenna_gain_error_centers[ant] = g_center
+
+            # for plot limits for outlier plot (we want a square plot so same for real and imag)
+            g_max_lo = np.max([np.min(g_center.real - ant_array.real), np.min(g_center.imag - ant_array.imag)])
+            g_max_hi = np.max([np.max(g_center.real + ant_array.real), np.max(g_center.imag + ant_array.imag)])
+            g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
+
+            # plot scatter of realizations for this antenna scaled to "max" (outliers)
+            ax[ant,1].scatter(ant_array.real - 1, ant_array.imag)
+            ax[ant,1].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Max) Powell", fontsize="7.5")
+            ax[ant,1].set_xlabel("Real - 1", fontsize = "7.5")
+            ax[ant,1].set_ylabel("Imag", fontsize = "7.5")
+            ax[ant,1].plot(g_center.real - 1, g_center.imag, 'bx')
+            ax[ant,1].plot(0,0,'rx')
+            ax[ant,1].add_patch(plt.Circle((g_center.real-1, g_center.imag), radius=g_var, fill=False, color="black"))
+            ax[ant,1].set_xlim(g_center.real-1-1.2*g_boundary, g_center.real-1+1.2*g_boundary)
+            ax[ant,1].set_ylim(g_center.imag-1.2*g_boundary, g_center.imag+1.2*g_boundary)
             
-            plt.savefig('images/realizations_per_antenna_limit-' + plot_type + '_'
-                + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                + '.png',
-                bbox_inches=0,)
+        plt.tight_layout()
+        plt.savefig('images/realizations_per_antenna_limit_' + str(Nants) + '_'
+            + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+            + '.png',
+            bbox_inches=0,)
+        plt.close(fig)
+            
+        # print("***AVERAGE OF CENTERS ACROSS ANTENNAS***", np.mean(antenna_gain_error_centers))
+        return np.mean(np.abs(antenna_gain_error_centers - 1)), np.abs(np.mean(antenna_gain_error_centers) - 1)
 
     def plot_gain_error_per_realization(self, gain_error_array, variation="stddev", plot_type="variation"):
         num_realizations = len(gain_error_array)
 
-        print("***NUM REALIZATIONS***", num_realizations)
-        fig, ax = plt.subplots(num_realizations, 1, figsize=(5, 5*num_realizations))
+        # print("***NUM REALIZATIONS***", num_realizations)
+        fig, ax = plt.subplots(num_realizations, 2, figsize=(13, 5*num_realizations), squeeze=False)
 
         # render LaTeX math
         plt.rcParams['text.usetex'] = True
 
         # track centers
-        realization_centers = np.zeros(num_realizations)
+        realization_centers = np.zeros(num_realizations, dtype=complex)
 
         for realization in range(num_realizations):
 
             gain_errors = gain_error_array[realization]
+            Nants = np.size(gain_errors)
 
             # set constants
             if variation == "stddev":
-                g_var = np.std(gain_errors)
+                g_var = np.std(gain_errors-1)
             elif variation == "iqr":
-                g_var_real = np.percentile(gain_errors.real, 75) - np.percentile(gain_errors.real, 25)
+                g_var_real = np.percentile(gain_errors.real-1, 75) - np.percentile(gain_errors.real-1, 25)
                 g_var_imag = np.percentile(gain_errors.imag, 75) - np.percentile(gain_errors.imag, 25)
                 g_var = np.sqrt(g_var_real**2 + g_var_imag**2)
 
@@ -954,45 +990,101 @@ class DevTools:
                 g_center = np.median(gain_errors)
             realization_centers[realization] = g_center
 
-            if plot_type=="variation":
+            g_offset_lo = np.min([np.min(g_center.real - g_var.real), np.min(g_center.imag - g_var.imag)])
+            g_offset_hi = np.max([np.max(g_center.real + g_var.real), np.max(g_center.imag + g_var.imag)])
+            g_boundary = np.max([np.abs(g_offset_lo), np.abs(g_offset_hi)])
 
-                g_offset_lo = np.min([np.min(g_center.real - g_var.real), np.min(g_center.imag - g_var.imag)])
-                g_offset_hi = np.max([np.max(g_center.real + g_var.real), np.max(g_center.imag + g_var.imag)])
-                g_boundary = np.max([np.abs(g_offset_lo), np.abs(g_offset_hi)])
+            # plot scatter of realizations for this antenna scaled to "var" (stddev/IQR)
+            ax[realization,0].scatter(gain_errors.real-1, gain_errors.imag)
+            ax[realization,0].set_title(f"Gain Scatter for Realization {realization} (Lim: Var) Powell", fontsize="7.5")
+            ax[realization,0].set_xlabel("Real - 1", fontsize = "7.5")
+            ax[realization,0].set_ylabel("Imag", fontsize = "7.5")
+            ax[realization,0].plot(g_center.real-1, g_center.imag, 'bx')
+            ax[realization,0].plot(0,0,'rx')
+            ax[realization,0].add_patch(plt.Circle((g_center.real-1, g_center.imag), radius=g_var, fill=False, color="black"))
+            ax[realization,0].set_xlim(g_center.real-1-g_boundary, g_center.real-1+g_boundary)
+            ax[realization,0].set_ylim(g_center.imag-g_boundary, g_center.imag+g_boundary)
 
-                # plot scatter of realizations for this antenna scaled to "var" (stddev/IQR)
-                ax[realization].scatter(gain_errors.real, gain_errors.imag)
-                ax[realization].set_title(f"Gain Scatter for Realization {realization} (Lim: Var)", fontsize="7.5")
-                ax[realization].set_xlabel("Real - 1", fontsize = "7.5")
-                ax[realization].set_ylabel("Imag", fontsize = "7.5")
-                ax[realization].plot(g_center.real, g_center.imag, 'bx')
-                ax[realization].add_patch(plt.Circle((g_center.real, g_center.imag), radius=g_var, fill=False, color="black"))
-                ax[realization].set_xlim(-g_boundary, g_boundary)
-                ax[realization].set_ylim(-g_boundary, g_boundary)
+        for realization in range(num_realizations):
+
+            gain_errors = gain_error_array[realization]
+
+            # set constants
+            if variation == "stddev":
+                g_var = np.std(gain_errors-1)
+            elif variation == "iqr":
+                g_var_real = np.percentile(gain_errors.real-1, 75) - np.percentile(gain_errors.real-1, 25)
+                g_var_imag = np.percentile(gain_errors.imag, 75) - np.percentile(gain_errors.imag, 25)
+                g_var = np.sqrt(g_var_real**2 + g_var_imag**2)
+
+            # calculate centers
+            if variation == "stddev":
+                g_center = np.mean(gain_errors)
+            elif variation == "iqr":
+                g_center = np.median(gain_errors)
+            realization_centers[realization] = g_center
+
+            # for plot limits for outlier plot (we want a square plot so same for real and imag)
+            g_max_lo = np.max([np.min(g_center.real - gain_errors.real), np.min(g_center.imag - gain_errors.imag)])
+            g_max_hi = np.max([np.max(g_center.real + gain_errors.real), np.max(g_center.imag + gain_errors.imag)])
+            g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
+
+            # plot scatter of realizations for this antenna scaled to "max" (outliers)
+            ax[realization,1].scatter(gain_errors.real-1, gain_errors.imag)
+            ax[realization,1].set_title(f"Gain Scatter for Realization {realization} (Lim: Max) Powell", fontsize="7.5")
+            ax[realization,1].set_xlabel("Real - 1", fontsize = "7.5")
+            ax[realization,1].set_ylabel("Imag", fontsize = "7.5")
+            ax[realization,1].plot(g_center.real-1, g_center.imag, 'bx')
+            ax[realization,1].plot(0,0,'rx')
+            ax[realization,1].add_patch(plt.Circle((g_center.real-1, g_center.imag), radius=g_var, fill=False, color="black"))
+            ax[realization,1].set_xlim(g_center.real-1-1.2*g_boundary, g_center.real-1+1.2*g_boundary-1)
+            ax[realization,1].set_ylim(g_center.imag-1.2*g_boundary, g_center.imag+1.2*g_boundary)
             
-            elif plot_type=="outlier":
-
-                # for plot limits for outlier plot (we want a square plot so same for real and imag)
-                g_max_lo = np.max([np.min(g_center.real - gain_errors.real), np.min(g_center.imag - gain_errors.imag)])
-                g_max_hi = np.max([np.max(g_center.real + gain_errors.real), np.max(g_center.imag + gain_errors.imag)])
-                g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
-
-                # plot scatter of realizations for this antenna scaled to "max" (outliers)
-                ax[realization].scatter(gain_errors.real, gain_errors.imag)
-                ax[realization].set_title(f"Gain Scatter for Realization {realization} (Lim: Max)", fontsize="7.5")
-                ax[realization].set_xlabel("Real - 1", fontsize = "7.5")
-                ax[realization].set_ylabel("Imag", fontsize = "7.5")
-                ax[realization].plot(g_center.real, g_center.imag, 'bx')
-                ax[realization].add_patch(plt.Circle((g_center.real, g_center.imag), radius=g_var, fill=False, color="black"))
-                ax[realization].set_xlim(-1.2*g_boundary, 1.2*g_boundary)
-                ax[realization].set_ylim(-1.2*g_boundary, 1.2*g_boundary)
+        plt.tight_layout()
+        plt.savefig('images/gain_error_per_realization_' + str(Nants) + '_'
+            + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+            + '.png',
+            bbox_inches=0,)
+        plt.close(fig)
             
-            plt.savefig('images/gain_error_per_realization-' + plot_type + '_'
-                + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                + '.png',
-                bbox_inches=0,)
+        # print("***AVERAGE OF CENTERS ACROSS REALIZATIONS***", np.mean(realization_centers))
+
+    # select down on outliers blts in uv array
+    # then plot the outliers in the uv plane
+    # 
+    # Schematic algorithm:
+    # 1) Break up concatenated array into per realizations (or average across realizations per antenna?)
+    # 2) Identify outliers in gain error via "variation" (stddev/IQR)
+    # 3) Convert outliers from antenna space to baseline space
+    # 4) Map outliers in baseline space to the corresponding (first) time slice of 
+    #    the uv array in baseline-time space.
+    # 5) Plot 'em (scatter should be fine)
+
+    def plot_outlier_baselines_in_uv_plane(self, num_realizations, g_arr, uv_arr, variation="stddev"):
+        Nants = np.size(g_arr) // num_realizations
+        realization_array = np.zeros(num_realizations, dtype=complex)
+        # process and characterize concatenated gain error array
+        for realization in range(num_realizations):
+            # gain errors for this realization
+            realization_array[realization] = g_arr[realization*Nants:(realization+1)*Nants]
+            print("***REALIZATION ARRAY SIZE***", np.size(realization_array))
+            # set constants
+            if variation == "stddev":
+                g_var = np.std(realization_array)
+            elif variation == "iqr":
+                g_var_real = np.percentile(realization_array.real, 75) - np.percentile(realization_array.real, 25)
+                g_var_imag = np.percentile(realization_array.imag, 75) - np.percentile(realization_array.imag, 25)
+                g_var = np.sqrt(g_var_real**2 + g_var_imag**2)
+            # calculate centers
+            if variation == "stddev":
+                g_center = np.mean(realization_array)
+            elif variation == "iqr":
+                g_center = np.median(realization_array)
+            # identify outliers in baseline space
+            outlier_mask = np.nonzero(np.abs(realization_array - g_center) > g_var)
+            gain_outliers_ant1 = realization_array[outlier_mask]  # this isn't right
             
-            print("***AVERAGE OF CENTERS***", np.mean(realization_centers))
+
 
     """getters and setters"""
     # params_init_flattened

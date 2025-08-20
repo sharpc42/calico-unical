@@ -441,70 +441,53 @@ class CalData:
 
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
-            # self.model_visibilities[time_ind, :, :, :] = np.reshape(
-            #     model_copy.data_array,
-            #     (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-            # )
-            # self.data_visibilities[time_ind, :, :, :] = np.reshape(
-            #     data_copy.data_array,
-            #     (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
-            # )
-            # DEV
-            np.random.seed(42)
-            self.model_visibilities[time_ind, :, :, :] = np.random.normal(
-                0,
-                14,
-                size=(
-                    1,
-                    self.Nbls,
-                    self.Nfreqs,
-                    self.N_vis_pols,
-                ),
-            ) + 1.0j * np.random.normal(
-                0,
-                14,
-                size=(
-                    1,
-                    self.Nbls,
-                    self.Nfreqs,
-                    self.N_vis_pols,
-                ),
-            )
-            self.data_visibilities[time_ind, :, :, :] = np.random.normal(
-                0,
-                14,
-                size=(
-                    1,
-                    self.Nbls,
-                    self.Nfreqs,
-                    self.N_vis_pols,
-                ),
-            ) + 1.0j * np.random.normal(
-                0,
-                14,
-                size=(
-                    1,
-                    self.Nbls,
-                    self.Nfreqs,
-                    self.N_vis_pols,
-                ),
-            )
 
-            flag_array[time_ind, :, :, :] = np.max(
-                np.stack(
-                    [
-                        np.reshape(
-                            model_copy.flag_array,
-                            (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-                        ),
-                        np.reshape(
-                            data_copy.flag_array,
-                            (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
-                        ),
-                    ]
-                ),
-                axis=0,
+            self.model_visibilities[time_ind, :, :, :] = np.reshape(
+                model_copy.data_array,
+                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
             )
+            self.data_visibilities[time_ind, :, :, :] = np.reshape(
+                data_copy.data_array,
+                (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+            )
+            # DEV
+            # np.random.seed(42)
+            # self.data_visibilities[time_ind, :, :, :] = np.random.normal(
+            #     0,
+            #     14,
+            #     size=(
+            #         1,
+            #         self.Nbls,
+            #         self.Nfreqs,
+            #         self.N_vis_pols,
+            #     ),
+            # ) + 1.0j * np.random.normal(
+            #     0,
+            #     14,
+            #     size=(
+            #         1,
+            #         self.Nbls,
+            #         self.Nfreqs,
+            #         self.N_vis_pols,
+            #     ),
+            # )
+            # self.model_visibilities = self.data_visibilities.copy()
+
+            # flag_array[time_ind, :, :, :] = np.max(
+            #     np.stack(
+            #         [
+            #             np.reshape(
+            #                 model_copy.flag_array,
+            #                 (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+            #             ),
+            #             np.reshape(
+            #                 data_copy.flag_array,
+            #                 (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+            #             ),
+            #         ]
+            #     ),
+            #     axis=0,
+            # )
 
         # Free memory
         data = model = data_copy = model_copy = None
@@ -1721,6 +1704,25 @@ class CalData:
                             # simulate thermal noise
                             try:
                                 actual_gain_realizations += 1
+                                # self.data_visibilities[:, :, :, :] = np.random.normal(
+                                #     0,
+                                #     14,
+                                #     size=(
+                                #         1,
+                                #         self.Nbls,
+                                #         self.Nfreqs,
+                                #         self.N_vis_pols,
+                                #     ),
+                                # ) + 1.0j * np.random.normal(
+                                #     0,
+                                #     14,
+                                #     size=(
+                                #         1,
+                                #         self.Nbls,
+                                #         self.Nfreqs,
+                                #         self.N_vis_pols,
+                                #     ),
+                                # )
                                 self.data_visibilities += np.random.normal(
                                     0.0,
                                     self.sigma_t,
@@ -1788,32 +1790,18 @@ class CalData:
                         
                         # identify biggest gain and model errors over time
                         gains_error = self.gains[:,0,0].copy()
-                        gains_error.real -= 1
+                        # gains_error.real -= 1  # do this in dev tool code
                         models_error = self.fit_vis[0,:,0,0].copy()
                         models_error -= self.model_visibilities[0,:,0,0]
-                        # biggest_miss_gains.append(np.max(np.abs(gains_error)))
-                        # biggest_miss_models.append(np.max(np.abs(models_error)))
-                        # dg = 0.005
-                        # gains_error_bls = gains_error[self.ant1_inds]
-                        # big_gain_misses = np.concatenate((big_gain_misses, gains_error_bls[np.abs(gains_error_bls) > dg]))
-                        # big_gain_misses_m_minus_u = np.concatenate((big_gain_misses_m_minus_u, models_error[np.abs(gains_error_bls) > dg]))
-                        # big_gain_misses_m = np.concatenate((big_gain_misses_m, self.model_visibilities[0,:,0,0][np.abs(gains_error_bls) > dg]))
-                        # big_gain_misses_u = np.concatenate((big_gain_misses_u, self.fit_vis[0,:,0,0][np.abs(gains_error_bls) > dg]))
+
                         # combine arrays
                         self.gain_params_realizations = np.concatenate((self.gain_params_realizations, gains_error))
                         self.model_params_realizations = np.concatenate((self.model_params_realizations, models_error))
-                        outlier_ants_1.update(self.ant1_inds[np.nonzero(np.abs(gains_error) > 1)])
-                        outlier_ants_2.update(self.ant2_inds[np.nonzero(np.abs(gains_error) > 2)])
+                        # outlier_ants_1.update(self.ant1_inds[np.nonzero(np.abs(gains_error) > 1)])
+                        # outlier_ants_2.update(self.ant2_inds[np.nonzero(np.abs(gains_error) > 2)])
 
                         gain_error_per_realization.append(gains_error)
-
-                        # see how calculation changes across realizations
-                        # average_gains[i] = np.mean(self.gains[:,0,0])
-                        # variance_per_realization.append((np.std(self.gains[:,0,0]))**2)
-                        # model_params_realizations = np.concatenate((model_params_realizations, self.fit_vis[0,:,0,0] - self.model_visibilities[0,:,0,0]))
                         
-
-
                         # import utils
                         
                         # minlength = np.max([np.max(self.ant1_inds), np.max(self.ant2_inds)]) + 1
@@ -1880,10 +1868,10 @@ class CalData:
                         # plt.title("Gains vs Avg Fitted Vis Minus Data Vis per Ant")
                         # plt.show()
                     
-                    # dev.plot_gain_error_per_realization(
-                    #     gain_error_per_realization,
-                    #     plot_type="outlier"
-                    # )
+                    dev.plot_gain_error_per_realization(
+                        gain_error_per_realization,
+                        plot_type="outlier"
+                    )
 
                     # plot param changes
                     def sim_error_type():
