@@ -785,8 +785,14 @@ def unified_calibration_wrapper(
     # dev
     glim=(-1,1),
     ulim=(-10,10),
-    sigma_t=1,
-    sigma_m=1,
+    antenna_gain_weights=None,
+    model_baseline_weights=None,
+    weights_threshold=None,
+    hard_cutoff=True,
+    cutoff_function="sigmoid",
+    power=2,
+    sigma_t=0.1,
+    sigma_m=0.1,
     sigma_n=None,
     sigma_e=None,
     gain_realizations=100,
@@ -968,13 +974,6 @@ def unified_calibration_wrapper(
         data_format_start_time = time.time()
 
     caldata_obj = caldata.CalData()
-    # Dev for now
-    caldata_obj.set_simulation_errors(
-        sigma_t,
-        sigma_m,
-        sigma_n=sigma_n,
-        sigma_e=sigma_e,
-    )
     caldata_obj.load_data(
         data,
         model,
@@ -994,6 +993,19 @@ def unified_calibration_wrapper(
         ulim=ulim,
         gain_realizations=gain_realizations,
         model_realizations=model_realizations,
+    )
+    # Dev for now
+    caldata_obj.set_weights_and_errors(
+        antenna_gain_weights=antenna_gain_weights,
+        model_baseline_weights=model_baseline_weights,
+        weights_threshold=weights_threshold,
+        hard_cutoff=hard_cutoff,
+        cutoff_function=cutoff_function,
+        power=power,
+        sigma_t=sigma_t,
+        sigma_m=sigma_m,
+        sigma_n=sigma_n,
+        sigma_e=sigma_e,
     )
 
     if caldata_obj.Nfreqs < 2:

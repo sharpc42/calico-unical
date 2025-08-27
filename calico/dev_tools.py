@@ -283,6 +283,7 @@ class DevTools:
 
         # add in 2D probability density later, starting with scatter plot
         if type == "histogram" or type == "both":
+            print("***HISTOGRAM***")
             gains_hist, gains_imag, gains_real = np.histogram2d(gains_array.real, gains_array.imag, bins=50, density=True)
             models_hist, models_imag, models_real = np.histogram2d(models_array.real, models_array.imag, bins=50, density=True)
             # print("***GAINS STD DEV***", np.std(gains_array))
@@ -292,6 +293,7 @@ class DevTools:
             hh1 = ax1.pcolormesh(gains_real, gains_imag, gains_hist, cmap="inferno")
             ax1.add_patch(plt.Circle((0,0), radius=np.std(gains_array), fill=False, color="white"))
             if glim:
+                print("***G LIM***")
                 ax1.set_xlim(glim[0], glim[1])
                 ax1.set_ylim(glim[0], glim[1])
             ax1.set_title(f"Final Gains (Error: {error_type}, sigma_T = {stddev_thermal}, sigma_M = {stddev_model})")
@@ -857,6 +859,12 @@ class DevTools:
                                                                 verbose=False,
                                                                 glim=None,
                                                                 ulim=None,
+                                                                antenna_gain_weights=None,
+                                                                model_baseline_weights=None,
+                                                                weights_threshold=10,
+                                                                hard_cutoff=False,
+                                                                cutoff_function="sigmoid",
+                                                                power=2,
                                                                 sigma_t=sigma,
                                                                 sigma_m=sigma,
                                                                 sigma_n=None,

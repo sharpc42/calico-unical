@@ -134,6 +134,7 @@ class CalData:
         self.antenna_numbers = None
         self.antenna_positions = None
         self.uv_array = None
+        self.uv_norm = None
         self.channel_width = None
         self.freq_array = None
         self.integration_time = None
@@ -442,36 +443,36 @@ class CalData:
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
 
-            self.model_visibilities[time_ind, :, :, :] = np.reshape(
-                model_copy.data_array,
-                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-            )
-            self.data_visibilities[time_ind, :, :, :] = np.reshape(
-                data_copy.data_array,
-                (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
-            )
-            # DEV
-            # np.random.seed(42)
-            # self.data_visibilities[time_ind, :, :, :] = np.random.normal(
-            #     0,
-            #     14,
-            #     size=(
-            #         1,
-            #         self.Nbls,
-            #         self.Nfreqs,
-            #         self.N_vis_pols,
-            #     ),
-            # ) + 1.0j * np.random.normal(
-            #     0,
-            #     14,
-            #     size=(
-            #         1,
-            #         self.Nbls,
-            #         self.Nfreqs,
-            #         self.N_vis_pols,
-            #     ),
+            # self.model_visibilities[time_ind, :, :, :] = np.reshape(
+            #     model_copy.data_array,
+            #     (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
             # )
-            # self.model_visibilities = self.data_visibilities.copy()
+            # self.data_visibilities[time_ind, :, :, :] = np.reshape(
+            #     data_copy.data_array,
+            #     (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+            # )
+            # DEV
+            np.random.seed(42)
+            self.data_visibilities[time_ind, :, :, :] = np.random.normal(
+                0,
+                14,
+                size=(
+                    1,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
+            ) + 1.0j * np.random.normal(
+                0,
+                14,
+                size=(
+                    1,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
+            )
+            self.model_visibilities = self.data_visibilities.copy()
 
             # flag_array[time_ind, :, :, :] = np.max(
             #     np.stack(
@@ -566,6 +567,7 @@ class CalData:
         )  # Convert to topocentric (East, North, Up or ENU) coords.
         uvw_array = antpos_enu[self.ant1_inds, :] - antpos_enu[self.ant2_inds, :]
         self.uv_array = uvw_array[:, :2]
+        self.uv_norm = np.linalg.norm(self.uv_array, axis=0)
 
         # Get polarization ordering
         self.vis_polarization_array = np.array(metadata_reference.polarization_array)
@@ -715,31 +717,32 @@ class CalData:
         #         ),
         #     )
 
-        # Define visibility weights
-        self.visibility_weights = np.ones(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=float,
-        )
-        self.visibility_weights /= self.sigma_t**2
+        # Initialize visibility weights
+        # self.visibility_weights = np.zeros(
+        #     (
+        #         self.Ntimes,
+        #         self.Nbls,
+        #         self.Nfreqs,
+        #         self.N_vis_pols,
+        #     ),
+        #     dtype=float,
+        # )
+        # self.visibility_weights /= self.sigma_t**2
+
         # if np.max(flag_array):  # Apply flagging
         #     self.visibility_weights[np.where(flag_array)] = 0.0
 
-        # Define model weights (this feels like the user should set)
-        self.model_weights = np.ones(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=float,
-        )
-        self.model_weights /= self.sigma_m**2
+        # Initialize model weights
+        # self.model_weights = np.ones(
+        #     (
+        #         self.Ntimes,
+        #         self.Nbls,
+        #         self.Nfreqs,
+        #         self.N_vis_pols,
+        #     ),
+        #     dtype=float,
+        # )
+        # self.model_weights /= self.sigma_m**2
 
         self.lambda_val = lambda_val
 
@@ -1506,53 +1509,196 @@ class CalData:
         # fit_vis_uvdata._Nants_data = len(self.ant_inds)
         # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
 
-    """
-        Set thermal noise according to baseline
-        (hard or soft cuttoffs)
-        * fraction_cutoff_start - Which percentage of baselines on the shorter end
-                                  should be cut off (float)
-        * cutoff_type - Hard or soft (string)
+    # NOTE: for below funcs, duplicating visibility weights line because
+    #       I may want to add different behaviors for that array in future
+    #       Also may want to move duplicate step-function line to main
+    #       weights function; downside is it removes user choice for custom
+    #       functions
+    # NOTE: do we want to have a weights class in an imported module to
+    #       keep this code clean? Then we could just import, instantiate
+    #       an object with these funcs, then call those from the main
+    #       weights function with getattr
+    def constant_weights(self):
+        self.visibility_weights[0,:,0,0] += 1/self.sigma_t**2
+        self.model_weights[0,:,0,0] += 1/self.sigma_m**2
 
-    """
-    def sigma_t(self, fraction_cutoff_start, cutoff_type):
-        return self.sigma_t  # placeholder
+    def hard_cutoff_weights(self, threshold):
+        self.visibility_weights[0,:,0,0] += 1/self.sigma_t**2
+        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
     
-    """
-        Set model error according to baesline
-        (hard or soft cutoffs)
-        * fraction_cutoff_start - Which percentage of baselines on the shorter end
-                                  should be cut off (float)
-        * cutoff_type - Hard or soft (string)
-    """
-    def sigma_m(self, fraction_cutoff_start, cutoff_type):
-        sigma_m = np.zeros(self.Ntimes, self.Nbls)  # just Nbls or also Ntimes?
-        # if cutoff_type == "hard":
-            
-        return self.sigma_m  # placeholder
+    # NOTE: Be careful that these functions are correctly implemented
+    #       I had them ordered before but I don't think that should be
+    #       necessary as numpy acts on them in the ordering of uv_norm
+    #       which should be the same shape as the weights array. But
+    #       double check it to be sure.
+    def sigmoid_weights(self, threshold):
+        self.visibility_weights[0,:,0,0] += 1/self.sigma_t**2
+        self.model_weights[0,:,0,0] += self.sigma_m / (1 + np.exp(-self.uv_norm + threshold))
+
+    def exponential_weights(self, threshold):
+        self.visibility_weights += 1/self.sigma_t**2
+        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
+        self.model_weights[0,:,0,0][self.uv_norm < threshold] += np.exp(self.uv_norm - threshold)
+
+    def power_law_weights(self, threshold):
+        self.visibility_weights += 1/self.sigma_t**2
+        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
+        try:
+            power = int(power)
+        except Exception as error:
+            print(f"{error}\n\nMaybe you passed a bad value for power for a power law cutoff?", end="")
+            print("Defaulting to power=2")
+            power = 2
+        self.model_weights[0,:,0,0][self.uv_norm < threshold] += (-1/(self.uv_norm - threshold))**power
+
+    def damped_sinusoid_weights(self, threshold):
+        self.visibility_weights[0,:,0,0] += 1/self.sigma_t**2
+        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
+        self.model_weights[0,:,0,0][self.uv_norm < threshold] += np.exp(self.uv_norm - threshold) * np.cos(self.uv_norm)**2
 
     """
-        Set thermal noise and model errors for simulation.
-        * sigma_t - True thermal noise passed to the cost function
-        * sigma_m - True model error passed to the cost function
-        * sigma_n - Effective thermal noise determining number of iterated realizations of thermal
-                    noise; defaults to sigma_t; zero turns off realizations for thermal noise
-        * sigma_e - Effective model error determining number of iterated realizations of model
-                    error; defaults to sigma_m; zero turns off realizations for model error
+        Set thermal noise and model errors for simulation. User-passed arrays for weights will be
+        applied before any user-passed constants.
+
+        * antenna_gain_weights - ndarray (Nants,)
+        
+            * Predefined weights for thermal noise on antenna gains. Expected to
+            to be of shape (Nants,) and will convert to baselines. Will be applied
+            before any passed sigma constants.
+
+        * model_baseline_weights - ndarray (Nbls,)
+        
+            * Predefined weights for model error on baseline visibilities.
+            Excpected to be of shape (Nbls,). Will be applied before any passed
+            sigma constants.
+
+        NOTE: I don't think these are compatible with multiple time steps as-is.
+
+        Below are if the user wishes to generate weights per passed parameters.
+
+        * weights_threshold - int
+        
+            * Characteristic length of baseline (magnitude of vector in uvw-space)
+            below which weights will shrink, i.e. error will grow, to de-prioritize
+            them in the calibration solution. Exact behavior associated with this
+            threshold is defined by whether or not the cuttoff is hard (below).
+            Pass as None with hard_cutoff (below) as True to set weights as constant.
+
+        * hard_cutoff - boolean
+        
+            * Whether or not weights will be reduced at threshold as a hard cutoff. 
+            If true then baselines below threshold will receive minimum weighting 
+            approximating zero and if false then baselines will be reduced to same 
+            minimum weighting via a continuous function (passed by cutoff_function 
+            below; default is sigmoid).
+
+        * cutoff_function - string
+        
+            * Continuous function to be used to lower weights to approximately zero 
+            at the baseline length passed by weights_threshold above; defaults to 
+            sigmoid. Supported types are "sigmoid", "exponential" (decay), "power law", ...
+
+        * power - int
+
+            * To be used in power law cutoff (default is power=2)
+
+        * sigma_t - float
+        
+            * True thermal noise passed to the cost function. This sets the max value 
+            of the antenna gain/visibility weight array.
+
+        * sigma_m - float
+        
+            * True model error passed to the cost function. This sets the max value 
+            of the model baseline weight array.
+
+        Below are dev tools:
+
+        * sigma_n - float
+        
+            * Effective thermal noise determining number of iterated realizations of 
+            thermal noise; defaults to sigma_t; zero turns off many realizations for 
+            thermal noise.
+
+        * sigma_e - float
+        
+            * Effective model error determining number of iterated realizations of 
+            model error; defaults to sigma_m; zero turns off many realizations for 
+            model error.
     """
-    def set_simulation_errors(self, sigma_t, sigma_m, sigma_n=None, sigma_e=None):
+    def set_weights_and_errors(
+            self, 
+            antenna_gain_weights=None,
+            model_baseline_weights=None,
+            weights_threshold=0,
+            hard_cutoff=True,
+            cutoff_function="sigmoid",
+            power=2,
+            sigma_t=0.1, 
+            sigma_m=0.1, 
+            sigma_n=None, 
+            sigma_e=None, 
+    ):
+        self.visibility_weights = np.zeros(
+            (
+                self.Ntimes,
+                self.Nbls,
+                self.Nfreqs,
+                self.N_vis_pols,
+            ),
+            dtype=float,
+        )
+        self.model_weights = np.zeros(
+            (
+                self.Ntimes,
+                self.Nbls,
+                self.Nfreqs,
+                self.N_vis_pols,
+            ),
+            dtype=float,
+        )
+
+        # set to user-passed weights
+        # NOTE: I don't want to return here because 1) I need to set the other
+        # and 2) they may have only passed one or the other array. Using a
+        # boolean check for the second part of the code might be worth it.
+        if antenna_gain_weights:
+            from calico import utils
+            try:
+                self.visibility_weights = antenna_gain_weights  # NOTE: Placeholder; convert antenna weights to baseline space
+            except Exception as error:
+                print(f"{error}\n\nGain weights cannot be used. Make sure antenna gain weight array has shape (Nants,)")
+                self.visibility_weights += 1
+            return
+        if model_baseline_weights:
+            try:
+                self.model_weights = model_baseline_weights
+            except Exception as error:
+                print(f"{error}\n\nModel weights cannot be used. Make sure model baseline weight array has shape (Nbls,)")
+                self.model_weights += 1
+            return
+        
         # true noise and error
         self.sigma_t = sigma_t
         self.sigma_m = sigma_m
-        # default effective thermal noise to true model noise
+        # default effective thermal noise to true model noise (for many realizations)
         if sigma_n == None:
             self.sigma_n = sigma_t
         else:
             self.sigma_n = sigma_n
-        # default effective model error to true model error
+        # default effective model error to true model error (for many realizations)
         if sigma_e == None:
             self.sigma_e = sigma_m
         else:
             self.sigma_e = sigma_e
+
+        # set weights according to user's passed function
+        try:
+            getattr(self, cutoff_function)
+        except Exception as error:
+            print(f"{error}\n\nMaybe you passed in a bad cutoff function? Defaulting to hard cutoff")
+            self.hard_cutoff_weights(weights_threshold)
+        sorted_weight_array /= self.sigma_m**2
 
     def unified_calibration(
         self,
@@ -1868,10 +2014,10 @@ class CalData:
                         # plt.title("Gains vs Avg Fitted Vis Minus Data Vis per Ant")
                         # plt.show()
                     
-                    dev.plot_gain_error_per_realization(
-                        gain_error_per_realization,
-                        plot_type="outlier"
-                    )
+                    # dev.plot_gain_error_per_realization(
+                    #     gain_error_per_realization,
+                    #     plot_type="outlier"
+                    # )
 
                     # plot param changes
                     def sim_error_type():
