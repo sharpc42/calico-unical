@@ -1548,8 +1548,9 @@ class CalData:
         self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
         try:
             power = int(power)
-        except Exception as error:
-            print(f"{error}\nMaybe you passed a bad value for power for a power law cutoff?", end=" ")
+        except Exception:
+            print(sys.exc_info())
+            print("Maybe you passed a bad value for power for a power law cutoff?", end=" ")
             print("Defaulting to power=2")
             power = 2
         x = self.uv_norm[self.uv_norm < threshold] - threshold
@@ -1671,15 +1672,15 @@ class CalData:
             from calico import utils
             try:
                 self.visibility_weights = antenna_gain_weights  # NOTE: Placeholder; convert antenna weights to baseline space
-            except Exception as error:
-                print(f"{error}\nGain weights cannot be used. Make sure antenna gain weight array has shape (Nants,)")
+            except:
+                print(f"{sys.exc_info()}\nGain weights cannot be used. Make sure antenna gain weight array has shape (Nants,)")
                 self.visibility_weights += 1
             return
         if model_baseline_weights:
             try:
                 self.model_weights = model_baseline_weights
-            except Exception as error:
-                print(f"{error}\nModel weights cannot be used. Make sure model baseline weight array has shape (Nbls,)")
+            except:
+                print(f"{sys.exc_info()}\nModel weights cannot be used. Make sure model baseline weight array has shape (Nbls,)")
                 self.model_weights += 1
             return
         
@@ -1692,8 +1693,8 @@ class CalData:
         # set weights according to user's passed function
         try:
             getattr(self, cutoff_function)(cutoff_threshold)
-        except Exception as error:
-            print(f"{error}\nMaybe you passed in a bad cutoff function? Defaulting to hard cutoff")
+        except:
+            print(f"{sys.exc_info()}\nMaybe you passed in a bad cutoff function? Defaulting to hard cutoff")
             self.hard_cutoff_weights(cutoff_threshold)
         self.model_weights[0,:,0,0] /= self.sigma_m_max**2
 
@@ -1803,7 +1804,7 @@ class CalData:
                             size=(self.Nbls),
                         )
                         self.data_visibilities[0,:,0,0] += thermal_noise_real + 1.0j * thermal_noise_imag
-                    except Exception:
+                    except:
                         print(sys.exc_info())
                         print("Initial thermal noise failed. Was sigma_t set correctly?")
                 perfect_model = None
@@ -1838,7 +1839,7 @@ class CalData:
                         )[self.threshold_mask]
                         self.data_visibilities[0,:,0,0] += (model_error_real_hi + model_error_real_lo
                                                             + 1.0j * (model_error_imag_hi + model_error_imag_lo))
-                    except Exception:
+                    except:
                         print(sys.exc_info())
                         print("Initial model error failed. Was sigma_m set correctly?")
                 for freq_ind in range(self.Nfreqs):
@@ -1879,8 +1880,8 @@ class CalData:
                                         1,
                                     ),
                                 )
-                            except Exception as e:
-                                print(type(e))
+                            except:
+                                print(sys.exc_info())
                                 print(f"Thermal noise realization {i} failed. Was sigma_t set correctly?")
                         # simulate model error
                         if i % (realizations / self.model_realizations) == 0 and self.sigma_e_max != 0.0:
@@ -1905,8 +1906,8 @@ class CalData:
                                         1,
                                     ),
                                 )
-                            except Exception as e:
-                                print(type(e))
+                            except:
+                                print(sys.exc_info())
                                 print(f"Model error realization {i} failed. Was sigma_m set correctly?")
                         # main unical code
                         before_arr_gains = self.gains[:, [freq_ind], :].copy()

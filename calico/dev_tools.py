@@ -849,7 +849,9 @@ class DevTools:
                                                 sigma=1,
                                                 variation="stddev", 
                                                 plot_type="variation",
-                                                data_path='data/tutorial_medium_onetime.uvfits'):
+                                                data_path='data/tutorial_medium_onetime.uvfits',
+                                                weights_threshold=50,
+                                                cutoff_function="constant_weights"):
 
         uvc, g_arr, u_arr = calwrap.unified_calibration_wrapper(data_path,
                                                                 data_path,
@@ -861,9 +863,8 @@ class DevTools:
                                                                 ulim=None,
                                                                 antenna_gain_weights=None,
                                                                 model_baseline_weights=None,
-                                                                weights_threshold=10,
-                                                                hard_cutoff=False,
-                                                                cutoff_function="sigmoid",
+                                                                weights_threshold=weights_threshold,
+                                                                cutoff_function=cutoff_function,
                                                                 power=2,
                                                                 sigma_t=sigma,
                                                                 sigma_m=sigma,
@@ -873,9 +874,6 @@ class DevTools:
                                                                 model_realizations=num_realizations)
         Nants = np.size(g_arr) // num_realizations
         fig, ax = plt.subplots(Nants, 2, figsize=(13, 5*Nants), squeeze=False)
-        
-        # render LaTeX math
-        plt.rcParams['text.usetex'] = True
 
         # track average of centers
         antenna_gain_error_centers = np.zeros(Nants, dtype=complex)
@@ -910,7 +908,7 @@ class DevTools:
 
             # plot scatter of realizations for this antenna scaled to "var" (stddev/IQR)
             ax[ant,0].scatter(ant_array.real - 1, ant_array.imag)
-            ax[ant,0].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Var) Powell", fontsize="7.5")
+            ax[ant,0].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Var) Func: ({cutoff_function})", fontsize="7.5")
             ax[ant,0].set_xlabel("Real - 1", fontsize = "7.5")
             ax[ant,0].set_ylabel("Imag", fontsize = "7.5")
             ax[ant,0].plot(g_center.real - 1, g_center.imag, 'bx')
@@ -947,7 +945,7 @@ class DevTools:
 
             # plot scatter of realizations for this antenna scaled to "max" (outliers)
             ax[ant,1].scatter(ant_array.real - 1, ant_array.imag)
-            ax[ant,1].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Max) Powell", fontsize="7.5")
+            ax[ant,1].set_title(f"Gain Error across {num_realizations} Realizations for Antenna {ant+1} (Lim: Max) Func: ({cutoff_function})", fontsize="7.5")
             ax[ant,1].set_xlabel("Real - 1", fontsize = "7.5")
             ax[ant,1].set_ylabel("Imag", fontsize = "7.5")
             ax[ant,1].plot(g_center.real - 1, g_center.imag, 'bx')
@@ -958,8 +956,8 @@ class DevTools:
             
         plt.tight_layout()
         plt.savefig('images/realizations_per_antenna_limit_' + str(Nants) + '_'
-            + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-            + '.png',
+            # + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+            + cutoff_function + '.png',
             bbox_inches=0,)
         plt.close(fig)
             
@@ -1054,45 +1052,56 @@ class DevTools:
             + '.png',
             bbox_inches=0,)
         plt.close(fig)
-            
-        # print("***AVERAGE OF CENTERS ACROSS REALIZATIONS***", np.mean(realization_centers))
 
-    # select down on outliers blts in uv array
-    # then plot the outliers in the uv plane
-    # 
-    # Schematic algorithm:
-    # 1) Break up concatenated array into per realizations (or average across realizations per antenna?)
-    # 2) Identify outliers in gain error via "variation" (stddev/IQR)
-    # 3) Convert outliers from antenna space to baseline space
-    # 4) Map outliers in baseline space to the corresponding (first) time slice of 
-    #    the uv array in baseline-time space.
-    # 5) Plot 'em (scatter should be fine)
+    # scatter plot spatial array with errors denoted by colors
+    # (assumes spatial array of shape (N,2) with N being e.g. Nbls or Nants
+    #  and 2 corresponding to x/y)
+    def plot_spatial_array_with_colored_errors(self, 
+                                               spatial_array, 
+                                               error_array, 
+                                               title, 
+                                               xlabel, 
+                                               ylabel, 
+                                               filename,
+                                               upper_limit=None,
+                                               lower_limit=None):
+        colors = error_array * 100 / np.abs(error_array)
+        plt.scatter(spatial_array[:,0], spatial_array[:,1], c=colors, cmap='viridis')
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        if not upper_limit and not lower_limit:
+            upper_limit = np.max([np.max(np.abs(spatial_array[:,0])), np.max(np.abs(spatial_array[:,1]))]) + 25
+            lower_limit = -upper_limit
+        plt.xlim(lower_limit, upper_limit)
+        plt.ylim(lower_limit, upper_limit)
+        plt.colorbar()
+        plt.savefig('images/' + filename + '.png')
+        plt.close()
 
-    def plot_outlier_baselines_in_uv_plane(self, num_realizations, g_arr, uv_arr, variation="stddev"):
-        Nants = np.size(g_arr) // num_realizations
-        realization_array = np.zeros(num_realizations, dtype=complex)
-        # process and characterize concatenated gain error array
-        for realization in range(num_realizations):
-            # gain errors for this realization
-            realization_array[realization] = g_arr[realization*Nants:(realization+1)*Nants]
-            print("***REALIZATION ARRAY SIZE***", np.size(realization_array))
-            # set constants
-            if variation == "stddev":
-                g_var = np.std(realization_array)
-            elif variation == "iqr":
-                g_var_real = np.percentile(realization_array.real, 75) - np.percentile(realization_array.real, 25)
-                g_var_imag = np.percentile(realization_array.imag, 75) - np.percentile(realization_array.imag, 25)
-                g_var = np.sqrt(g_var_real**2 + g_var_imag**2)
-            # calculate centers
-            if variation == "stddev":
-                g_center = np.mean(realization_array)
-            elif variation == "iqr":
-                g_center = np.median(realization_array)
-            # identify outliers in baseline space
-            outlier_mask = np.nonzero(np.abs(realization_array - g_center) > g_var)
-            gain_outliers_ant1 = realization_array[outlier_mask]  # this isn't right
-            
-
+    # plot model visibilities in uv plane
+    def plot_visibilities_in_uv_plane(self, u_minus_m, uv_arr, variation="stddev"):
+        self.plot_spatial_array_with_colored_errors(
+            uv_arr,
+            u_minus_m,
+            "u-v_T in uv plane",
+            "u",
+            "v",
+            "u_minus_m_in_uv_plane"
+        )
+    
+    # plot gain errors in position space
+    def plot_gains_in_position_space(self, g_errors, ant_pos_arr):
+        self.plot_spatial_array_with_colored_errors(
+            ant_pos_arr,
+            g_errors,
+            "g-(1,0) in north-east plane",
+            "N",
+            "E",
+            "gain_error_in_spatial_plane",
+            upper_limit=300,
+            lower_limit=-300,
+        )
 
     """getters and setters"""
     # params_init_flattened
