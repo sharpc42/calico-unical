@@ -1057,6 +1057,7 @@ class DevTools:
     # (assumes spatial array of shape (N,2) with N being e.g. Nbls or Nants
     #  and 2 corresponding to x/y)
     def plot_spatial_array_with_colored_errors(self, 
+                                               cutoff_threshold,
                                                spatial_array, 
                                                error_array, 
                                                title, 
@@ -1065,9 +1066,9 @@ class DevTools:
                                                filename,
                                                upper_limit=None,
                                                lower_limit=None):
-        colors = error_array * 100 / np.abs(error_array)
+        colors = error_array / np.max(np.abs(error_array))
         plt.scatter(spatial_array[:,0], spatial_array[:,1], c=colors, cmap='viridis')
-        plt.title(title)
+        plt.title(f"{title}\nCutoff Threshold:{cutoff_threshold}")
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         if not upper_limit and not lower_limit:
@@ -1080,19 +1081,21 @@ class DevTools:
         plt.close()
 
     # plot model visibilities in uv plane
-    def plot_visibilities_in_uv_plane(self, u_minus_m, uv_arr, variation="stddev"):
+    def plot_visibilities_in_uv_plane(self, cutoff_threshold, u_minus_m, uv_arr, reduction_factor=1):
         self.plot_spatial_array_with_colored_errors(
+            cutoff_threshold,
             uv_arr,
-            u_minus_m,
-            "u-v_T in uv plane",
+            np.abs(u_minus_m),
+            "|u-v_T| in uv plane\n1/sigma_e^2 Reduction Factor = " + str(reduction_factor),
             "u",
             "v",
-            "u_minus_m_in_uv_plane"
+            "u_minus_m_in_uv_plane_redfac" + str(reduction_factor) 
         )
     
     # plot gain errors in position space
-    def plot_gains_in_position_space(self, g_errors, ant_pos_arr):
+    def plot_gains_in_position_space(self, cutoff_threshold, g_errors, ant_pos_arr):
         self.plot_spatial_array_with_colored_errors(
+            cutoff_threshold,
             ant_pos_arr,
             g_errors,
             "g-(1,0) in north-east plane",
@@ -1101,6 +1104,76 @@ class DevTools:
             "gain_error_in_spatial_plane",
             upper_limit=300,
             lower_limit=-300,
+        )
+    
+    def variable_sigmas_plot_individual_and_diff(self, 
+                                                 reduction_factor=1, 
+                                                 cutoff_threshold=50,
+                                                 cutoff_function="constant_weights",
+                                                 sigma_m_0=1,
+                                                 sigma_e_0=None,):
+        _,g,u1,uv = calwrap.unified_calibration_wrapper('data/tutorial_medium_onetime.uvfits',
+                                                        'data/tutorial_medium_onetime.uvfits',
+                                                        parallel=False,
+                                                        verbose=False,
+                                                        glim=None,
+                                                        ulim=None,
+                                                        antenna_gain_weights=None,
+                                                        model_baseline_weights=None,
+                                                        cutoff_threshold=cutoff_threshold,
+                                                        cutoff_function=cutoff_function,
+                                                        power=2,
+                                                        sigma_t_0=1,
+                                                        sigma_m_0=sigma_m_0,
+                                                        sigma_n_0=None,
+                                                        sigma_e_0=sigma_e_0,
+                                                        gain_realizations=1,
+                                                        model_realizations=1,
+                                                        reduction_factor=1)
+        
+        _,g,u2,uv = calwrap.unified_calibration_wrapper('data/tutorial_medium_onetime.uvfits',
+                                                        'data/tutorial_medium_onetime.uvfits',
+                                                        parallel=False,
+                                                        verbose=False,
+                                                        glim=None,
+                                                        ulim=None,
+                                                        antenna_gain_weights=None,
+                                                        model_baseline_weights=None,
+                                                        cutoff_threshold=cutoff_threshold,
+                                                        cutoff_function=cutoff_function,
+                                                        power=2,
+                                                        sigma_t_0=1,
+                                                        sigma_m_0=1,
+                                                        sigma_n_0=None,
+                                                        sigma_e_0=None,
+                                                        gain_realizations=1,
+                                                        model_realizations=1,
+                                                        reduction_factor=reduction_factor)
+
+        title = "Reduced minus unreduced |u-v^T| in uv plane\n" + \
+                {1/sigma_e_0^2} + f"Reduction Factor = 1" + \
+                f"\nCutoff Function: {cutoff_function}\nCutoff Threshold: {cutoff_threshold}" 
+        self.plot_spatial_array_with_colored_errors(
+            cutoff_threshold,
+            uv,
+            np.abs(u1) - np.abs(u2),
+            title,
+            "u",
+            "v",
+            f"reduced_minus_unreduced_mag_in_uv_plane_cof_{cutoff_function}"
+        )
+
+        title = "|Reduced minus unreduced u-v^T| in uv plane\n" + \
+                f"1/sigma_e^2 Reduction Factor = {reduction_factor}" + \
+                f"\nCutoff Function: {cutoff_function}\nCutoff Threshold: {cutoff_threshold}" 
+        self.plot_spatial_array_with_colored_errors(
+            cutoff_threshold,
+            uv,
+            np.abs(u1 - u2),
+            title,
+            "u",
+            "v",
+            f"mag_reduced_minus_unreduced_in_uv_plane_cof_{cutoff_function}"
         )
 
     """getters and setters"""

@@ -790,12 +790,14 @@ def unified_calibration_wrapper(
     cutoff_threshold=None,
     cutoff_function="sigmoid",
     power=2,
-    sigma_t_max=0.1,
-    sigma_m_max=0.1,
-    sigma_n_max=None,
-    sigma_e_max=None,
+    sigma_t_0=0.1,
+    sigma_m_0=0.1,
+    sigma_n_0=None,
+    sigma_e_0=None,
     gain_realizations=100,
     model_realizations=1,
+    weighting_function="constant_weights",
+    scaling_factor=1,
 ):
     """
     Top-level wrapper for running unified calibration per polarization. Function 
@@ -992,18 +994,8 @@ def unified_calibration_wrapper(
         ulim=ulim,
         gain_realizations=gain_realizations,
         model_realizations=model_realizations,
-    )
-    # Dev for now
-    caldata_obj.set_weights_and_errors(
-        antenna_gain_weights=antenna_gain_weights,
-        model_baseline_weights=model_baseline_weights,
-        cutoff_threshold=cutoff_threshold,
-        cutoff_function=cutoff_function,
-        power=power,
-        sigma_t_max=sigma_t_max,
-        sigma_m_max=sigma_m_max,
-        sigma_n_max=sigma_n_max,
-        sigma_e_max=sigma_e_max,
+        weighting_function=weighting_function,
+        scaling_factor=scaling_factor,
     )
 
     if caldata_obj.Nfreqs < 2:
@@ -1051,6 +1043,8 @@ def unified_calibration_wrapper(
         parallel=parallel,
         verbose=verbose,
         pool=pool,
+        reduction_factor=scaling_factor,
+        cutoff_threshold=cutoff_threshold,
     )
     if verbose:
         print(
@@ -1074,4 +1068,4 @@ def unified_calibration_wrapper(
         sys.stderr = stderr_orig
         log_file_new.close()
 
-    return uvcal, caldata_obj.gain_params_realizations, caldata_obj.model_params_realizations
+    return uvcal, caldata_obj.gain_params_realizations, caldata_obj.model_params_realizations, caldata_obj.uv_array

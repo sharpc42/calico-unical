@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import pyuvdata
 from astropy.units import Quantity
-from calico import calibration_qa, calibration_optimization, dev_tools
+from calico import calibration_qa, calibration_optimization, dev_tools, variable_weights
 import multiprocessing
 
 
@@ -162,10 +162,10 @@ class CalData:
         self.model_params_realizations = None
         self.glim = None
         self.ulim = None
-        self.sigma_t_max = None
-        self.sigma_m_max = None
-        self.sigma_n_max = None
-        self.sigma_e_max = None
+        self.sigma_t_0 = None
+        self.sigma_m_0 = None
+        self.sigma_n_0 = None
+        self.sigma_e_0 = None
         self.gain_realizations = None
         self.model_realizations = None
         self.antpos_enu = None
@@ -233,6 +233,8 @@ class CalData:
         ulim=(-10,10),
         gain_realizations=100,
         model_realizations=1,
+        weighting_function="constant_weights",
+        scaling_factor=1,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -719,32 +721,17 @@ class CalData:
         #         ),
         #     )
 
-        # Initialize visibility weights
-        # self.visibility_weights = np.zeros(
-        #     (
-        #         self.Ntimes,
-        #         self.Nbls,
-        #         self.Nfreqs,
-        #         self.N_vis_pols,
-        #     ),
-        #     dtype=float,
-        # )
-        # self.visibility_weights /= self.sigma_t_max**2
-
+        # NOTE: Incorporate this into VWA
         # if np.max(flag_array):  # Apply flagging
         #     self.visibility_weights[np.where(flag_array)] = 0.0
 
-        # Initialize model weights
-        # self.model_weights = np.ones(
-        #     (
-        #         self.Ntimes,
-        #         self.Nbls,
-        #         self.Nfreqs,
-        #         self.N_vis_pols,
-        #     ),
-        #     dtype=float,
-        # )
-        # self.model_weights /= self.sigma_m_max**2
+        # Initialize data and model weights
+        vwa = variable_weights.VariableWeightsArray()
+        vwa.set_weights(
+            self,
+            weighting_function=weighting_function,
+            scaling_factor=scaling_factor
+        )
 
         self.lambda_val = lambda_val
 
@@ -1511,205 +1498,6 @@ class CalData:
         # fit_vis_uvdata._Nants_data = len(self.ant_inds)
         # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
 
-    # NOTE: for below funcs, duplicating visibility weights line because
-    #       I may want to add different behaviors for that array in future
-    #       Also may want to move duplicate step-function line to main
-    #       weights function; downside is it removes user choice for custom
-    #       functions
-    # NOTE: do we want to have a weights class in an imported module to
-    #       keep this code clean? Then we could just import, instantiate
-    #       an object with these funcs, then call those from the main
-    #       weights function with getattr
-    def constant_weights(self, threshold):
-        self.visibility_weights[0,:,0,0] += 1/self.sigma_t_max**2
-        self.model_weights[0,:,0,0] += 1/self.sigma_m_max**2
-
-    def hard_cutoff_weights(self, threshold):
-        self.visibility_weights[0,:,0,0] += 1/self.sigma_t_max**2
-        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
-    
-    # NOTE: Be careful that these functions are correctly implemented
-    #       I had them ordered before but I don't think that should be
-    #       necessary as numpy acts on them in the ordering of uv_norm
-    #       which should be the same shape as the weights array. But
-    #       double check it to be sure.
-    def sigmoid_weights(self, threshold):
-        self.visibility_weights[0,:,0,0] += 1/self.sigma_t_max**2
-        self.model_weights[0,:,0,0] += 1 / (1 + np.exp(-self.uv_norm + threshold))
-
-    def exponential_weights(self, threshold):
-        self.visibility_weights += 1/self.sigma_t_max**2
-        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
-        x = self.uv_norm[self.threshold_mask] - threshold
-        self.model_weights[0,:,0,0][self.threshold_mask] += np.exp(x)
-
-    def power_law_weights(self, threshold, power=2):
-        self.visibility_weights += 1/self.sigma_t_max**2
-        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
-        try:
-            power = int(power)
-        except Exception:
-            print(sys.exc_info())
-            print("Maybe you passed a bad value for power for a power law cutoff?", end=" ")
-            print("Defaulting to power=2")
-            power = 2
-        x = self.uv_norm[self.uv_norm < threshold] - threshold
-        self.model_weights[0,:,0,0][self.threshold_mask] += (-1/x)**power
-
-    def damped_sinusoid_weights(self, threshold):
-        self.visibility_weights[0,:,0,0] += 1/self.sigma_t_max**2
-        self.model_weights[0,:,0,0] = np.heaviside(self.uv_norm - threshold, 1)
-        x = self.uv_norm[self.threshold_mask] - threshold
-        self.model_weights[0,:,0,0][self.threshold_mask] += np.exp(x) * np.cos(x)**2
-
-    """
-        Set thermal noise and model errors for simulation. User-passed arrays for weights will be
-        applied before any user-passed constants.
-
-        * antenna_gain_weights - ndarray (Nants,)
-        
-            * Predefined weights ~ 1/sigma^2 for thermal noise on antenna gains. Expected
-            to be of shape (Nants,) and will convert to baselines. Will be applied
-            before any passed sigma constants.
-
-        * model_baseline_weights - ndarray (Nbls,)
-        
-            * Predefined weights ~ 1/sigma^2 for model error on baseline visibilities.
-            Expected to be of shape (Nbls,). Will be applied before any passed
-            sigma constants.
-
-        NOTE: I don't think these are compatible with multiple time steps as-is.
-
-        
-        Below are if the user wishes to generate weights per passed parameters.
-
-        * weights_threshold - int
-        
-            * Characteristic length of baseline (magnitude of vector in uvw-space)
-            below which weights will shrink, i.e. error will grow, to de-prioritize
-            them in the calibration solution. Exact behavior associated with this
-            threshold is defined by whether or not the cuttoff is hard (below).
-            Pass as None with hard_cutoff (below) as True to set weights as constant.
-
-        * hard_cutoff - boolean
-        
-            * Whether or not weights will be reduced at threshold as a hard cutoff. 
-            If true then baselines below threshold will receive minimum weighting 
-            approximating zero and if false then baselines will be reduced to same 
-            minimum weighting via a continuous function (passed by cutoff_function 
-            below; default is sigmoid).
-
-        * cutoff_function - string
-        
-            * Continuous function to be used to lower weights to approximately zero 
-            at the baseline length passed by weights_threshold above; defaults to 
-            sigmoid. Supported types are "sigmoid", "exponential" (decay), "power law", ...
-
-        * power - int
-
-            * To be used in power law cutoff (default is power=2)
-
-        * sigma_t - float
-        
-            * True thermal noise passed to the cost function. This sets the max value 
-            of the antenna gain/visibility weight array.
-
-        * sigma_m - float
-        
-            * True model error passed to the cost function. This sets the max value 
-            of the model baseline weight array.
-
-        Below are dev tools:
-
-        * sigma_n - float
-        
-            * Effective thermal noise determining number of iterated realizations of 
-            thermal noise; defaults to sigma_t; zero turns off many realizations for 
-            thermal noise.
-
-        * sigma_e - float
-        
-            * Effective model error determining number of iterated realizations of 
-            model error; defaults to sigma_m; zero turns off many realizations for 
-            model error.
-    """
-    def set_weights_and_errors(
-            self, 
-            antenna_gain_weights=None,    # 1/sigma_T^2
-            model_baseline_weights=None,  # 1/sigma_M^2
-            cutoff_threshold=50,
-            cutoff_function="constant_weights",
-            power=2,
-            sigma_t_max=0.1, 
-            sigma_m_max=0.1, 
-            sigma_n_max=None, 
-            sigma_e_max=None, 
-    ):
-        self.visibility_weights = np.zeros(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=float,
-        )
-        self.model_weights = np.zeros(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=float,
-        )
-
-        # set to user-passed weights
-        # NOTE: I don't want to return here because 1) I need to set the other
-        # and 2) they may have only passed one or the other array. Using a
-        # boolean check for the second part of the code might be worth it.
-        if antenna_gain_weights:
-            from calico import utils
-            try:
-                self.visibility_weights = antenna_gain_weights  # NOTE: Placeholder; convert antenna weights to baseline space
-            except:
-                print(f"{sys.exc_info()}\nGain weights cannot be used. Make sure antenna gain weight array has shape (Nants,)")
-                self.visibility_weights += 1
-            return
-        if model_baseline_weights:
-            try:
-                self.model_weights = model_baseline_weights
-            except:
-                print(f"{sys.exc_info()}\nModel weights cannot be used. Make sure model baseline weight array has shape (Nbls,)")
-                self.model_weights += 1
-            return
-        
-        self.threshold_mask = self.uv_norm < cutoff_threshold
-
-        # true noise and error
-        self.sigma_t_max = sigma_t_max
-        self.sigma_m_max = sigma_m_max
-
-        # set weights according to user's passed function
-        try:
-            getattr(self, cutoff_function)(cutoff_threshold)
-        except:
-            print(f"{sys.exc_info()}\nMaybe you passed in a bad cutoff function? Defaulting to hard cutoff")
-            self.hard_cutoff_weights(cutoff_threshold)
-        self.model_weights[0,:,0,0] /= self.sigma_m_max**2
-
-        # NOTE: have these eventually be arrays matched to model weights
-        # default effective thermal noise to true model noise
-        if sigma_n_max == None:
-            self.sigma_n_max = sigma_t_max
-        else:
-            self.sigma_n_max = sigma_n_max
-        # default effective model error to true model error
-        if sigma_e_max == None:
-            self.sigma_e_max = sigma_m_max
-        else:
-            self.sigma_e_max = sigma_e_max
-
     def unified_calibration(
         self,
         xtol=1e-5,
@@ -1720,6 +1508,8 @@ class CalData:
         max_processes=40,
         pool=None,
         verbose=False,
+        reduction_factor=1,
+        cutoff_threshold=50,
     ):
         """
         Run calibration per polarization. Updates the gains attribute and u parameters with
@@ -1790,17 +1580,17 @@ class CalData:
                     use_pool.terminate()
             else:
                 np.random.seed(42)
-                if self.sigma_n_max != 0.0:
+                if self.sigma_n_0 != 0.0:
                     # initial thermal noise
                     try:
                         thermal_noise_real = np.random.normal(
                             0.0,
-                            self.sigma_t_max,
+                            self.sigma_t_0,
                             size=(self.Nbls),
                         )
                         thermal_noise_imag = np.random.normal(
                             0.0,
-                            self.sigma_t_max,
+                            self.sigma_t_0,
                             size=(self.Nbls),
                         )
                         self.data_visibilities[0,:,0,0] += thermal_noise_real + 1.0j * thermal_noise_imag
@@ -1808,7 +1598,7 @@ class CalData:
                         print(sys.exc_info())
                         print("Initial thermal noise failed. Was sigma_t set correctly?")
                 perfect_model = None
-                if self.sigma_e_max != 0.0:
+                if self.sigma_e_0 != 0.0:
                     # initial model error
                     perfect_model = self.model_visibilities.copy()
                     try:
@@ -1819,22 +1609,22 @@ class CalData:
 
                         model_error_real_hi[~self.threshold_mask] += np.random.normal(
                             0.0,
-                            self.sigma_e_max,
+                            self.sigma_e_0,
                             size=(self.Nbls),
                         )[~self.threshold_mask]
                         model_error_imag_hi[~self.threshold_mask] += np.random.normal(
                             0.0,
-                            self.sigma_e_max,
+                            self.sigma_e_0,
                             size=(self.Nbls),
                         )[~self.threshold_mask]
                         model_error_real_lo[self.threshold_mask] += np.random.normal(
                             0.0,
-                            self.sigma_e_max / 2,
+                            self.sigma_e_0 / reduction_factor,
                             size=(self.Nbls),
                         )[self.threshold_mask]
                         model_error_imag_lo[self.threshold_mask] += np.random.normal(
                             0.0,
-                            self.sigma_e_max / 2,
+                            self.sigma_e_0 / reduction_factor,
                             size=(self.Nbls),
                         )[self.threshold_mask]
                         self.data_visibilities[0,:,0,0] += (model_error_real_hi + model_error_real_lo
@@ -1856,14 +1646,14 @@ class CalData:
                         self.fit_vis = self.fit_vis_orig.copy()
                         # reset seed
                         import time
-                        np.random.seed(i)
-                        if i % (realizations / self.gain_realizations) == 0 and self.sigma_n_max != 0.0:
+                        if i % (realizations / self.gain_realizations) == 0 and self.sigma_n_0 != 0.0:
                             # simulate thermal noise
                             try:
+                                np.random.seed(i)
                                 actual_gain_realizations += 1
                                 self.data_visibilities += np.random.normal(
                                     0.0,
-                                    self.sigma_n_max,
+                                    self.sigma_n_0,
                                     size=(
                                         self.Ntimes,
                                         self.Nbls,
@@ -1872,7 +1662,7 @@ class CalData:
                                     ),
                                 ) + 1.0j * np.random.normal(
                                     0.0,
-                                    self.sigma_n_max,
+                                    self.sigma_n_0,
                                     size=(
                                         self.Ntimes,
                                         self.Nbls,
@@ -1884,28 +1674,56 @@ class CalData:
                                 print(sys.exc_info())
                                 print(f"Thermal noise realization {i} failed. Was sigma_t set correctly?")
                         # simulate model error
-                        if i % (realizations / self.model_realizations) == 0 and self.sigma_e_max != 0.0:
+                        if i % (realizations / self.model_realizations) == 0 and self.sigma_e_0 != 0.0:
                             try:
-                                actual_model_realizations += 1
-                                self.model_visibilities += np.random.normal(
+                                # actual_model_realizations += 1
+                                # self.model_visibilities += np.random.normal(
+                                #     0.0,
+                                #     self.sigma_e_0,
+                                #     size=(
+                                #         self.Ntimes,
+                                #         self.Nbls,
+                                #         1,
+                                #         1,
+                                #     ),
+                                # ) + 1.0j * np.random.normal(
+                                #     0.0,
+                                #     self.sigma_e_0,
+                                #     size=(
+                                #         self.Ntimes,
+                                #         self.Nbls,
+                                #         1,
+                                #         1,
+                                #     ),
+                                # )
+                                np.random.seed(42)
+                                model_error_real_hi = np.zeros(self.Nbls)
+                                model_error_imag_hi = np.zeros(self.Nbls)
+                                model_error_real_lo = np.zeros(self.Nbls)
+                                model_error_imag_lo = np.zeros(self.Nbls)
+
+                                model_error_real_hi[~self.threshold_mask] += np.random.normal(
                                     0.0,
-                                    self.sigma_e_max,
-                                    size=(
-                                        self.Ntimes,
-                                        self.Nbls,
-                                        1,
-                                        1,
-                                    ),
-                                ) + 1.0j * np.random.normal(
+                                    self.sigma_e_0,
+                                    size=(self.Nbls),
+                                )[~self.threshold_mask]
+                                model_error_imag_hi[~self.threshold_mask] += np.random.normal(
                                     0.0,
-                                    self.sigma_e_max,
-                                    size=(
-                                        self.Ntimes,
-                                        self.Nbls,
-                                        1,
-                                        1,
-                                    ),
-                                )
+                                    self.sigma_e_0,
+                                    size=(self.Nbls),
+                                )[~self.threshold_mask]
+                                model_error_real_lo[self.threshold_mask] += np.random.normal(
+                                    0.0,
+                                    self.sigma_e_0 / reduction_factor,
+                                    size=(self.Nbls),
+                                )[self.threshold_mask]
+                                model_error_imag_lo[self.threshold_mask] += np.random.normal(
+                                    0.0,
+                                    self.sigma_e_0 / reduction_factor,
+                                    size=(self.Nbls),
+                                )[self.threshold_mask]
+                                self.data_visibilities[0,:,0,0] += (model_error_real_hi + model_error_real_lo
+                                                                    + 1.0j * (model_error_imag_hi + model_error_imag_lo))
                             except:
                                 print(sys.exc_info())
                                 print(f"Model error realization {i} failed. Was sigma_m set correctly?")
@@ -1947,9 +1765,9 @@ class CalData:
 
                     # plot param changes
                     def sim_error_type():
-                        if self.sigma_e_max == 0.0:
+                        if self.sigma_e_0 == 0.0:
                             return "thermal"
-                        elif self.sigma_n_max == 0.0:
+                        elif self.sigma_n_0 == 0.0:
                             return "model"
                         else:
                             return "both"
@@ -1960,22 +1778,22 @@ class CalData:
                     #     glim=self.glim,
                     #     ulim=self.ulim,
                     #     error_type=sim_error_type(),
-                    #     stddev_thermal=self.sigma_t_max,
-                    #     stddev_model=self.sigma_m_max,
+                    #     stddev_thermal=self.sigma_t_0,
+                    #     stddev_model=self.sigma_m_0,
                     # )
                     if perfect_model is not None:
-                        dev.plot_visibilities_in_uv_plane(
-                            self.fit_vis[0,:,0,0] - perfect_model[0,:,0,0],
-                            self.uv_array,
-                        )
-                    else:
-                        dev.plot_visibilities_in_uv_plane(
+                        # NOTE: If None then it doesn't work with many realizations
+                        self.model_params_realizations = self.fit_vis[0,:,0,0] - perfect_model[0,:,0,0]
+                    dev.plot_visibilities_in_uv_plane(
+                            cutoff_threshold,
                             self.model_params_realizations,
                             self.uv_array,
+                            reduction_factor=reduction_factor,
                         )
-                    dev.plot_gains_in_position_space(
-                        self.gain_params_realizations - 1,
-                        self.antpos_enu[:,:2]
-                    )
+                    # dev.plot_gains_in_position_space(
+                    #     cutoff_threshold,
+                    #     self.gain_params_realizations - 1,
+                    #     self.antpos_enu[:,:2]
+                    # )
 
                     #self.write_fit_vis()
