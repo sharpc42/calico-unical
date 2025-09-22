@@ -14,6 +14,9 @@ class DevTools:
         freq_ind=None
         vis_pol_ind=None
 
+    def format_var_name(self, input_string):
+        output_string = input_string.replace("_", " ")
+        return output_string.title()
 
     def compare_analytic_and_numeric_jacobians(self):
         jac_numeric_result = jacobian(self.cost_vectorized, 
@@ -1056,19 +1059,20 @@ class DevTools:
     # scatter plot spatial array with errors denoted by colors
     # (assumes spatial array of shape (N,2) with N being e.g. Nbls or Nants
     #  and 2 corresponding to x/y)
-    def plot_spatial_array_with_colored_errors(self, 
-                                               cutoff_threshold,
+    def plot_spatial_array_with_colored_errors(self,
                                                spatial_array, 
                                                error_array, 
                                                title, 
                                                xlabel, 
                                                ylabel, 
                                                filename,
+                                               scaling_factor=1,
+                                               threshold_length=50,
                                                upper_limit=None,
                                                lower_limit=None):
         colors = error_array / np.max(np.abs(error_array))
         plt.scatter(spatial_array[:,0], spatial_array[:,1], c=colors, cmap='viridis')
-        plt.title(f"{title}\nCutoff Threshold:{cutoff_threshold}")
+        plt.title(f"{title}")
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         if not upper_limit and not lower_limit:
@@ -1077,41 +1081,49 @@ class DevTools:
         plt.xlim(lower_limit, upper_limit)
         plt.ylim(lower_limit, upper_limit)
         plt.colorbar()
+        params = (
+            f'1/$\\sigma_e^2$ Scaling Factor {scaling_factor}\n'
+            f'Threshold Length {threshold_length}\n'
+        )
+        bbox = dict(boxstyle='round', fc='blanchedalmond', ec='orange', alpha=0.5)
+        plt.text(150, 100, params, fontsize=9, bbox=bbox, horizontalalignment='right')
         plt.savefig('images/' + filename + '.png')
         plt.close()
 
     # plot model visibilities in uv plane
-    def plot_visibilities_in_uv_plane(self, cutoff_threshold, u_minus_m, uv_arr, reduction_factor=1):
+    def plot_visibilities_in_uv_plane(self, threshold_length, u_minus_m, uv_arr, scaling_factor=1):
         self.plot_spatial_array_with_colored_errors(
-            cutoff_threshold,
             uv_arr,
             np.abs(u_minus_m),
-            "|u-v_T| in uv plane\n1/sigma_e^2 Reduction Factor = " + str(reduction_factor),
+            "|u-v_T| in uv plane",
             "u",
             "v",
-            "u_minus_m_in_uv_plane_redfac" + str(reduction_factor) 
+            "u_minus_m_in_uv_plane_redfac" + str(scaling_factor),
+            threshold_length=threshold_length,
+            scaling_factor=scaling_factor,
         )
     
-    # plot gain errors in position space
-    def plot_gains_in_position_space(self, cutoff_threshold, g_errors, ant_pos_arr):
+    # plot gain errors in position spacex
+    def plot_gains_in_position_space(self, threshold_length, g_errors, ant_pos_arr):
         self.plot_spatial_array_with_colored_errors(
-            cutoff_threshold,
             ant_pos_arr,
             g_errors,
             "g-(1,0) in north-east plane",
             "N",
             "E",
             "gain_error_in_spatial_plane",
+            threshold_length=threshold_length,
             upper_limit=300,
             lower_limit=-300,
         )
     
     def variable_sigmas_plot_individual_and_diff(self, 
-                                                 reduction_factor=1, 
-                                                 cutoff_threshold=50,
-                                                 cutoff_function="constant_weights",
+                                                 scaling_factor=1, 
+                                                 threshold_length=50,
+                                                 weighting_function="constant_weights",
                                                  sigma_m_0=1,
                                                  sigma_e_0=None,):
+        
         _,g,u1,uv = calwrap.unified_calibration_wrapper('data/tutorial_medium_onetime.uvfits',
                                                         'data/tutorial_medium_onetime.uvfits',
                                                         parallel=False,
@@ -1120,8 +1132,8 @@ class DevTools:
                                                         ulim=None,
                                                         antenna_gain_weights=None,
                                                         model_baseline_weights=None,
-                                                        cutoff_threshold=cutoff_threshold,
-                                                        cutoff_function=cutoff_function,
+                                                        threshold_length=threshold_length,
+                                                        weighting_function=weighting_function,
                                                         power=2,
                                                         sigma_t_0=1,
                                                         sigma_m_0=sigma_m_0,
@@ -1129,7 +1141,7 @@ class DevTools:
                                                         sigma_e_0=sigma_e_0,
                                                         gain_realizations=1,
                                                         model_realizations=1,
-                                                        reduction_factor=1)
+                                                        scaling_factor=1)
         
         _,g,u2,uv = calwrap.unified_calibration_wrapper('data/tutorial_medium_onetime.uvfits',
                                                         'data/tutorial_medium_onetime.uvfits',
@@ -1139,8 +1151,8 @@ class DevTools:
                                                         ulim=None,
                                                         antenna_gain_weights=None,
                                                         model_baseline_weights=None,
-                                                        cutoff_threshold=cutoff_threshold,
-                                                        cutoff_function=cutoff_function,
+                                                        threshold_length=threshold_length,
+                                                        weighting_function=weighting_function,
                                                         power=2,
                                                         sigma_t_0=1,
                                                         sigma_m_0=1,
@@ -1148,33 +1160,108 @@ class DevTools:
                                                         sigma_e_0=None,
                                                         gain_realizations=1,
                                                         model_realizations=1,
-                                                        reduction_factor=reduction_factor)
+                                                        scaling_factor=scaling_factor)
 
-        title = "Reduced minus unreduced |u-v^T| in uv plane\n" + \
-                {1/sigma_e_0^2} + f"Reduction Factor = 1" + \
-                f"\nCutoff Function: {cutoff_function}\nCutoff Threshold: {cutoff_threshold}" 
-        self.plot_spatial_array_with_colored_errors(
-            cutoff_threshold,
-            uv,
-            np.abs(u1) - np.abs(u2),
-            title,
-            "u",
-            "v",
-            f"reduced_minus_unreduced_mag_in_uv_plane_cof_{cutoff_function}"
-        )
+        # title = "Reduced minus unreduced |u-v^T| in uv plane\n" + \
+        #         f"1/sigma_e_0^2 Scaling Factor = 1" + \
+        #         f"\nWeighting Function: {self.format_var_name(weighting_function)}"
+        # self.plot_spatial_array_with_colored_errors(
+        #     uv,
+        #     np.abs(u1) - np.abs(u2),
+        #     title,
+        #     "u",
+        #     "v",
+        #     f"reduced_minus_unreduced_mag_in_uv_plane_cof_{weighting_function}",
+        #     threshold_length=threshold_length,
+        #     scaling_factor=scaling_factor,
+        # )
 
-        title = "|Reduced minus unreduced u-v^T| in uv plane\n" + \
-                f"1/sigma_e^2 Reduction Factor = {reduction_factor}" + \
-                f"\nCutoff Function: {cutoff_function}\nCutoff Threshold: {cutoff_threshold}" 
+        title = "|u1-u2| in uv plane" + \
+                f"\nWeighting Function: {self.format_var_name(weighting_function)}" 
         self.plot_spatial_array_with_colored_errors(
-            cutoff_threshold,
             uv,
             np.abs(u1 - u2),
             title,
-            "u",
-            "v",
-            f"mag_reduced_minus_unreduced_in_uv_plane_cof_{cutoff_function}"
+            "u (m)",
+            "v (m)",
+            f"mag_reduced_minus_unreduced_in_uv_plane_cof_{weighting_function}",
+            threshold_length=threshold_length,
+            scaling_factor=scaling_factor,
         )
+        
+        uv_norm = np.linalg.norm(uv, axis=1)
+        inner_baselines = np.abs(u1-u2)[uv_norm < threshold_length]
+        outer_baselines = np.abs(u1-u2)[uv_norm >= threshold_length]
+        self.plot_histogram(main_array=outer_baselines,
+                            extra_array=inner_baselines,
+                            main_label="Outer Baselines",
+                            extra_label="Inner Baselines",
+                            title=f"Histogram |u1-u2|\nWeighting Function: {weighting_function}",
+                            xlabel="|u1-u2|",
+                            ylabel="count",
+                            filename="u1u2_hist",
+                            main_num_bins=25,
+                            extra_num_bins=100,
+                            params = (
+                                f'1/$\\sigma_m^2$ Scaling Factor {scaling_factor}\n'
+                                f'Threshold Length {threshold_length}\n'
+                            ))
+
+    def plot_weights_per_baseline(self,
+                                  uv_norm_array,
+                                  weight_array,
+                                  weighting_function,
+                                  scaling_factor=1,
+                                  threshold_length=50):
+        plt.scatter(uv_norm_array, weight_array, marker="_")
+        plt.title(f"Weight per baseline length\nWeighting Function: {self.format_var_name(weighting_function)}")
+        plt.xlabel("Baseline length (m)")
+        plt.ylabel(f"1 / $\\sigma_m^2$")
+        plt.ylim(0, np.max(weight_array) + 0.1)
+        params = (
+            f'1/$\\sigma_m^2$ Scaling Factor {scaling_factor}\n'
+            f'Threshold Length {threshold_length}\n'
+        )
+        bbox = dict(boxstyle='round', fc='blanchedalmond', ec='orange', alpha=0.5)
+        plt.text(np.max(uv_norm_array), 0.1, params, fontsize=9, bbox=bbox, horizontalalignment='right')
+        plt.savefig('images/weights_per_baseline.png')
+        plt.close()
+
+    def plot_histogram(self,
+                       main_array,
+                       title,
+                       xlabel,
+                       ylabel,
+                       filename,
+                       params,
+                       extra_array=None,
+                       extra_label="",
+                       main_label="",
+                       main_num_bins=50,
+                       extra_num_bins=50):
+        main_step_size = (np.max(main_array) - np.min(main_array)) / main_num_bins
+        main_hist_edges = np.arange(np.min(main_array) - main_step_size/2, np.max(main_array) + main_step_size/2, main_step_size)
+        main_hist, _ = np.histogram(main_array, bins=main_hist_edges)
+        extra_step_size = (np.max(extra_array) - np.min(extra_array)) / extra_num_bins
+        extra_hist_edges = np.arange(np.min(extra_array) - extra_step_size/2, np.max(extra_array) + extra_step_size/2, extra_step_size)
+        extra_hist, _ = np.histogram(extra_array, bins=extra_hist_edges)
+        plt.hist(main_hist_edges[:-1], weights=main_hist, bins=main_num_bins, label=main_label, alpha=0.9)
+        plt.hist(extra_hist_edges[:-1], weights=extra_hist, bins=extra_num_bins, label=extra_label, alpha=0.8)
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        if extra_array is not None:
+            plt.legend()
+            text_x = max(np.max(main_array), max(extra_array))
+            text_y = max(max(main_hist), max(extra_hist)) / 2
+        else:
+            text_x = np.max(main_array)
+            text_y = max(main_hist) / 2
+        bbox = dict(boxstyle='round', fc='blanchedalmond', ec='orange', alpha=0.5)
+        print(f"text x {text_x} text y {text_y}")
+        plt.text(text_x, text_y, params, fontsize=9, bbox=bbox, horizontalalignment='right')
+        plt.savefig("images/" + filename + ".png")
+        plt.close()
 
     """getters and setters"""
     # params_init_flattened
