@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import pyuvdata
 from astropy.units import Quantity
-from calico import calibration_qa, calibration_optimization, dev_tools, variable_weights
+from calico import calibration_qa, calibration_optimization, dev_tools, variable_weights, noise_and_error_simulation as sim
 import multiprocessing
 
 
@@ -169,6 +169,7 @@ class CalData:
         self.gain_realizations = None
         self.model_realizations = None
         self.antpos_enu = None
+        self.threshold_length = 0
         self.threshold_mask = None
 
     def set_gains_from_calfile(self, calfile):
@@ -234,7 +235,13 @@ class CalData:
         gain_realizations=100,
         model_realizations=1,
         weighting_function="constant_weights",
-        scaling_factor=1,
+        scaling_factor_sim=1,
+        scaling_factor_cost=1,
+        sigma_t_0=0.1,
+        sigma_n_0=None,
+        sigma_m_0=0.1,
+        sigma_e_0=None,
+        threshold_length=50,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -726,12 +733,19 @@ class CalData:
         #     self.visibility_weights[np.where(flag_array)] = 0.0
 
         # Initialize data and model weights
+        self.threshold_length = threshold_length
         vwa = variable_weights.VariableWeightsArray()
         vwa.set_weights(
             self,
             weighting_function=weighting_function,
-            scaling_factor=scaling_factor
+            scaling_factor=scaling_factor_cost,
+            sigma_t_0=sigma_t_0,
+            sigma_n_0=sigma_n_0,
+            sigma_m_0=sigma_m_0,
+            sigma_e_0=sigma_e_0,
+            threshold_length=self.threshold_length
         )
+        vwa.plot_weights_per_baseline(self, scaling_factor=scaling_factor_cost)
 
         self.lambda_val = lambda_val
 
@@ -1508,8 +1522,9 @@ class CalData:
         max_processes=40,
         pool=None,
         verbose=False,
-        reduction_factor=1,
-        cutoff_threshold=50,
+        scaling_factor_sim=1,
+        scaling_factor_cost=1,
+        threshold_length=50,
     ):
         """
         Run calibration per polarization. Updates the gains attribute and u parameters with
@@ -1579,59 +1594,12 @@ class CalData:
                 if pool is None:  # Leave things how we found them
                     use_pool.terminate()
             else:
-                np.random.seed(42)
-                if self.sigma_n_0 != 0.0:
-                    # initial thermal noise
-                    try:
-                        thermal_noise_real = np.random.normal(
-                            0.0,
-                            self.sigma_t_0,
-                            size=(self.Nbls),
-                        )
-                        thermal_noise_imag = np.random.normal(
-                            0.0,
-                            self.sigma_t_0,
-                            size=(self.Nbls),
-                        )
-                        self.data_visibilities[0,:,0,0] += thermal_noise_real + 1.0j * thermal_noise_imag
-                    except:
-                        print(sys.exc_info())
-                        print("Initial thermal noise failed. Was sigma_t set correctly?")
+                if self.sigma_t_0 != 0.0:
+                    sim.simulate_thermal_noise(caldata_obj=self, seed=42)
                 perfect_model = None
                 if self.sigma_e_0 != 0.0:
-                    # initial model error
                     perfect_model = self.model_visibilities.copy()
-                    try:
-                        model_error_real_hi = np.zeros(self.Nbls)
-                        model_error_imag_hi = np.zeros(self.Nbls)
-                        model_error_real_lo = np.zeros(self.Nbls)
-                        model_error_imag_lo = np.zeros(self.Nbls)
-
-                        model_error_real_hi[~self.threshold_mask] += np.random.normal(
-                            0.0,
-                            self.sigma_e_0,
-                            size=(self.Nbls),
-                        )[~self.threshold_mask]
-                        model_error_imag_hi[~self.threshold_mask] += np.random.normal(
-                            0.0,
-                            self.sigma_e_0,
-                            size=(self.Nbls),
-                        )[~self.threshold_mask]
-                        model_error_real_lo[self.threshold_mask] += np.random.normal(
-                            0.0,
-                            self.sigma_e_0 / reduction_factor,
-                            size=(self.Nbls),
-                        )[self.threshold_mask]
-                        model_error_imag_lo[self.threshold_mask] += np.random.normal(
-                            0.0,
-                            self.sigma_e_0 / reduction_factor,
-                            size=(self.Nbls),
-                        )[self.threshold_mask]
-                        self.data_visibilities[0,:,0,0] += (model_error_real_hi + model_error_real_lo
-                                                            + 1.0j * (model_error_imag_hi + model_error_imag_lo))
-                    except:
-                        print(sys.exc_info())
-                        print("Initial model error failed. Was sigma_m set correctly?")
+                    sim.simulate_model_error(caldata_obj=self, seed=42, scaling_factor=scaling_factor_sim)
                 for freq_ind in range(self.Nfreqs):
                     self.gain_params_realizations = np.array([])
                     self.model_params_realizations = np.array([])
@@ -1646,87 +1614,13 @@ class CalData:
                         self.fit_vis = self.fit_vis_orig.copy()
                         # reset seed
                         import time
-                        if i % (realizations / self.gain_realizations) == 0 and self.sigma_n_0 != 0.0:
-                            # simulate thermal noise
-                            try:
-                                np.random.seed(i)
-                                actual_gain_realizations += 1
-                                self.data_visibilities += np.random.normal(
-                                    0.0,
-                                    self.sigma_n_0,
-                                    size=(
-                                        self.Ntimes,
-                                        self.Nbls,
-                                        1,
-                                        1,
-                                    ),
-                                ) + 1.0j * np.random.normal(
-                                    0.0,
-                                    self.sigma_n_0,
-                                    size=(
-                                        self.Ntimes,
-                                        self.Nbls,
-                                        1,
-                                        1,
-                                    ),
-                                )
-                            except:
-                                print(sys.exc_info())
-                                print(f"Thermal noise realization {i} failed. Was sigma_t set correctly?")
+                        if i % (realizations / self.gain_realizations) == 0:
+                            if self.sigma_n_0 != 0.0:
+                                sim.simulate_thermal_noise(caldata_obj=self, seed=i)
                         # simulate model error
-                        if i % (realizations / self.model_realizations) == 0 and self.sigma_e_0 != 0.0:
-                            try:
+                            if self.sigma_e_0 != 0.0:
                                 # actual_model_realizations += 1
-                                # self.model_visibilities += np.random.normal(
-                                #     0.0,
-                                #     self.sigma_e_0,
-                                #     size=(
-                                #         self.Ntimes,
-                                #         self.Nbls,
-                                #         1,
-                                #         1,
-                                #     ),
-                                # ) + 1.0j * np.random.normal(
-                                #     0.0,
-                                #     self.sigma_e_0,
-                                #     size=(
-                                #         self.Ntimes,
-                                #         self.Nbls,
-                                #         1,
-                                #         1,
-                                #     ),
-                                # )
-                                np.random.seed(42)
-                                model_error_real_hi = np.zeros(self.Nbls)
-                                model_error_imag_hi = np.zeros(self.Nbls)
-                                model_error_real_lo = np.zeros(self.Nbls)
-                                model_error_imag_lo = np.zeros(self.Nbls)
-
-                                model_error_real_hi[~self.threshold_mask] += np.random.normal(
-                                    0.0,
-                                    self.sigma_e_0,
-                                    size=(self.Nbls),
-                                )[~self.threshold_mask]
-                                model_error_imag_hi[~self.threshold_mask] += np.random.normal(
-                                    0.0,
-                                    self.sigma_e_0,
-                                    size=(self.Nbls),
-                                )[~self.threshold_mask]
-                                model_error_real_lo[self.threshold_mask] += np.random.normal(
-                                    0.0,
-                                    self.sigma_e_0 / reduction_factor,
-                                    size=(self.Nbls),
-                                )[self.threshold_mask]
-                                model_error_imag_lo[self.threshold_mask] += np.random.normal(
-                                    0.0,
-                                    self.sigma_e_0 / reduction_factor,
-                                    size=(self.Nbls),
-                                )[self.threshold_mask]
-                                self.data_visibilities[0,:,0,0] += (model_error_real_hi + model_error_real_lo
-                                                                    + 1.0j * (model_error_imag_hi + model_error_imag_lo))
-                            except:
-                                print(sys.exc_info())
-                                print(f"Model error realization {i} failed. Was sigma_m set correctly?")
+                                sim.simulate_model_error(caldata_obj=self, seed=i, scaling_factor=scaling_factor_sim)
                         # main unical code
                         before_arr_gains = self.gains[:, [freq_ind], :].copy()
                         before_arr_u = self.fit_vis[:, :, [freq_ind], :].copy()
@@ -1784,14 +1678,20 @@ class CalData:
                     if perfect_model is not None:
                         # NOTE: If None then it doesn't work with many realizations
                         self.model_params_realizations = self.fit_vis[0,:,0,0] - perfect_model[0,:,0,0]
-                    dev.plot_visibilities_in_uv_plane(
-                            cutoff_threshold,
-                            self.model_params_realizations,
-                            self.uv_array,
-                            reduction_factor=reduction_factor,
-                        )
+                    sim_weight_array = sim.format_sim_weights_per_baseline(self, 
+                                                                           scaling_factor=scaling_factor_sim, 
+                                                                           threshold_length=threshold_length)
+                    sim.plot_weights_per_baseline(self, sim_weight_array, 
+                                                  scaling_factor=scaling_factor_sim, 
+                                                  threshold_length=threshold_length)
+                    # dev.plot_visibilities_in_uv_plane(
+                    #         threshold_length,
+                    #         self.model_params_realizations,
+                    #         self.uv_array,
+                    #         scaling_factor=1/scaling_factor,
+                    #     )
                     # dev.plot_gains_in_position_space(
-                    #     cutoff_threshold,
+                    #     threshold_length,
                     #     self.gain_params_realizations - 1,
                     #     self.antpos_enu[:,:2]
                     # )
