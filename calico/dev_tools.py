@@ -427,7 +427,6 @@ class DevTools:
         freq_ind : int = 0,
         vis_pol_ind : int = 0,
         feed_pol_ind : int = 0,
-        model_error_type : str = "additive",
     ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
         #       freqs so there's no immediate issue. However we will want to get there
@@ -503,7 +502,7 @@ class DevTools:
                     print(f"Creating model error realization {i+1}")
                 model_error_real, model_error_imag, me_real_long, me_real_short = sim.simulate_model_error(
                                                                                       Nbls=caldata_obj.Nbls,
-                                                                                      sigma_e_0=run_params['sigma_e'],
+                                                                                      sigma_e_0=np.abs(run_params['sigma_e']),
                                                                                       uv_norm_array=caldata_obj.uv_norm,
                                                                                       threshold_length=100,
                                                                                       weighting_function=run_params['weighting_function'],
@@ -516,9 +515,9 @@ class DevTools:
                     model_error_real = 0
                     model_error_imag = 0
                 this_model_error = model_error_real + 1.0j*model_error_imag  
-                if model_error_type == "additive":
+                if run_params['sigma_e'] >= 0:
                     model_vis_realizations.append(initial_model_vis + this_model_error)
-                elif model_error_type == "subtractive":
+                elif run_params['sigma_e'] < 0:
                     model_vis_realizations.append(initial_model_vis)
                     initial_data_vis += this_model_error
                 model_err_realizations_long.append(me_real_long)
