@@ -1,7 +1,7 @@
 import pickle
 import os
 
-max_realizations = 2
+max_realizations = 1
 fhd_runs_medium_noise_01_m = 1.03
 fhd_runs_medium_noise_015_m = 1.53
 fhd_runs_medium_noise_05_m = 3.46
@@ -2079,10 +2079,10 @@ def generate_files():
 def generate_custom_file(
     filename: str,
     scaling_factors: list,
-    sigma_t: float = add_gaussian_error_medium_noise / 10,
-    sigma_n: float = add_gaussian_error_medium_noise / 10,
-    sigma_m: float = add_gaussian_error_medium_noise,
-    sigma_e: float = add_gaussian_error_medium_noise,
+    sigma_t: float = fhd_runs_medium_noise_015_m / 10,
+    sigma_n: float = fhd_runs_medium_noise_015_m / 10,
+    sigma_m: float = fhd_runs_medium_noise_015_m,
+    sigma_e: float = fhd_runs_medium_noise_015_m,
     thermal_realizations: int = max_realizations,
     model_realizations: int = 0,
     weighting_function: str = "constant_weights",
@@ -2103,5 +2103,5 @@ def generate_custom_file(
             },
         )
     cwd = os.getcwd()
-    with open(f'{cwd}/calico/data/{filename}.pkl', 'wb') as file:
+    with open(f'{cwd}/calico/data/{filename}_run_params.pkl', 'wb') as file:
         pickle.dump(custom_file, file)

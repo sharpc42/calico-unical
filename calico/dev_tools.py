@@ -22,11 +22,13 @@ class DevTools:
         freq_ind=None
         vis_pol_ind=None
 
-    def format_var_name(self, input_string: str) -> str:
+    def format_var_name(self, 
+                        input_string: str
+    ) -> str:
         output_string = input_string.replace("_", " ")
         return output_string.title()
 
-    def compare_analytic_and_numeric_jacobians(self):
+    def compare_analytic_and_numeric_jacobians(self) -> None:
         jac_numeric_result = jacobian(self.cost_vectorized, 
                                       self.params_init_flattened).df
         jac_analytic_result = cal_opt.jacobian_unical_wrapper(
@@ -87,22 +89,13 @@ class DevTools:
             (-2,2),
             "step_dir_numeric_",
         )
-        # scatter plot of numeric step vs analytic step
-        # plt.scatter(analytic_step.real, analytic_step.imag, c="blue")
-        # plt.scatter(numeric_step.real, numeric_step.imag, c="orange")
-        # plt.title("Analytic Step (Blue) and Numeric Step (Orange)")
-        # plt.xlabel("Real")
-        # plt.ylabel("Imag")
-        # plt.savefig('images/' + 'analytic-vs-numeric_'
-        #          + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-        #          + '.png',
-        #          bbox_inches=0,)
     
     def display_where_large_real_or_imag(
         self,
         jac_analytic: np.ndarray[float],
         jac_numeric: np.ndarray[float],
-    ):
+        verbose : bool = False,
+    ) -> None:
         jac_error, jac_frac, where_large = self.calc_error_vals(jac_numeric, jac_analytic)
         n_vals = len(where_large[0])
         # find large errors
@@ -111,27 +104,19 @@ class DevTools:
         param_vals = self.params_init_flattened[where_large]
         # print display
         np.set_printoptions(precision=4)
-        print("***WHERE ERROR IS LARGE***")
+        if verbose:
+           print("***WHERE ERROR IS LARGE***")
         part = lambda x : "Real" if x == 0 else "Imag"
-        for val in range(n_vals):
-            print("Value",val+1)
-            print(f"aj: {analytic_vals[val]} nj: {numeric_vals[val]} val: {param_vals[val]} bl_ind: {part((where_large[0][val] - 2*self.Nants_unflagged) % 2)}")
-        # plot display
-        # params = [x for x in range(2 * self.Nants_unflagged + 2 * len(self.caldata_obj.bl_inds))]
-        # plt.scatter(params, jac_error)
-        # plt.scatter(params, jac_frac, alpha=0.3)
-        # plt.title("Fractional error vs Numerical fraction")
-        # plt.xlabel("Params (alternating real/imag)")
-        # plt.savefig('images/' + 'where_large_'
-        #          + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-        #          + '.png',
-        #          bbox_inches=0,)
+        if verbose:
+            for val in range(n_vals):
+                print("Value",val+1)
+                print(f"aj: {analytic_vals[val]} nj: {numeric_vals[val]} val: {param_vals[val]} bl_ind: {part((where_large[0][val] - 2*self.Nants_unflagged) % 2)}")
 
     def calc_error_vals(
         self,
-        numeric_jac: np.ndarray,
-        analytic_jac: np.ndarray,
-    ) -> tuple[float, float, np.ndarray]:
+        numeric_jac : np.ndarray,
+        analytic_jac : np.ndarray,
+    ) -> tuple[float, float, np.ndarray[int]]:
         jac_error = (np.abs(analytic_jac - numeric_jac)
                      / (np.abs(analytic_jac) + np.abs(numeric_jac)))
         jac_frac = (2 * np.abs(numeric_jac)
@@ -143,8 +128,8 @@ class DevTools:
     # normalized complex array
     def assemble_jac_into_complex_array(
         self,
-        analytic_jac_result: np.ndarray[float], 
-        numeric_jac_result: np.ndarray[float],
+        analytic_jac_result : np.ndarray[float], 
+        numeric_jac_result : np.ndarray[float],
     ) -> tuple[np.ndarray[complex], np.ndarray[complex]]:
         jac = np.zeros(shape=(self.Nants_unflagged + self.caldata_obj.Nbls), dtype=complex)
         jac_numeric = np.zeros(shape=(self.Nants_unflagged + self.caldata_obj.Nbls), dtype=complex)
@@ -158,7 +143,7 @@ class DevTools:
         jac_numeric /= np.abs(jac_numeric)
         return jac, jac_numeric
 
-    def get_starting_cost_func_val(self):
+    def get_starting_cost_func_val(self) -> None:
         print("***STARTING FUNCTION VALUE***", 
         cal_opt.cost_unical_wrapper(self.params_init_flattened,
                                     self.caldata_obj,
@@ -168,7 +153,9 @@ class DevTools:
                                     self.freq_ind,
                                     self.vis_pol_ind,))
         
-    def cost_for_numeric_jac(self, params_array: np.ndarray[float]) -> float:
+    def cost_for_numeric_jac(self, 
+                             params_array : np.ndarray[float]
+    ) -> float:
         self.Nants_unflagged = len(self.caldata_obj.ant_inds)
         # reshape gain params
         gains_reshaped = np.reshape(params_array[:2*self.Nants_unflagged], (self.Nants_unflagged, 2))
@@ -186,21 +173,23 @@ class DevTools:
                        + self.caldata_obj.model_weights_reshaped * np.abs(res_vec_2)**2)
         return cost
     
-    def cost_vectorized(self, params_array: np.ndarray[float]) -> np.ndarray:
+    def cost_vectorized(self, 
+                        params_array : np.ndarray[float]
+    ) -> np.ndarray:
         return np.apply_along_axis(self.cost_for_numeric_jac, axis=0, arr=params_array)
     
     def complex_trajectory_plot(
         self,
-        starting_complex_point: list[complex] | np.ndarray[complex],
-        complex_step: list[complex] | np.ndarray[complex],
-        n_trajectories: int,
-        filename_prefix: str,
-        xlims: tuple[int | float] = None,
-        ylims: tuple[int | float] = None,
-        title: str = "",
-        xlabel: str = "",
-        ylabel: str = "",
-    ):
+        starting_complex_point : list[complex] | np.ndarray[complex],
+        complex_step : list[complex] | np.ndarray[complex],
+        n_trajectories : int,
+        filename_prefix : str,
+        xlims : tuple[int | float] = None,
+        ylims : tuple[int | float] = None,
+        title : str = "",
+        xlabel : str = "",
+        ylabel : str = "",
+    ) -> None:
         fig, ax = plt.subplots()
         for val in range(n_trajectories):
             ax.annotate(
@@ -230,20 +219,22 @@ class DevTools:
 
     def plot_change_in_gain_and_model_params(
         self, 
-        gains_array: np.ndarray, 
-        models_array: np.ndarray,
-        type: str = "trajectory",
-        glim: tuple[int | float, int | float] = (-0.013, 0.013),
-        ulim: tuple[int | float, int | float] = (-1.5,1.5),
-        error_type="thermal",
-        stddev_thermal="1",
-        stddev_model="1",
-    ):
-        # print("***FIT TESTS***")
-        # print("\tGains Error, Min -", np.min(np.abs(self.caldata_obj.gains - 1)))
-        # print("\tGains Error, Max -", np.max(np.abs(self.caldata_obj.gains - 1)))
-        # print("\t|u-m|, Min -", np.min(np.abs(self.caldata_obj.fit_vis - self.caldata_obj.model_visibilities)))
-        # print("\t|u-m|, Max -", np.max(np.abs(self.caldata_obj.fit_vis - self.caldata_obj.model_visibilities)))
+        gains_array : np.ndarray, 
+        models_array : np.ndarray,
+        type : str = "trajectory",
+        glim : tuple[int | float, int | float] = (-0.013, 0.013),
+        ulim : tuple[int | float, int | float] = (-1.5,1.5),
+        error_type : str = "thermal",
+        stddev_thermal : str = "1",
+        stddev_model : str = "1",
+        verbose : bool = False,
+    ) -> None:
+        if verbose:
+            print("***FIT TESTS***")
+            print("\tGains Error, Min -", np.min(np.abs(self.caldata_obj.gains - 1)))
+            print("\tGains Error, Max -", np.max(np.abs(self.caldata_obj.gains - 1)))
+            print("\t|u-m|, Min -", np.min(np.abs(self.caldata_obj.fit_vis - self.caldata_obj.model_visibilities)))
+            print("\t|u-m|, Max -", np.max(np.abs(self.caldata_obj.fit_vis - self.caldata_obj.model_visibilities)))
         if type == "trajectory" or type == "both":
             # plot gains parameters trajectory
             self.complex_trajectory_plot(
@@ -336,15 +327,15 @@ class DevTools:
             plt.close()
 
     def old_calculate_many_realizations(self, 
-                                    data_file: str,
-                                    run_params_filename: str,
-                                    out_file: str,
-                                    model_file: str = "",
-                                    variation: str = "stddev", 
-                                    max_realizations: int = 100,
-                                    verbose: bool = False,
-                                    simulate_visibilities: bool = False,
-    ):
+                                    data_file : str,
+                                    run_params_filename : str,
+                                    out_file : str,
+                                    model_file : str = "",
+                                    variation : str = "stddev", 
+                                    max_realizations : int = 100,
+                                    verbose : bool = False,
+                                    simulate_visibilities : bool = False,
+    ) -> tuple[np.ndarray[complex] | np.ndarray[complex] | np.ndarray[complex]]:
 
         with open(f'calico/data/{run_params_filename}.pkl', 'rb') as file:
             run_params_list = pickle.load(file)
@@ -428,16 +419,16 @@ class DevTools:
 
     def calculate_many_realizations(
         self,
-        run_params_filename = 'baseline_dependence_runs_large_noise',
-        vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename
-        model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename
-        verbose=True,
-        caldata_obj=None,
-        freq_ind=0,
-        vis_pol_ind=0,
-        feed_pol_ind=0,
-        model_error_type="additive",
-    ):
+        run_params_filename : str = 'baseline_dependence_runs_large_noise',
+        vis_data_writeout_filename : str = 'tutorial_full_onetime_unflagged',
+        model_data_writeout_filename : str = 'tutorial_full_onetime_unflagged',
+        verbose : bool = True,
+        caldata_obj : bool = None,
+        freq_ind : int = 0,
+        vis_pol_ind : int = 0,
+        feed_pol_ind : int = 0,
+        model_error_type : str = "additive",
+    ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
         #       freqs so there's no immediate issue. However we will want to get there
         #       eventually, and right now the used freq ind is set inside the unical
@@ -477,7 +468,7 @@ class DevTools:
             num_model_realizations = run_params['model_error_realizations']
 
             if verbose:
-                print("n before", n)
+                print("Number of runs", n)
 
             # do one if not set
             if verbose:
@@ -509,7 +500,7 @@ class DevTools:
             # create realizations of thermal noise and model error
             for i in range(num_model_realizations):
                 if verbose: 
-                    print(f"Creating model error realization {i}")
+                    print(f"Creating model error realization {i+1}")
                 model_error_real, model_error_imag, me_real_long, me_real_short = sim.simulate_model_error(
                                                                                       Nbls=caldata_obj.Nbls,
                                                                                       sigma_e_0=run_params['sigma_e'],
@@ -534,7 +525,7 @@ class DevTools:
                 model_err_realizations_short.append(me_real_short)
             for i in range(num_thermal_realizations):
                 if verbose: 
-                    print(f"Creating thermal noise realization {i}")
+                    print(f"Creating thermal noise realization {i+1}")
                 thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
                                                              sigma_t_0=run_params['sigma_t'],
                                                              Nbls=caldata_obj.Nbls,
@@ -557,9 +548,9 @@ class DevTools:
             cost_function_realizations = []
 
             for j, data in enumerate(data_vis_realizations):
-                if verbose: print(f"Optimization - Data thermal noise realization {j}")
+                if verbose: print(f"Optimization - Data thermal noise realization {j+1}")
                 for k, model in enumerate(model_vis_realizations):
-                    if verbose: print(f"Optimization - Model error realization {k}")
+                    if verbose: print(f"Optimization - Model error realization {k+1}")
                     caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind] = data
                     caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind] = model
                     vwa = variable_weights.VariableWeightsArray()
@@ -572,10 +563,13 @@ class DevTools:
                         threshold_length=caldata_obj.threshold_length
                     )
                     caldata_obj.unified_calibration(verbose=verbose)
+                    
+                    # store data
                     full_data_realizations = np.concatenate((full_data_realizations, data))
                     full_model_realizations = np.concatenate((full_model_realizations, model))
                     gains = copy.deepcopy(caldata_obj.gains[:,freq_ind,feed_pol_ind])
                     gain_params_realizations = np.concatenate((gain_params_realizations, gains))
+                    print(f"***GAIN PARAMS REALIZATIONS***\n{gain_params_realizations}\n\n")
                     u_params = copy.deepcopy(caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind])
                     model_params_realizations = np.concatenate((model_params_realizations, u_params))
                     true_sky_realizations = np.concatenate((true_sky_realizations, initial_data_vis))
@@ -640,29 +634,23 @@ class DevTools:
                     'uv array': uv_array,
                     'cost runs': np.asarray(cost_function_realizations),
                 }
-            print("n after", n)
             with open(f'{model_path}_{run_params_filename}_output_arr_{n}.pkl', 'wb') as file:
                 print(f"data path {model_path}")
                 print(f"file\n\t{file}")
                 pickle.dump(output_arrays, file)
-            # cleanup files
-            os.system(f'rm {data_path}_data_temp.pkl')
-            os.system(f'rm {model_path}_model_temp.pkl')
-            os.system(f'rm {data_path}_temp_noise.pkl')
-            os.system(f'rm {data_path}_temp_model_err_long.pkl')
-            os.system(f'rm {data_path}_temp_model_err_short.pkl')
 
             if verbose:
                 print("***FINISHED THIS RUN***")
-                print(f"\n***Many realizations time***\n\t{(start_many_real_time - time.time())/3600} hours\n")
+                print(f"\n***Many realizations time***\n\t{(time.time() - start_many_real_time)/3600:.4f} hours\n")
 
     def plot_many_realizations(self, 
-                               variation = "stddev", 
-                               data_filepath = "", 
-                               run_params_filename = "",
-                               threshold_length = 100,
-                               simulation_type = "gaussian",
-                               verbose = False,):
+                               variation: str = "stddev", 
+                               data_filepath: str = "", 
+                               run_params_filename: str = "",
+                               threshold_length: int = 100,
+                               simulation_type: str = "gaussian",
+                               verbose: bool = False,
+        ) -> None:
 
         with open(f'calico/data/{run_params_filename}.pkl', 'rb') as file:
             run_params_list = pickle.load(file)
@@ -692,6 +680,7 @@ class DevTools:
             except:
                 e_short_arr = None
                 e_long_arr = None
+            if not (np.any(e_short_arr) and np.any(e_long_arr)):
                 split_model_error_arrays = False
             uv_arr = output_arrays['uv array']
             cost_arr = output_arrays['cost runs']
@@ -709,7 +698,6 @@ class DevTools:
                 uvT_var = np.std(u_minus_vT)
                 v_var = np.std(v_arr)
                 vT_var = np.std(vT_arr)
-                cost_var = np.std(cost_arr)
             elif variation == "iqr":
                 g_var_real = np.percentile(g_arr.real, 75) - np.percentile(g_arr.real, 25)
                 um_var_real = np.percentile(u_minus_m.real, 75) - np.percentile(u_minus_m.real, 25)
@@ -752,7 +740,6 @@ class DevTools:
                                       np.max(np.abs(e_long_arr.real))])
                 es_boundary = np.max([np.min(np.abs(e_short_arr.real)), 
                                       np.max(np.abs(e_short_arr.real))])
-            cost_boundary = np.max(cost_arr)
 
             # set bin sizes
             # g_step = g_var / 7.5
@@ -764,7 +751,6 @@ class DevTools:
             uvT_step = uvT_boundary / 100
             v_step = vT_var / 7.5  # change to appropriate fixed size
             e_step = 0.2
-            cost_step = cost_var / 7.5  # not fixed between runs
 
             g_bins = np.arange(-g_boundary, g_boundary, g_step)
             um_bins = np.arange(-um_boundary, um_boundary, um_step)
@@ -777,7 +763,6 @@ class DevTools:
                 el_bins = np.arange(-el_boundary, el_boundary, e_step)
             if es_boundary is not None:
                 es_bins = np.arange(-es_boundary, es_boundary, e_step)
-            cost_bins = np.arange(-cost_step, cost_boundary, cost_step)
 
             # calculate centers
             if variation == "stddev":
@@ -819,9 +804,6 @@ class DevTools:
                 error_short_hist, error_short_bins = np.histogram(e_short_arr, 
                                                                   bins=es_bins, 
                                                                   density=True)
-            cost_func_hist, cost_func_bins = np.histogram(cost_arr,
-                                                          bins=cost_bins,
-                                                          density=True)
             g_real_hist, g_real_bins = np.histogram(g_arr.real, 
                                                     bins=g_bins, 
                                                     density=True)
@@ -1037,28 +1019,29 @@ class DevTools:
                 + '_sigma_t_' + which_sigma_t + '.pdf',
                 bbox_inches=0, format='pdf')
         
-        with open(f'{data_filepath}_{run_params_filename}_calculated_values.pkl', 'wb') as file:
+        with open(f'calico/data/gain_error_offset_analysis_output_calcs.pkl', 'wb') as file:
             if verbose:
                 print(f"***calculated values***")
                 print(f"data path {data_filepath}")
                 print(f"file\n\t{file}")
-            pickle.dump(output_arrays, file)
+            pickle.dump(output_dicts, file)
         
         plt.close()
 
-    def test_function(self):
+    def test_function(self) -> None:
         return 'Returning a new and beautiful string, some say the best string, from within dev tools test function'
 
     # plot gain errors across realizations for one antenna at a time at two
     # scales: one set to "var" (stddev/IQR), the other to "max" (outliers)
     def plot_gains_one_ant_same_noise_and_error(self, 
-                                                num_realizations: int = 20, 
-                                                sigma: int | float = 1.0,
-                                                variation: str = "stddev", 
-                                                plot_type: str = "variation",
-                                                data_path: str = 'data/tutorial_medium_onetime.uvfits',
-                                                weights_threshold: int | float = 50,
-                                                cutoff_function: str = "constant_weights") -> float:
+                                                num_realizations : int = 20, 
+                                                sigma : int | float = 1.0,
+                                                variation : str = "stddev", 
+                                                plot_type : str = "variation",
+                                                data_path : str = 'data/tutorial_medium_onetime.uvfits',
+                                                weights_threshold : int | float = 50,
+                                                cutoff_function : str = "constant_weights"
+        ) -> float:
 
         uvc, g_arr, u_arr = calwrap.unified_calibration_wrapper(data_path,
                                                                 data_path,
@@ -1172,9 +1155,10 @@ class DevTools:
         return np.mean(np.abs(antenna_gain_error_centers - 1)), np.abs(np.mean(antenna_gain_error_centers) - 1)
 
     def plot_gain_error_per_realization(self, 
-                                        gain_error_array: np.ndarray, 
-                                        variation: str = "stddev", 
-                                        plot_type: str = "variation"):
+                                        gain_error_array : np.ndarray, 
+                                        variation : str = "stddev", 
+                                        plot_type : str = "variation"
+        ) -> None:
         num_realizations = len(gain_error_array)
 
         # print("***NUM REALIZATIONS***", num_realizations)
@@ -1263,20 +1247,23 @@ class DevTools:
             bbox_inches=0,)
         plt.close(fig)
 
-    # scatter plot spatial array with errors denoted by colors
-    # (assumes spatial array of shape (N,2) with N being e.g. Nbls or Nants
-    #  and 2 corresponding to x/y)
+    """
+        Plots a scatter plot spatial array with errors denoted by colors
+        (assumes spatial array of shape (N,2) with N being e.g. Nbls or Nants
+        and 2 corresponding to x/y)
+    """
     def plot_spatial_array_with_colored_errors(self,
-                                               spatial_array: np.ndarray, 
-                                               error_array: np.ndarray, 
-                                               title: str, 
-                                               xlabel: str, 
-                                               ylabel: str, 
-                                               filename: str,
-                                               scaling_factor: int = 1,
-                                               threshold_length: int = 50,
-                                               upper_limit: int = None,
-                                               lower_limit: int = None):
+                                               spatial_array : np.ndarray, 
+                                               error_array : np.ndarray, 
+                                               title : str, 
+                                               xlabel : str, 
+                                               ylabel : str, 
+                                               filename : str,
+                                               scaling_factor : int = 1,
+                                               threshold_length : int = 50,
+                                               upper_limit : int = None,
+                                               lower_limit : int = None
+        ) -> None:
         colors = error_array / np.max(np.abs(error_array))
         plt.scatter(spatial_array[:,0], spatial_array[:,1], c=colors, cmap='viridis')
         plt.title(f"{title}")
@@ -1298,7 +1285,12 @@ class DevTools:
         plt.close()
 
     # plot model visibilities in uv plane
-    def plot_visibilities_in_uv_plane(self, threshold_length, u_minus_m, uv_arr, scaling_factor=1):
+    def plot_visibilities_in_uv_plane(self, 
+                                      threshold_length : int, 
+                                      u_minus_m : np.ndarray[complex], 
+                                      uv_arr : np.ndarray[complex], 
+                                      scaling_factor : int = 1,
+        ) -> None:
         self.plot_spatial_array_with_colored_errors(
             uv_arr,
             np.abs(u_minus_m),
@@ -1311,7 +1303,11 @@ class DevTools:
         )
     
     # plot gain errors in position spacex
-    def plot_gains_in_position_space(self, threshold_length, g_errors, ant_pos_arr):
+    def plot_gains_in_position_space(self, 
+                                     threshold_length : int, 
+                                     g_errors : np.ndarray[float], 
+                                     ant_pos_arr : np.ndarray[float]
+        ) -> None:
         self.plot_spatial_array_with_colored_errors(
             ant_pos_arr,
             g_errors,
@@ -1325,13 +1321,14 @@ class DevTools:
         )
     
     def variable_sigmas_plot_individual_and_diff(self, 
-                                                 scaling_factor_sim=1,
-                                                 scaling_factor_cost=1, 
-                                                 threshold_length=50,
-                                                 weighting_function="constant_weights",
-                                                 sigma_m_0=1,
-                                                 sigma_e_0=None,
-                                                 datafile='data/tutorial_medium_onetime.uvfits'):
+                                                 scaling_factor_sim : int = 1,
+                                                 scaling_factor_cost : int = 1, 
+                                                 threshold_length : int = 50,
+                                                 weighting_function : str = "constant_weights",
+                                                 sigma_m_0 : int = 1,
+                                                 sigma_e_0 : int = None,
+                                                 datafile : str = "data/tutorial_medium_onetime.uvfits"
+        ) -> None:
 
         _,g1,u1,m,uv = calwrap.unified_calibration_wrapper(data=datafile,
                                                            model=datafile,
@@ -1459,8 +1456,9 @@ class DevTools:
                                   weighting_function,
                                   scaling_factor=1,
                                   threshold_length=50,
-                                  sigma="sigma_m",
-                                  ylim=None):
+                                  sigma : str = "sigma_m",
+                                  ylim : float = None
+    ) -> None:
         plt.scatter(uv_norm_array, weight_array, marker="_")
         plt.title(f"Weight per baseline length\nWeighting Function: {self.format_var_name(weighting_function)}")
         plt.xlabel("Baseline length (m)")
@@ -1478,19 +1476,20 @@ class DevTools:
         plt.close()
 
     def plot_histogram(self,
-                       main_array,
-                       title,
-                       xlabel,
-                       ylabel,
-                       filename,
-                       params,
-                       extra_array=None,
+                       main_array : np.ndarray[float],
+                       title : str,
+                       xlabel : str,
+                       ylabel : str,
+                       filename : str,
+                       params : str,
+                       extra_array : np.ndarray[float] = None,
                        extra_label="",
                        main_label="",
                        main_num_bins=50,
                        extra_num_bins=50,
                        xlim_hi: int = None,
-                       xlim_lo: int = -1,):
+                       xlim_lo: int = -1,
+    ) -> None:
         if not xlim_hi:
             if extra_array is not None:
                 xlim_hi = np.max([np.max(main_array), np.max(extra_array)]) * 1.1
@@ -1532,23 +1531,24 @@ class DevTools:
         plt.close()
 
     def plot_histogram2d(self,
-                         main_array,
-                         title,
-                         xlabel,
-                         ylabel,
-                         filename,
-                         params,
-                         main_label="",
-                         main_num_bins=50,
+                         main_array : np.ndarray[float],
+                         title : str,
+                         xlabel : str,
+                         ylabel : str,
+                         filename : str,
+                         params : str,
+                         main_label : str = "",
+                         main_num_bins : int = 50,
                          xlim_hi: int | float = None,
                          xlim_lo: int | float = None,
                          ylim_lo: int | float = None,
                          ylim_hi: int | float = None,
-                         variation="stddev",
-                         radius=None,
-                         xlim=None,
-                         ylim=None,
-                         ax=None):
+                         variation : str = "stddev",
+                         radius : float = None,
+                         xlim : int | float = None,
+                         ylim : int | float = None,
+                         ax : plt.axes = None
+    ) -> None:
         
         if variation == "stddev":
             main_var = np.std(main_array)
@@ -1598,29 +1598,64 @@ class DevTools:
         plt.savefig(f"images/{filename}.png")
         plt.close()
 
-    """getters and setters"""
+    """
+        Getters and Setters
+    """
     # params_init_flattened
-    def get_params_init_flattened(self) -> np.ndarray[float]:
+    def get_params_init_flattened(
+        self
+    ) -> np.ndarray[float]:
         return self.params_init_flattened
-    def set_params_init_flattened(self, val):
+    
+    def set_params_init_flattened(
+        self, 
+        val : np.ndarray[float]
+    ) -> None:
         self.params_init_flattened = val
+
     # caldata_obj
-    def get_caldata_obj(self) -> object:
+    def get_caldata_obj(
+        self
+    ) -> object:
         return self.caldata_obj
-    def set_caldata_obj(self, val):
+    
+    def set_caldata_obj(
+        self,
+        val : object,
+    ) -> None:
         self.caldata_obj = val
+
     # Nants_unflagged
-    def get_Nants_unflagged(self) -> int:
+    def get_Nants_unflagged(
+        self
+    ) -> int:
         return self.Nants_unflagged
-    def set_Nants_unflagged(self, val):
+    
+    def set_Nants_unflagged(
+        self, 
+        val : int,
+    ) -> None:
         self.Nants_unflagged = val
+
     # freq_ind
-    def get_freq_ind(self) -> int:
+    def get_freq_ind(
+        self
+    ) -> int:
         return self.freq_ind
-    def set_freq_ind(self, val):
+    
+    def set_freq_ind(self,
+                     val : int,
+    ) -> None:
         self.freq_ind = val
+
     # vis_pol_ind
-    def get_vis_pol_ind(self) -> int:
+    def get_vis_pol_ind(
+        self
+    ) -> int:
         return self.vis_pol_ind
-    def set_vis_pol_ind(self, val):
+    
+    def set_vis_pol_ind(
+        self, 
+        val : int,
+    ) -> None:
         self.vis_pol_ind = val
