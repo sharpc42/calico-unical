@@ -514,10 +514,12 @@ class DevTools:
                         print("Did not simulate model error")
                     model_error_real = 0
                     model_error_imag = 0
-                this_model_error = model_error_real + 1.0j*model_error_imag  
-                if run_params['sigma_e'] >= 0:
+                this_model_error = model_error_real + 1.0j*model_error_imag 
+                # vT < m
+                if run_params['sigma_e'] < 0:
                     model_vis_realizations.append(initial_model_vis + this_model_error)
-                elif run_params['sigma_e'] < 0:
+                # vT > m
+                elif run_params['sigma_e'] >= 0:
                     model_vis_realizations.append(initial_model_vis)
                     initial_data_vis += this_model_error
                 model_err_realizations_long.append(me_real_long)
@@ -568,8 +570,8 @@ class DevTools:
                     full_model_realizations = np.concatenate((full_model_realizations, model))
                     gains = copy.deepcopy(caldata_obj.gains[:,freq_ind,feed_pol_ind])
                     gain_params_realizations = np.concatenate((gain_params_realizations, gains))
-                    print(f"***GAIN PARAMS REALIZATIONS***\n{gain_params_realizations}\n\n")
                     u_params = copy.deepcopy(caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind])
+                    # print(f"***U PARAMS***\n{u_params}\n\n")
                     model_params_realizations = np.concatenate((model_params_realizations, u_params))
                     true_sky_realizations = np.concatenate((true_sky_realizations, initial_data_vis))
                     full_noise_realizations = np.concatenate((
@@ -720,18 +722,39 @@ class DevTools:
 
             g_boundary = np.max([np.abs(np.min(g_arr.real)),
                                  np.abs(np.max(g_arr.real))])
+            if np.isnan(g_boundary) or np.isinf(g_boundary):
+                print("Plot Many Realizations - g_boundary is inf or nan, setting to 1")
+                g_boundary = 1
             um_boundary = np.max([np.abs(np.min(u_minus_m.real)),
                                   np.abs(np.max(u_minus_m.real))])
+            if np.isnan(um_boundary) or np.isinf(um_boundary):
+                print("Plot Many Realizations - um_boundary is inf or nan, setting to 1")
+                um_boundary = 1
             uvT_boundary = np.max([np.abs(np.min(u_minus_vT.real)),
                                    np.abs(np.max(u_minus_vT.real))])
+            if np.isnan(uvT_boundary) or np.isinf(uvT_boundary):
+                print("Plot Many Realizations - uvT_boundary is inf or nan, setting to 1")
+                uvT_boundary = 1
             vT_boundary = np.max([np.abs(np.min(vT_arr)),
                                   np.abs(np.max(vT_arr))])
+            if np.isnan(vT_boundary) or np.isinf(vT_boundary):
+                print("Plot Many Realizations - vT_boundary is inf or nan, setting to 1")
+                vT_boundary = 1
             v_boundary = np.max([np.abs(np.min(v_arr.real)),
                                  np.abs(np.max(v_arr.real))])
+            if np.isnan(v_boundary) or np.isinf(v_boundary):
+                print("Plot Many Realizations - v_boundary is inf or nan, setting to 1")
+                v_boundary = 1
             m_boundary = np.max([np.abs(np.min(m_arr.real)),
                                  np.abs(np.max(m_arr.real))])
+            if np.isnan(m_boundary) or np.isinf(m_boundary):
+                print("Plot Many Realizations - m_boundary is inf or nan, setting to 1")
+                m_boundary = 1
             n_boundary = np.max([np.abs(np.min(n_arr.real)),
                                  np.abs(np.max(n_arr.real))])
+            if np.isnan(n_boundary) or np.isinf(n_boundary):
+                print("Plot Many Realizations - n_boundary is inf or nan, setting to 1")
+                n_boundary = 1
             el_boundary = None
             es_boundary = None
             if split_model_error_arrays:
@@ -745,9 +768,9 @@ class DevTools:
             # g_step = 0.1
             # um_step = 0.05
             # uvT_step = 0.05
-            g_step = g_boundary / 30
-            um_step = um_boundary / 100
-            uvT_step = uvT_boundary / 100
+            g_step = g_boundary / 3
+            um_step = um_boundary / 10
+            uvT_step = uvT_boundary / 10
             v_step = vT_var / 7.5  # change to appropriate fixed size
             e_step = 0.2
 
@@ -825,6 +848,10 @@ class DevTools:
 
             glim = 1.0*g_boundary
             uvT_lim = 0.5*uvT_boundary
+            if np.isnan(glim) or np.isinf(glim):
+                glim = 1
+            if np.isnan(uvT_lim) or np.isinf(uvT_lim):
+                uvT_lim = 1
 
             uv_norm = np.linalg.norm(uv_arr, axis=1)
             uv_extend = np.array([])
@@ -842,6 +869,9 @@ class DevTools:
             # glim = 0.4
             ax[run,1].set_xlim(-glim, glim)
             g_1d_max = np.max([np.max(g_real_hist), np.max(g_imag_hist)])
+            if np.isnan(g_1d_max) or np.isinf(g_1d_max):
+                g_1d_max = 1
+
             # g_1d_max = 8
             ax[run,1].set_ylim(0,g_1d_max)
             if run == 0:
@@ -850,6 +880,9 @@ class DevTools:
 
             # initial gains
             g_vmax = np.max(gains_hist2d)
+            if np.isnan(g_vmax) or np.isinf(g_vmax):
+                print("Plot Many Realizations - g_vmax is inf or nan, setting to 1")
+                g_vmax = 1
             # g_vmax = 15000
             im = ax[run,2].pcolormesh(gains_real2d, gains_imag2d, gains_hist2d.T, cmap="viridis", vmin=0, vmax=g_vmax, rasterized=True)
             ax[run,2].add_patch(plt.Circle((g_center_real, g_center_imag), radius=g_var, fill=False, color="white"))
@@ -903,6 +936,9 @@ class DevTools:
 
             # initial models
             uvT_vmax = np.max(uvT_hist2d)
+            if np.isnan(uvT_vmax) or np.isinf(uvT_vmax):
+                print("Plot Many Realizations - uvT_vmax is inf or nan, setting to 1")
+                uvT_vmax = 1
             # uvT_vmax = 2
             im2 = ax[run,5].pcolormesh(uvT_real2d, uvT_imag2d, uvT_hist2d, cmap="inferno", vmin=0, vmax=uvT_vmax, rasterized=True)
             ax[run,5].add_patch(plt.Circle((uvT_center_real, uvT_center_imag), radius=uvT_var, fill=False, color="white"))
@@ -982,6 +1018,7 @@ class DevTools:
             ax[run,8].text(0.2,0.15,f"$<|u|>$ = {avg_mag_u:.3f}", fontsize="13")
             ax[run,8].text(0.2,0.00,f"$\\sigma$ Re($u$) = {sigma_re_u:.3f}", fontsize="13")
 
+            print(f"***PLOTTING FUNC - AVG MAG VTM***\n\t{avg_mag_vTm}\n\n")
             this_output_dict = {
                 "sigma_re_m" : sigma_re_m,
                 "avg_mag_model" : avg_mag_model,
@@ -1596,7 +1633,6 @@ class DevTools:
         plt.colorbar(im)
         plt.savefig(f"images/{filename}.png")
         plt.close()
-
     """
         Getters and Setters
     """
@@ -1658,3 +1694,88 @@ class DevTools:
         val : int,
     ) -> None:
         self.vis_pol_ind = val
+
+def build_3d_scatter_plot(
+    x_array : np.ndarray,
+    y_array : np.ndarray,
+    z_array : np.ndarray,
+    z_array_2 : np.ndarray = None, 
+    second_plot : bool = False,
+    show_plot : bool = False,
+    plot_title : str = "",
+    plot_xlabel : str = "",
+    plot_ylabel : str = "",
+    plot_zlabel : str = "",
+    xlim_hi : int | float = 1,
+    xlim_lo : int | float = 0,
+    ylim_hi : int | float = 1,
+    ylim_lo : int | float = 0,
+    zlim_hi : int | float = 1,
+    zlim_lo : int | float = 0,
+    first_plot_label : str = "",
+    second_plot_label : str = "",
+    filename : str = "",
+) -> None:
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(x_array, y_array, z_array, label=first_plot_label)
+    if second_plot:
+        ax.scatter(x_array, y_array, z_array_2, label=second_plot_label)
+    xx, yy = np.meshgrid(range(int(np.min(x_array) - 1), int(np.max(x_array) + 1)), 
+                        range(int(np.min(y_array) - 1), int(np.max(y_array) + 1)))
+    zz = 0 * np.ones_like(xx)
+    ax.plot_surface(xx,yy,zz, alpha=0.2)
+    ax.set_title(plot_title)
+    ax.set_xlabel(plot_xlabel)
+    ax.set_ylabel(plot_ylabel)
+    ax.set_zlabel(plot_zlabel)
+    ax.set_xlim(xlim_lo, xlim_hi)
+    ax.set_ylim(ylim_lo, ylim_hi)
+    ax.set_zlim(zlim_lo, zlim_hi)
+    if len(first_plot_label) > 0:
+        plt.legend()
+    if show_plot:
+        plt.show()
+    plt.savefig(filename, bbox_inches=0)
+    plt.close()
+
+def plot_3d_data_as_2d_hist(
+    x_array     : np.ndarray,
+    y_array     : np.ndarray,
+    z_array     : np.ndarray,
+    plot_title  : str = "",
+    plot_xlabel : str = "",
+    plot_ylabel : str = "",
+    plot_vmax   : int | float = 1, 
+    plot_vmin   : int | float = 0,     
+    filename    : str = "",   
+    plot_cmap   : str = "viridis",   
+) -> None:
+    from scipy.interpolate import griddata
+    xx, yy = np.meshgrid(range(int(np.min(x_array) - 1), int(np.max(x_array) + 1)), 
+                        range(int(np.min(y_array) - 1), int(np.max(y_array) + 1)))
+    data_gridded = griddata(
+        (x_array, y_array),
+        z_array,
+        (xx, yy),
+        method = 'linear',
+    )
+    plt.imshow(
+        data_gridded,
+        cmap=plot_cmap,
+        vmax=plot_vmax,
+        vmin=plot_vmin,
+        extent=[np.min(x_array),
+                np.max(x_array),
+                np.min(y_array),
+                np.max(y_array)],
+        aspect='equal',
+        origin='lower',
+    )
+    plt.colorbar()
+    plt.title(plot_title)
+    plt.xlabel(plot_xlabel)
+    plt.ylabel(plot_ylabel)
+    plt.tight_layout()
+    plt.savefig(filename, bbox_inches=0)
+    plt.close()
