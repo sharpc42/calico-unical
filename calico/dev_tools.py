@@ -508,13 +508,13 @@ class DevTools:
                                                                                       weighting_function=run_params['weighting_function'],
                                                                                       scaling_factor=run_params['scaling_factor_sim'],
                                                                                       seed=i,)
-                
                 if model_error_real is None:
                     if verbose: 
                         print("Did not simulate model error")
                     model_error_real = 0
                     model_error_imag = 0
                 this_model_error = model_error_real + 1.0j*model_error_imag 
+                
                 # vT < m
                 if run_params['sigma_e'] < 0:
                     model_vis_realizations.append(initial_model_vis + this_model_error)
@@ -1752,6 +1752,7 @@ def plot_3d_data_as_2d_hist(
     plot_cmap   : str = "viridis",   
 ) -> None:
     from scipy.interpolate import griddata
+    from matplotlib import colors
     xx, yy = np.meshgrid(range(int(np.min(x_array) - 1), int(np.max(x_array) + 1)), 
                         range(int(np.min(y_array) - 1), int(np.max(y_array) + 1)))
     data_gridded = griddata(
@@ -1763,14 +1764,15 @@ def plot_3d_data_as_2d_hist(
     plt.imshow(
         data_gridded,
         cmap=plot_cmap,
-        vmax=plot_vmax,
-        vmin=plot_vmin,
+        # vmax=plot_vmax,
+        # vmin=plot_vmin,
         extent=[np.min(x_array),
                 np.max(x_array),
                 np.min(y_array),
                 np.max(y_array)],
         aspect='equal',
         origin='lower',
+        norm=colors.SymLogNorm(10**-4)
     )
     plt.colorbar()
     plt.title(plot_title)
