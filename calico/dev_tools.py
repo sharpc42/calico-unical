@@ -1749,7 +1749,8 @@ def plot_3d_data_as_2d_hist(
     plot_vmax   : int | float = 1, 
     plot_vmin   : int | float = 0,     
     filename    : str = "",   
-    plot_cmap   : str = "viridis",   
+    plot_cmap   : str = "viridis",  
+    log_cmap    : bool = False, 
 ) -> None:
     from scipy.interpolate import griddata
     from matplotlib import colors
@@ -1761,19 +1762,31 @@ def plot_3d_data_as_2d_hist(
         (xx, yy),
         method = 'linear',
     )
-    plt.imshow(
-        data_gridded,
-        cmap=plot_cmap,
-        # vmax=plot_vmax,
-        # vmin=plot_vmin,
-        extent=[np.min(x_array),
-                np.max(x_array),
-                np.min(y_array),
-                np.max(y_array)],
-        aspect='equal',
-        origin='lower',
-        norm=colors.SymLogNorm(10**-4)
-    )
+    if log_cmap:
+        plt.imshow(
+            data_gridded,
+            cmap=plot_cmap,
+            extent=[np.min(x_array),
+                    np.max(x_array),
+                    np.min(y_array),
+                    np.max(y_array)],
+            aspect='equal',
+            origin='lower',
+            norm=colors.SymLogNorm(10**-4),
+        )
+    else:
+        plt.imshow(
+            data_gridded,
+            cmap=plot_cmap,
+            vmax=plot_vmax,
+            vmin=plot_vmin,
+            extent=[np.min(x_array),
+                    np.max(x_array),
+                    np.min(y_array),
+                    np.max(y_array)],
+            aspect='equal',
+            origin='lower',
+        )
     plt.colorbar()
     plt.title(plot_title)
     plt.xlabel(plot_xlabel)
