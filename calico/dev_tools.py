@@ -1,6 +1,7 @@
 import subprocess
 import time
 import pickle
+import json
 import os
 import copy
 
@@ -447,16 +448,16 @@ class DevTools:
         model_path = os.getcwd() + f'/calico/data/{model_data_writeout_filename}'
         run_params_path = os.getcwd() + f'/calico/data/{run_params_filename}'
         if verbose:
-            print("run params path", run_params_path)
-        with open(f'{run_params_path}.pkl', 'rb') as file:
-            run_params_list = pickle.load(file)
+            print("settings path", run_params_path)
+        with open(f'{run_params_path}.json', 'r') as file:
+            run_params_list = json.load(file)
 
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind])
         original_model_vis = copy.deepcopy(caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind])
 
         if verbose:
-            print("len run params list", len(run_params_list))
+            print("len settings list", len(run_params_list))
         for n, run_params in enumerate(run_params_list):
             data_vis_realizations = []
             model_vis_realizations = []
@@ -613,48 +614,55 @@ class DevTools:
                 print("\tcost function realizations\t\t", len(cost_function_realizations))
             try:
                 output_arrays = {
-                    'v runs': full_data_realizations,
-                    'm runs': full_model_realizations,
-                    'g runs': gain_params_realizations,
-                    'u runs': model_params_realizations,
-                    'vT runs': true_sky_realizations,
-                    'n runs': full_noise_realizations,
-                    'e runs long': model_err_realizations_long[0],
-                    'e runs short': model_err_realizations_short[0],
-                    'uv array': uv_array,
-                    'cost runs': cost_function_realizations,
+                    'v runs'       : full_data_realizations,
+                    'm runs'       : full_model_realizations,
+                    'g runs'       : gain_params_realizations,
+                    'u runs'       : model_params_realizations,
+                    'vT runs'      : true_sky_realizations,
+                    'n runs'       : full_noise_realizations,
+                    'e runs long'  : model_err_realizations_long[0],
+                    'e runs short' : model_err_realizations_short[0],
+                    'uv array'     : uv_array,
+                    'cost runs'    : cost_function_realizations,
                 }
             except:
                 output_arrays = {
-                    'v runs': full_data_realizations,
-                    'm runs': full_model_realizations,
-                    'g runs': gain_params_realizations,
-                    'u runs': model_params_realizations,
-                    'vT runs': true_sky_realizations,
-                    'n runs': full_noise_realizations,
-                    'uv array': uv_array,
-                    'cost runs': np.asarray(cost_function_realizations),
+                    'v runs'    : full_data_realizations,
+                    'm runs'    : full_model_realizations,
+                    'g runs'    : gain_params_realizations,
+                    'u runs'    : model_params_realizations,
+                    'vT runs'   : true_sky_realizations,
+                    'n runs'    : full_noise_realizations,
+                    'uv array'  : uv_array,
+                    'cost runs' : np.asarray(cost_function_realizations),
                 }
-            with open(f'{model_path}_{run_params_filename}_output_arr_{n}.pkl', 'wb') as file:
+            with open(
+                f'{model_path}_{run_params_filename}_output_arr_{n}.json', 
+                mode='w'
+            ) as file:
                 print(f"data path {model_path}")
                 print(f"file\n\t{file}")
-                pickle.dump(output_arrays, file)
+                json.dump(output_arrays, file)
 
             if verbose:
                 print("***FINISHED THIS RUN***")
-                print(f"\n***Many realizations time***\n\t{(time.time() - start_many_real_time)/3600:.4f} hours\n")
+                finish_time = (time.time() - start_many_real_time)/3600
+                print(f"\n***Many realizations time***\n\t{finish_time:.4f} hours\n")
 
     def plot_many_realizations(self, 
-                               variation: str = "stddev", 
-                               data_filepath: str = "", 
-                               run_params_filename: str = "",
-                               threshold_length: int = 100,
-                               simulation_type: str = "gaussian",
-                               verbose: bool = False,
+                               variation           : str = "stddev", 
+                               data_filepath       : str = "", 
+                               run_params_filename : str = "",
+                               threshold_length    : int = 100,
+                               simulation_type     : str = "gaussian",
+                               verbose             : bool = False,
         ) -> None:
 
-        with open(f'calico/data/{run_params_filename}.pkl', 'rb') as file:
-            run_params_list = pickle.load(file)
+        with open(
+            f'calico/data/{run_params_filename}.json', 
+            mode='r',
+        ) as file:
+            run_params_list = json.load(file)
 
         output_dicts = []
 
@@ -666,8 +674,11 @@ class DevTools:
                                sharey=False)
         
         for run, run_params in enumerate(run_params_list):
-            with open(f'{data_filepath}_{run_params_filename}_output_arr_{run}.pkl', 'rb') as file:
-                output_arrays = pickle.load(file)
+            with open(
+                f'{data_filepath}_{run_params_filename}_output_arr_{run}.json', 
+                mode='r',
+            ) as file:
+                output_arrays = json.load(file)
             g_arr = output_arrays['g runs'] - 1
             u_arr = output_arrays['u runs']
             m_arr = output_arrays['m runs']
@@ -884,8 +895,22 @@ class DevTools:
                 print("Plot Many Realizations - g_vmax is inf or nan, setting to 1")
                 g_vmax = 1
             # g_vmax = 15000
-            im = ax[run,2].pcolormesh(gains_real2d, gains_imag2d, gains_hist2d.T, cmap="viridis", vmin=0, vmax=g_vmax, rasterized=True)
-            ax[run,2].add_patch(plt.Circle((g_center_real, g_center_imag), radius=g_var, fill=False, color="white"))
+            im = ax[run,2].pcolormesh(
+                gains_real2d, 
+                gains_imag2d, 
+                gains_hist2d.T, 
+                cmap="viridis", 
+                vmin=0, 
+                vmax=g_vmax, 
+                rasterized=True
+            )
+            ax[run,2].add_patch(plt.Circle(
+                (g_center_real, 
+                g_center_imag), 
+                radius=g_var, 
+                fill=False, 
+                color="white"
+            ))
             ax[run,2].plot(0, 0, 'w^')
             ax[run,2].set_ylabel("Imag")
             ax[run,2].set_xlabel("Real - 1")
@@ -893,7 +918,10 @@ class DevTools:
             ax[run,2].set_xlim(-glim, glim)
             ax[run,2].set_ylim(-glim, glim)
             if run == 0:
-                ax[run,2].set_title(f"2D Gains Error\n(Complex Plane)", fontsize="22")
+                ax[run,2].set_title(
+                    f"2D Gains Error\n(Complex Plane)", 
+                    fontsize="22",
+                )
             ax[run,2].tick_params(labelbottom=True, labelleft=True)
 
             # |u-m| hist for short and long baselines
@@ -921,16 +949,33 @@ class DevTools:
             if es_boundary is not None:
                 short_uvT = np.abs(u_minus_vT)[uv_extend < threshold_length]
             if es_boundary is not None:
-                ax[run,4].hist(short_uvT, bins=50, label="Short Baselines", histtype="step")
+                ax[run,4].hist(
+                    short_uvT, 
+                    bins=50, 
+                    label="Short Baselines", 
+                    histtype="step",
+                )
             if el_boundary is not None:
-                ax[run,4].hist(long_uvT, bins=50, label="Long Baselines", histtype="step")
+                ax[run,4].hist(
+                    long_uvT, 
+                    bins=50, 
+                    label="Long Baselines",
+                    histtype="step",
+                )
             else:
-                ax[run,4].hist(np.abs(u_minus_vT), bins=uvT_bins, histtype="step")
+                ax[run,4].hist(
+                    np.abs(u_minus_vT), 
+                    bins=uvT_bins, 
+                    histtype="step",
+                )
             ax[run,4].set_xlim(0,uvT_boundary)
             # ax[run,4].set_xlim(0,4)
             ax[run,4].set_xlabel("(Jy)")
             if run == 0:
-                ax[run,4].set_title("1D True Model Error", fontsize="22")
+                ax[run,4].set_title(
+                    "1D True Model Error", 
+                    fontsize="22",
+                )
             ax[run,4].tick_params(labelbottom=True, labelleft=True)
             ax[run,4].legend()
 
@@ -940,22 +985,42 @@ class DevTools:
                 print("Plot Many Realizations - uvT_vmax is inf or nan, setting to 1")
                 uvT_vmax = 1
             # uvT_vmax = 2
-            im2 = ax[run,5].pcolormesh(uvT_real2d, uvT_imag2d, uvT_hist2d, cmap="inferno", vmin=0, vmax=uvT_vmax, rasterized=True)
-            ax[run,5].add_patch(plt.Circle((uvT_center_real, uvT_center_imag), radius=uvT_var, fill=False, color="white"))
+            im2 = ax[run,5].pcolormesh(
+                uvT_real2d, 
+                uvT_imag2d, 
+                uvT_hist2d, 
+                cmap="inferno", 
+                vmin=0, 
+                vmax=uvT_vmax, 
+                rasterized=True,
+            )
+            ax[run,5].add_patch(plt.Circle(
+                (uvT_center_real, 
+                 uvT_center_imag), 
+                 radius=uvT_var, 
+                 fill=False, 
+                 color="white",
+            ))
             ax[run,5].set_ylabel("Imag")
             ax[run,5].set_xlabel("Real")
             # uvT_lim = 1.5
             ax[run,5].set_xlim(-uvT_lim, uvT_lim)
             ax[run,5].set_ylim(-uvT_lim, uvT_lim)
             if run == 0:
-                ax[run,5].set_title(f"2D True Model Error\n(Complex Plane)", fontsize="22")
+                ax[run,5].set_title(
+                    f"2D True Model Error\n(Complex Plane)", 
+                    fontsize="22",
+                )
 
             # plot distributions for vis data, thermal noise, and long/short model errors
             ax[run,6].stairs(vT_real_hist, vT_real_bins, label="vT")
             ax[run,6].stairs(model_hist, model_bins, label="m")
             ax[run,6].set_xlabel("Real")
             if run == 0:
-                ax[run,6].set_title("Data Distributions", fontsize="22")
+                ax[run,6].set_title(
+                    "Data Distributions", 
+                    fontsize="22",
+                )
             ax[run,6].tick_params(labelbottom=True, labelleft=True)
             ax[run,6].legend()
 
@@ -970,27 +1035,75 @@ class DevTools:
             ax[run,7].set_axis_off()
             if run == 0:
                 ax[run,7].text(0.0,1.03,"Output Calcs", fontsize="22")
-            ax[run,7].text(0.0,0.85,f"$\\sigma$ Re($m$) = {sigma_re_m:.2f}", fontsize="13")
-            ax[run,7].text(0.0,0.71,f"$<|m|>$ = {avg_mag_model:.2f}", fontsize="13")
-            ax[run,7].text(0.0,0.57,f"$<|v_T|>$ = {avg_mag_vT:.2f}", fontsize="13")
-            ax[run,7].text(0.0,0.43,f"$\\sigma$ Re($v_T-m$) = {sigma_re_vTm:.2f}", fontsize="13", fontweight="bold")
-            ax[run,7].text(0.0,0.29,f"$<|v_T-m|>$ = {avg_mag_vTm:.2f}", fontsize="13")
-            ax[run,7].text(0.0,0.15,f"$\\sigma$ Re($n$) (out) = {sigma_re_n:.2f}", fontsize="13", fontweight="bold")
-            ax[run,7].text(0.0,0.0,f"$<|v|>$ = {avg_mag_v:.2f}", fontsize="13")
+            ax[run,7].text(
+                0.0, 0.85,
+                f"$\\sigma$ Re($m$) = {sigma_re_m:.2f}", 
+                fontsize="13",
+            )
+            ax[run,7].text(
+                0.0, 0.71,
+                f"$<|m|>$ = {avg_mag_model:.2f}", 
+                fontsize="13",
+            )
+            ax[run,7].text(
+                0.0, 0.57,
+                f"$<|v_T|>$ = {avg_mag_vT:.2f}", 
+                fontsize="13",
+            )
+            ax[run,7].text(
+                0.0, 0.43,
+                f"$\\sigma$ Re($v_T-m$) = {sigma_re_vTm:.2f}", 
+                fontsize="13", 
+                fontweight="bold",
+            )
+            ax[run,7].text(
+                0.0, 0.29,
+                f"$<|v_T-m|>$ = {avg_mag_vTm:.2f}",
+                fontsize="13",
+            )
+            ax[run,7].text(
+                0.0, 0.15,
+                f"$\\sigma$ Re($n$) (out) = {sigma_re_n:.2f}", 
+                fontsize="13", 
+                fontweight="bold",
+            )
+            ax[run,7].text(
+                0.0, 0.0,
+                f"$<|v|>$ = {avg_mag_v:.2f}", 
+                fontsize="13",
+            )
 
             if run == 0:
-                ax[run,7].text(1.02,1.03,"Given to Algo", fontsize="22")
-            ax[run,7].text(1.05,0.85,f"$\\sigma_t$ = {run_params['sigma_t']:.2f}", fontsize="13")
-            ax[run,7].text(1.05,0.71,f"$\\sigma_n$ (in) = {run_params['sigma_n']:.2f}", fontsize="13")
+                ax[run,7].text(
+                    1.02, 1.03,
+                    "Given to Algo", 
+                    fontsize="22",
+                )
+            ax[run,7].text(
+                1.05, 0.85,
+                f"$\\sigma_t$ = {run_params['sigma_t']:.2f}",
+                fontsize="13",
+            )
+            ax[run,7].text(
+                1.05, 0.71,
+                f"$\\sigma_n$ (in) = {run_params['sigma_n']:.2f}",
+                fontsize="13",
+            )
             if run == 2 or run == len(run_params_list) - 1:
-                ax[run,7].text(1.05,0.57,f"$\\sigma_e$ = {run_params['sigma_m'] \
-                                                           / (run_params['scaling_factor_cost'])**2:.2f}", 
-                                                           fontsize="15",
-                                                           fontweight="bold")
+                ax[run,7].text(
+                    1.05, 0.57,
+                    f"$\\sigma_e$ = {run_params['sigma_m'] \
+                        / (run_params['scaling_factor_cost'])**2:.2f}", 
+                    fontsize="15",
+                    fontweight="bold",
+                )
             else:
-                ax[run,7].text(1.05,0.57,f"$\\sigma_e$ = {run_params['sigma_m'] \
-                                                           / (run_params['scaling_factor_cost'])**2:.2f}", 
-                                                           fontsize="13")
+                ax[run,7].text(
+                    1.05, 0.57,
+                    f"$\\sigma_e$ = {run_params['sigma_m'] \
+                        / (run_params['scaling_factor_cost'])**2:.2f}", 
+                    fontsize="13",
+                )
 
             # additional calculated quantities
             avg_re_g_offset = np.mean(g_arr.real)
@@ -1005,18 +1118,59 @@ class DevTools:
             sigma_re_u = np.std(u_arr.real)
             ax[run,8].set_axis_off()
             if run == 0:
-                ax[run,8].text(0.2,1.03,"More Calcs", fontsize="22")
-            ax[run,8].text(0.2,0.85,f"$<Re(g-1)>$ = {avg_re_g_offset:.6f}", fontsize="13", fontweight="bold")
-            ax[run,8].text(0.2,0.71,f"$<Im(g)>$ = {avg_im_g_offset:.6f}", fontsize="13")
-            ax[run,8].text(0.2,0.57,f"$<|u-m|>$ = {avg_mag_um:.2f}   $<|u-v_T|> = {avg_mag_uvT:.2f}$", fontsize="13")
+                ax[run,8].text(
+                    0.2, 1.03,
+                    "More Calcs", 
+                    fontsize="22",
+                )
+            ax[run,8].text(
+                0.2, 0.85,
+                f"$<Re(g-1)>$ = {avg_re_g_offset:.6f}", 
+                fontsize="13", 
+                fontweight="bold",
+            )
+            ax[run,8].text(
+                0.2, 0.71,
+                f"$<Im(g)>$ = {avg_im_g_offset:.6f}", 
+                fontsize="13",
+            )
+            ax[run,8].text(
+                0.2, 0.57,
+                f"$<|u-m|>$ = {avg_mag_um:.2f}   $<|u-v_T|> = {avg_mag_uvT:.2f}$", 
+                fontsize="13",
+            )
             if variation == "stddev":
-                ax[run,8].text(0.2,0.43,f"$\\sigma$ Re($g$) = {sigma_re_g:.2f}\t\t  $\\sigma$ Im($g$): {sigma_im_g:.2f}", fontsize="13")
-                ax[run,8].text(0.2,0.29,f"$\\sigma$ Re($u-m$) = {sigma_re_um:.2f}    $\\sigma$ Re($u-v_T$): {sigma_re_uvT:.2f}", fontsize="13")
+                ax[run,8].text(
+                    0.2, 0.43,
+                    f"$\\sigma$ Re($g$) = {sigma_re_g:.2f}\t\t  $\\sigma$ Im($g$): {sigma_im_g:.2f}", 
+                    fontsize="13",
+                )
+                ax[run,8].text(
+                    0.2, 0.29,
+                    f"$\\sigma$ Re($u-m$) = {sigma_re_um:.2f}    $\\sigma$ Re($u-v_T$): {sigma_re_uvT:.2f}", 
+                    fontsize="13",
+                )
             elif variation == "iqr":
-                ax[run,8].text(0.2,0.43,f"IQR($g$): {g_var:.2f}", fontsize="13")
-                ax[run,8].text(0.2,0.29,f"IQR($u-m$): {um_var:.2f}\tIQR($u-v_T$): {uvT_var:.2f}", fontsize="13")
-            ax[run,8].text(0.2,0.15,f"$<|u|>$ = {avg_mag_u:.3f}", fontsize="13")
-            ax[run,8].text(0.2,0.00,f"$\\sigma$ Re($u$) = {sigma_re_u:.3f}", fontsize="13")
+                ax[run,8].text(
+                    0.2, 0.43,
+                    f"IQR($g$): {g_var:.2f}", 
+                    fontsize="13",
+                )
+                ax[run,8].text(
+                    0.2, 0.29,
+                    f"IQR($u-m$): {um_var:.2f}\tIQR($u-v_T$): {uvT_var:.2f}",
+                    fontsize="13",
+                )
+            ax[run,8].text(
+                0.2, 0.15,
+                f"$<|u|>$ = {avg_mag_u:.3f}", 
+                fontsize="13",
+            )
+            ax[run,8].text(
+                0.2, 0.00,
+                f"$\\sigma$ Re($u$) = {sigma_re_u:.3f}", 
+                fontsize="13",
+            )
 
             print(f"***PLOTTING FUNC - AVG MAG VTM***\n\t{avg_mag_vTm}\n\n")
             this_output_dict = {
@@ -1053,14 +1207,18 @@ class DevTools:
         plt.savefig('calico/images/' + str(max_realizations) + '-realizations_' + variation + '_'
                 + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
                 + '_sigma_t_' + which_sigma_t + '.pdf',
-                bbox_inches=0, format='pdf')
+                bbox_inches=0, 
+                format='pdf')
         
-        with open(f'calico/data/gain_error_offset_analysis_output_calcs.pkl', 'wb') as file:
+        with open(
+            f'calico/data/gain_error_offset_analysis_output_calcs.json',
+            mode='w'
+        ) as file:
             if verbose:
                 print(f"***calculated values***")
                 print(f"data path {data_filepath}")
                 print(f"file\n\t{file}")
-            pickle.dump(output_dicts, file)
+            json.dump(output_dicts, file)
         
         plt.close()
 
@@ -1696,25 +1854,25 @@ class DevTools:
         self.vis_pol_ind = val
 
 def build_3d_scatter_plot(
-    x_array : np.ndarray,
-    y_array : np.ndarray,
-    z_array : np.ndarray,
-    z_array_2 : np.ndarray = None, 
-    second_plot : bool = False,
-    show_plot : bool = False,
-    plot_title : str = "",
-    plot_xlabel : str = "",
-    plot_ylabel : str = "",
-    plot_zlabel : str = "",
-    xlim_hi : int | float = 1,
-    xlim_lo : int | float = 0,
-    ylim_hi : int | float = 1,
-    ylim_lo : int | float = 0,
-    zlim_hi : int | float = 1,
-    zlim_lo : int | float = 0,
-    first_plot_label : str = "",
+    x_array           : np.ndarray,
+    y_array           : np.ndarray,
+    z_array           : np.ndarray,
+    z_array_2         : np.ndarray = None, 
+    second_plot       : bool = False,
+    show_plot         : bool = False,
+    plot_title        : str = "",
+    plot_xlabel       : str = "",
+    plot_ylabel       : str = "",
+    plot_zlabel       : str = "",
+    xlim_hi           : int | float = 1,
+    xlim_lo           : int | float = 0,
+    ylim_hi           : int | float = 1,
+    ylim_lo           : int | float = 0,
+    zlim_hi           : int | float = 1,
+    zlim_lo           : int | float = 0,
+    first_plot_label  : str = "",
     second_plot_label : str = "",
-    filename : str = "",
+    filename          : str = "",
 ) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -1751,6 +1909,7 @@ def plot_3d_data_as_2d_hist(
     filename    : str = "",   
     plot_cmap   : str = "viridis",  
     log_cmap    : bool = False, 
+    suffix      : str = "",
 ) -> None:
     from scipy.interpolate import griddata
     from matplotlib import colors
