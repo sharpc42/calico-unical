@@ -8,6 +8,8 @@ import copy
 from scipy.differentiate import jacobian
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image, PngImagePlugin
+from matplotlib.backends.backend_pdf import PdfPages
 
 from calico import cost_function_calculations, calibration_optimization as cal_opt, calibration_wrappers as calwrap
 from pyuvdata import UVData
@@ -612,51 +614,46 @@ class DevTools:
                     print("No model error simulated on short baselines.")
                 print("\tuv array\t\t\t", uv_array.shape)
                 print("\tcost function realizations\t\t", len(cost_function_realizations))
+            output_arrays = {
+                'v runs'    : full_data_realizations,
+                'm runs'    : full_model_realizations,
+                'g runs'    : gain_params_realizations,
+                'u runs'    : model_params_realizations,
+                'vT runs'   : true_sky_realizations,
+                'n runs'    : full_noise_realizations,
+                'uv array'  : uv_array,
+                'cost runs' : np.asarray(cost_function_realizations),
+            }
             try:
-                output_arrays = {
-                    'v runs'       : full_data_realizations,
-                    'm runs'       : full_model_realizations,
-                    'g runs'       : gain_params_realizations,
-                    'u runs'       : model_params_realizations,
-                    'vT runs'      : true_sky_realizations,
-                    'n runs'       : full_noise_realizations,
-                    'e runs long'  : model_err_realizations_long[0],
-                    'e runs short' : model_err_realizations_short[0],
-                    'uv array'     : uv_array,
-                    'cost runs'    : cost_function_realizations,
-                }
+                output_arrays['e runs long']  = model_err_realizations_long[0]
+                output_arrays['e runs short'] = model_err_realizations_short[0] 
             except:
-                output_arrays = {
-                    'v runs'    : full_data_realizations,
-                    'm runs'    : full_model_realizations,
-                    'g runs'    : gain_params_realizations,
-                    'u runs'    : model_params_realizations,
-                    'vT runs'   : true_sky_realizations,
-                    'n runs'    : full_noise_realizations,
-                    'uv array'  : uv_array,
-                    'cost runs' : np.asarray(cost_function_realizations),
-                }
+                if verbose:
+                    print(f"No baseline dependent model error realizations to write")
             with open(
-                f'{model_path}_{run_params_filename}_output_arr_{n}.json', 
-                mode='w'
+                f'{model_path}_many_reals_output_data_{run_params_filename}_{n}.pkl', 
+                mode='wb'
             ) as file:
                 print(f"data path {model_path}")
                 print(f"file\n\t{file}")
-                json.dump(output_arrays, file)
+                pickle.dump(output_arrays, file)
 
             if verbose:
                 print("***FINISHED THIS RUN***")
                 finish_time = (time.time() - start_many_real_time)/3600
                 print(f"\n***Many realizations time***\n\t{finish_time:.4f} hours\n")
 
-    def plot_many_realizations(self, 
-                               variation           : str = "stddev", 
-                               data_filepath       : str = "", 
-                               run_params_filename : str = "",
-                               threshold_length    : int = 100,
-                               simulation_type     : str = "gaussian",
-                               verbose             : bool = False,
-        ) -> None:
+    def plot_many_realizations(
+        self, 
+        variation           : str  = "stddev", 
+        data_filepath       : str  = "", 
+        run_params_filename : str  = "",
+        threshold_length    : int  = 100,
+        simulation_type     : str  = "gaussian",
+        verbose             : bool = False,
+        suffix              : str  = "",
+        metadata            : dict = None,
+    ) -> None:
 
         with open(
             f'calico/data/{run_params_filename}.json', 
@@ -675,16 +672,20 @@ class DevTools:
         
         for run, run_params in enumerate(run_params_list):
             with open(
-                f'{data_filepath}_{run_params_filename}_output_arr_{run}.json', 
-                mode='r',
+                f'{data_filepath}_many_reals_output_data_{run_params_filename}_{run}.pkl', 
+                mode='rb',
             ) as file:
-                output_arrays = json.load(file)
-            g_arr = output_arrays['g runs'] - 1
-            u_arr = output_arrays['u runs']
-            m_arr = output_arrays['m runs']
-            v_arr = output_arrays['v runs']
-            vT_arr = output_arrays['vT runs']
-            n_arr = output_arrays['n runs']
+                output_arrays = pickle.load(file)
+
+            g_arr    = output_arrays['g runs'] - 1
+            u_arr    = output_arrays['u runs']
+            m_arr    = output_arrays['m runs']
+            v_arr    = output_arrays['v runs']
+            vT_arr   = output_arrays['vT runs']
+            n_arr    = output_arrays['n runs']
+            uv_arr   = output_arrays['uv array']
+            cost_arr = output_arrays['cost runs']
+
             split_model_error_arrays = True
             try:
                 e_short_arr = output_arrays['e runs short']
@@ -694,12 +695,11 @@ class DevTools:
                 e_long_arr = None
             if not (np.any(e_short_arr) and np.any(e_long_arr)):
                 split_model_error_arrays = False
-            uv_arr = output_arrays['uv array']
-            cost_arr = output_arrays['cost runs']
+
             max_realizations = max([run_params["thermal_noise_realizations"], 
                                     run_params["model_error_realizations"]])
 
-            u_minus_m = u_arr - m_arr
+            u_minus_m  = u_arr - m_arr
             u_minus_vT = u_arr - vT_arr
             v_minus_vT = v_arr - vT_arr
 
@@ -817,54 +817,76 @@ class DevTools:
                 print(f"g arr mean of real {np.mean(g_arr.real)} mean of imag {np.mean(g_arr.imag)}\n")
 
             # get histograms
-            vT_real_hist, vT_real_bins = np.histogram(vT_arr.real,
-                                            bins=vT_bins,
-                                            density=True)
-            data_hist, data_bins = np.histogram(v_arr.real, 
-                                                bins=v_bins, 
-                                                density=True)
-            model_hist, model_bins = np.histogram(m_arr.real, 
-                                                  bins=m_bins, 
-                                                  density=True)
-            noise_hist, noise_bins = np.histogram(n_arr.real, 
-                                                  bins=n_bins, 
-                                                  density=True)
+            vT_real_hist, vT_real_bins = np.histogram(
+                vT_arr.real,
+                bins=vT_bins,
+                density=True
+            )
+            data_hist, data_bins = np.histogram(
+                v_arr.real, 
+                bins=v_bins, 
+                density=True
+            )
+            model_hist, model_bins = np.histogram(
+                m_arr.real, 
+                bins=m_bins, 
+                density=True
+            )
+            noise_hist, noise_bins = np.histogram(
+                n_arr.real, 
+                bins=n_bins, 
+                density=True
+            )
             if el_boundary is not None:
-                error_long_hist, error_long_bins = np.histogram(e_long_arr, 
-                                                                bins=el_bins, 
-                                                                density=True)
+                error_long_hist, error_long_bins = np.histogram(
+                    e_long_arr, 
+                    bins=el_bins, 
+                    density=True
+                )
             if es_boundary is not None:
-                error_short_hist, error_short_bins = np.histogram(e_short_arr, 
-                                                                  bins=es_bins, 
-                                                                  density=True)
-            g_real_hist, g_real_bins = np.histogram(g_arr.real, 
-                                                    bins=g_bins, 
-                                                    density=True)
-            g_imag_hist, g_imag_bins = np.histogram(g_arr.imag,
-                                                    bins=g_bins, 
-                                                    density=True)
+                error_short_hist, error_short_bins = np.histogram(
+                    e_short_arr, 
+                    bins=es_bins, 
+                    density=True
+                )
+            g_real_hist, g_real_bins = np.histogram(
+                g_arr.real, 
+                bins=g_bins, 
+                density=True
+            )
+            g_imag_hist, g_imag_bins = np.histogram(
+                g_arr.imag,
+                bins=g_bins, 
+                density=True
+            )
+            gains_hist2d, gains_real2d, gains_imag2d = np.histogram2d(
+                g_arr.real, 
+                g_arr.imag, 
+                bins=g_bins, 
+                density=True
+            )
+            um_hist2d, um_real2d, um_imag2d = np.histogram2d(
+                u_minus_m.real, 
+                u_minus_m.imag, 
+                bins=um_bins, 
+                density=True
+            )
+            uvT_hist2d, uvT_real2d, uvT_imag2d = np.histogram2d(
+                u_minus_vT.real, 
+                u_minus_vT.imag, 
+                bins=uvT_bins, 
+                density=True
+            )
 
-            gains_hist2d, gains_real2d, gains_imag2d = np.histogram2d(g_arr.real, 
-                                                                      g_arr.imag, 
-                                                                      bins=g_bins, 
-                                                                      density=True)
-            um_hist2d, um_real2d, um_imag2d = np.histogram2d(u_minus_m.real, 
-                                                             u_minus_m.imag, 
-                                                             bins=um_bins, 
-                                                             density=True)
-            uvT_hist2d, uvT_real2d, uvT_imag2d = np.histogram2d(u_minus_vT.real, 
-                                                                u_minus_vT.imag, 
-                                                                bins=uvT_bins, 
-                                                                density=True)
-
-            glim = 1.0*g_boundary
+            glim    = 1.0*g_boundary
             uvT_lim = 0.5*uvT_boundary
+
             if np.isnan(glim) or np.isinf(glim):
                 glim = 1
             if np.isnan(uvT_lim) or np.isinf(uvT_lim):
                 uvT_lim = 1
 
-            uv_norm = np.linalg.norm(uv_arr, axis=1)
+            uv_norm   = np.linalg.norm(uv_arr, axis=1)
             uv_extend = np.array([])
             for _ in range(max_realizations):
                 uv_extend = np.concatenate((uv_extend, uv_norm))
@@ -875,8 +897,16 @@ class DevTools:
             ax[run,0].text(0.4,0.6,f"{np.mean(cost_arr):.2f}", fontsize="17")
 
             # plot g real and imaginary histograms
-            ax[run,1].plot(g_real_bins[:-1], g_real_hist, label="Real")
-            ax[run,1].plot(g_imag_bins[:-1], g_imag_hist, label="Imaginary")
+            ax[run,1].plot(
+                g_real_bins[:-1], 
+                g_real_hist, 
+                label="Real",
+            )
+            ax[run,1].plot(
+                g_imag_bins[:-1], 
+                g_imag_hist, 
+                label="Imaginary",
+            )
             # glim = 0.4
             ax[run,1].set_xlim(-glim, glim)
             g_1d_max = np.max([np.max(g_real_hist), np.max(g_imag_hist)])
@@ -886,13 +916,17 @@ class DevTools:
             # g_1d_max = 8
             ax[run,1].set_ylim(0,g_1d_max)
             if run == 0:
-                ax[run,1].set_title("1D Gains Error\n(Real=Blue, Imag=Orange)", fontsize="22")
+                ax[run,1].set_title(
+                    "1D Gains Error\n(Real=Blue, Imag=Orange)", 
+                    fontsize="22",
+                )
             ax[run,1].tick_params(labelbottom=True, labelleft=True)
 
             # initial gains
             g_vmax = np.max(gains_hist2d)
             if np.isnan(g_vmax) or np.isinf(g_vmax):
-                print("Plot Many Realizations - g_vmax is inf or nan, setting to 1")
+                if verbose:
+                    print("Ploting - g_vmax is inf or nan, setting to 1")
                 g_vmax = 1
             # g_vmax = 15000
             im = ax[run,2].pcolormesh(
@@ -1172,26 +1206,25 @@ class DevTools:
                 fontsize="13",
             )
 
-            print(f"***PLOTTING FUNC - AVG MAG VTM***\n\t{avg_mag_vTm}\n\n")
             this_output_dict = {
-                "sigma_re_m" : sigma_re_m,
-                "avg_mag_model" : avg_mag_model,
-                "avg_mag_vT" : avg_mag_vT,
-                "sigma_re_vTm" : sigma_re_vTm,
-                "avg_mag_vTm" : avg_mag_vTm,
-                "sigma_re_n" : sigma_re_n,
-                "avg_mag_v" : avg_mag_v,
+                "sigma_re_m"      : sigma_re_m,
+                "avg_mag_model"   : avg_mag_model,
+                "avg_mag_vT"      : avg_mag_vT,
+                "sigma_re_vTm"    : sigma_re_vTm,
+                "avg_mag_vTm"     : avg_mag_vTm,
+                "sigma_re_n"      : sigma_re_n,
+                "avg_mag_v"       : avg_mag_v,
                 "avg_re_g_offset" : avg_re_g_offset,
                 "avg_im_g_offset" : avg_im_g_offset,
-                "avg_mag_um" : avg_mag_um,
-                "avg_mag_uvT" : avg_mag_uvT,
-                "sigma_re_g" : sigma_re_g,
-                "sigma_im_g" : sigma_im_g,
-                "sigma_re_um" : sigma_re_um,
-                "sigma_re_uvT" : sigma_re_uvT,
-                "avg_mag_u" : avg_mag_u,
-                "sigma_re_u" : sigma_re_u,
-                "sigma_re_vT": sigma_re_vT,
+                "avg_mag_um"      : avg_mag_um,
+                "avg_mag_uvT"     : avg_mag_uvT,
+                "sigma_re_g"      : sigma_re_g,
+                "sigma_im_g"      : sigma_im_g,
+                "sigma_re_um"     : sigma_re_um,
+                "sigma_re_uvT"    : sigma_re_uvT,
+                "avg_mag_u"       : avg_mag_u,
+                "sigma_re_u"      : sigma_re_u,
+                "sigma_re_vT"     : sigma_re_vT,
             }
             output_dicts.append(this_output_dict)
             
@@ -1204,14 +1237,22 @@ class DevTools:
             sigma_t *= 10
         which_sigma_t += str(int(sigma_t*100))
 
-        plt.savefig('calico/images/' + str(max_realizations) + '-realizations_' + variation + '_'
-                + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                + '_sigma_t_' + which_sigma_t + '.pdf',
-                bbox_inches=0, 
-                format='pdf')
-        
+        filename = f'calico/images/sigma_t_{which_sigma_t}_{max_realizations}-realizations_{variation}_{suffix}.png'
+        plt.savefig(
+            filename,
+            bbox_inches=0,
+        )
+        plt.close()
+
+        print(f"\n\n***METADATA***\n\nLength: {len(metadata)}\n\n{metadata}\n\n")
+        metadata_str = "\n".join([f"{key}: {val}" for key, val in metadata.items()])
+        img = Image.open(filename)
+        img_metadata = PngImagePlugin.PngInfo()
+        img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
+        img.save(filename, pnginfo=img_metadata)        
+
         with open(
-            f'calico/data/gain_error_offset_analysis_output_calcs.json',
+            f'calico/data/output_calcs_{suffix}.json',
             mode='w'
         ) as file:
             if verbose:
@@ -1219,8 +1260,6 @@ class DevTools:
                 print(f"data path {data_filepath}")
                 print(f"file\n\t{file}")
             json.dump(output_dicts, file)
-        
-        plt.close()
 
     def test_function(self) -> None:
         return 'Returning a new and beautiful string, some say the best string, from within dev tools test function'
@@ -1873,6 +1912,8 @@ def build_3d_scatter_plot(
     first_plot_label  : str = "",
     second_plot_label : str = "",
     filename          : str = "",
+    suffix            : str = "",
+    metadata          : dict = None,
 ) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
@@ -1894,8 +1935,14 @@ def build_3d_scatter_plot(
         plt.legend()
     if show_plot:
         plt.show()
-    plt.savefig(filename, bbox_inches=0)
+    plt.savefig(filename, bbox_inches=0, metadata=metadata)
     plt.close()
+
+    metadata_str = "\n".join([f"{key}: {val}" for key, val in metadata.items()])
+    img = Image.open(filename)
+    img_metadata = PngImagePlugin.PngInfo()
+    img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
+    img.save(filename, pnginfo=img_metadata)
 
 def plot_3d_data_as_2d_hist(
     x_array     : np.ndarray,
@@ -1910,6 +1957,7 @@ def plot_3d_data_as_2d_hist(
     plot_cmap   : str = "viridis",  
     log_cmap    : bool = False, 
     suffix      : str = "",
+    metadata    : dict = None,
 ) -> None:
     from scipy.interpolate import griddata
     from matplotlib import colors
@@ -1953,3 +2001,9 @@ def plot_3d_data_as_2d_hist(
     plt.tight_layout()
     plt.savefig(filename, bbox_inches=0)
     plt.close()
+
+    metadata_str = "\n".join([f"{key}: {val}" for key, val in metadata.items()])
+    img = Image.open(filename)
+    img_metadata = PngImagePlugin.PngInfo()
+    img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
+    img.save(filename, pnginfo=img_metadata)
