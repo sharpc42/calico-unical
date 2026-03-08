@@ -27,6 +27,11 @@ def main(calibrate : bool = True,
 
     top_start_time = time.time()
 
+    starting_sigma_t_vals = []
+    starting_sigma_m_vals = []
+    result_sigma_t_vals = []
+    result_sigma_m_vals = []
+
     if calibrate:
         scaling_factors = [0.1, 1]  # skycal and truth
         sigma_t_scales  = np.arange(  0, 15, 7/3)
@@ -128,7 +133,11 @@ def main(calibrate : bool = True,
                     mode='r'
                 ) as file:
                     output_calcs = json.load(file)
-                output_calcs_list.append(output_calcs)
+                for output_calc_dict in output_calcs:
+                    output_calcs_list.append(output_calc_dict)
+                starting_sigma_t_vals.append(output_calcs[0]["sigma_re_n"])
+                starting_real_sigma_uvT = output_calcs[0]["sigma_re_u"] - output_calcs[0]["sigma_re_vT"]
+                starting_sigma_m_vals.append(starting_real_sigma_uvT)
                                    
                 if verbose:
                     print("Cleaning up calculated saved files")
@@ -188,26 +197,19 @@ def main(calibrate : bool = True,
 
     if verbose:
         print("Collecting skycal and truth values")
-    for i, sigma_t in enumerate(sigma_t_scales):
-        if np.abs(sigma_t) - 0.0 < 1e-5:
-            sigma_t = 0.1
-        for j, sigma_m in enumerate(sigma_m_scales):
-            this_calcs_list = output_calcs_list[i+j]
-            if np.abs(sigma_m) - 0.0 < 1e-5:
-                sigma_m = 0.1
-            for k, calc in enumerate(this_calcs_list):
-                real_sigma_uvT = calc["sigma_re_u"] - calc["sigma_re_vT"]
-                if k % 2 == 0:
-                    avg_mag_vTm = calc["avg_mag_vTm"]
-                    if calc["avg_mag_vT"] < calc["avg_mag_model"]:
-                        avg_mag_vTm *= -1
-                    vT_minus_m_gaussian.append(avg_mag_vTm)
-                    real_sigma_t_calculated_gaussian.append(sigma_t)
-                    real_sigma_uvT_truth_gaussian.append(sigma_m)
-                    real_g_minus_1_truth_gaussian.append(calc["sigma_re_g"])
-                else:
-                    real_sigma_uvT_skycal_gaussian.append(real_sigma_uvT)
-                    real_g_minus_1_skycal_gaussian.append(calc["sigma_re_g"]) 
+    for i, calc in enumerate(output_calcs_list):
+        real_sigma_uvT = calc["sigma_re_u"] - calc["sigma_re_vT"]
+        if i % 2 == 0:
+            avg_mag_vTm = calc["avg_mag_vTm"]
+            if calc["avg_mag_vT"] < calc["avg_mag_model"]:
+                avg_mag_vTm *= -1
+            vT_minus_m_gaussian.append(avg_mag_vTm)
+            real_sigma_t_calculated_gaussian.append(calc["sigma_re_n"])
+            real_sigma_uvT_truth_gaussian.append(real_sigma_uvT)
+            real_g_minus_1_truth_gaussian.append(calc["sigma_re_g"])
+        else:
+            real_sigma_uvT_skycal_gaussian.append(real_sigma_uvT)
+            real_g_minus_1_skycal_gaussian.append(calc["sigma_re_g"]) 
 
     vT_minus_m_gaussian              = np.asarray(vT_minus_m_gaussian)
     real_sigma_t_calculated_gaussian = np.asarray(real_sigma_t_calculated_gaussian)
@@ -215,6 +217,11 @@ def main(calibrate : bool = True,
     real_g_minus_1_skycal_gaussian   = np.asarray(real_g_minus_1_skycal_gaussian)
     real_sigma_uvT_truth_gaussian    = np.asarray(real_sigma_uvT_truth_gaussian)
     real_sigma_uvT_skycal_gaussian   = np.asarray(real_sigma_uvT_skycal_gaussian)
+    result_sigma_m_vals = vT_minus_m_gaussian
+    result_sigma_t_vals = real_sigma_t_calculated_gaussian
+    print(f"\n\n***initial sigma values***\n\n{starting_sigma_t_vals=}\n\n{starting_sigma_m_vals=}")
+    print(f"\n\n***unpacked sigma values***\n\n{result_sigma_t_vals=}\n\n{result_sigma_m_vals=}\n\n")
+
     if verbose:
         print(f"Plotting truth 2D grid for gain offset")
     dev.plot_3d_data_as_2d_hist(
@@ -327,7 +334,7 @@ def main(calibrate : bool = True,
         plot_zlabel       = "Re(g-1)",
         xlim_hi           = 16,    xlim_lo     = -16,
         ylim_hi           = 16,    ylim_lo     = -1,
-        zlim_hi           = 0.15,  zlim_lo     = -0.15,
+        zlim_hi           = 0.25,  zlim_lo     = -0.25,
         filename          = f'{image_path}/{filename_3d_scatter_gain}_{file_suffix}_gaussian.png',
         suffix            = file_suffix,
         metadata          = metadata,
