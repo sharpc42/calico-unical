@@ -184,29 +184,18 @@ def main(calibrate : bool = True,
     sigma_t_scales = [float(i) for i in metadata["Sigma_t Vals"].split(",")]
     sigma_m_scales = [float(i) for i in metadata["Sigma_m Vals"].split(",")]
 
-    # sigma_t_vals = []
-    # sigma_m_vals = []
-    # print(f"\n\n***OUTPUT CALCS LIST (plot)***\n\t{len(output_calcs_list)=}\n{output_calcs_list}\n\n")
     if verbose:
         print("Collecting skycal and truth values")
-    # print("\n\n***PLOTTING***")
     for i, sigma_t in enumerate(sigma_t_scales):
         if np.abs(sigma_t) - 0.0 < 1e-5:
             sigma_t = 0.1
-        # print(f"\n{sigma_t=:.3f}")
         for j, sigma_m in enumerate(sigma_m_scales):
             this_calcs_list = output_calcs_list[i+j]
             if np.abs(sigma_m) - 0.0 < 1e-5:
                 sigma_m = 0.1
-            # print(f"\n{sigma_m=:.3f}")
-            # print(f"\n{i=}\t{j=}\t{i+j=}")
             for k, calc in enumerate(this_calcs_list):
                 real_sigma_uvT = calc["sigma_re_u"] - calc["sigma_re_vT"]
                 if k % 2 == 0:
-                    # print(f"\n{calc["sigma_re_n"]=:.4f}")
-                    # print(f"\n{real_sigma_uvT=:.4f}")
-                    # sigma_t_vals.append(calc["sigma_re_n"])
-                    # sigma_m_vals.append(real_sigma_uvT)
                     avg_mag_vTm = calc["avg_mag_vTm"]
                     if calc["avg_mag_vT"] < calc["avg_mag_model"]:
                         avg_mag_vTm *= -1
@@ -224,10 +213,6 @@ def main(calibrate : bool = True,
     real_g_minus_1_skycal_gaussian   = np.asarray(real_g_minus_1_skycal_gaussian)
     real_sigma_uvT_truth_gaussian    = np.asarray(real_sigma_uvT_truth_gaussian)
     real_sigma_uvT_skycal_gaussian   = np.asarray(real_sigma_uvT_skycal_gaussian)
-    # print(f"\n\n***METADATA***\n\nLength: {len(metadata)}\n\n{metadata}\n\n")
-    # print(f"\n\n***SIGMA T***\n\t{np.min(real_sigma_t_calculated_gaussian)=:.3f}\t{np.max(real_sigma_t_calculated_gaussian)=:.3f}\n{real_sigma_t_calculated_gaussian.shape}")
-    # print(f"\n***SIGMA VT-M***\n\t{np.min(vT_minus_m_gaussian)=:.3f}\t\t{np.max(vT_minus_m_gaussian)=:.3f}\n\n")
-    # print(f"\n{real_sigma_t_calculated_gaussian=}\n\n{sigma_t_vals=}\n\n{vT_minus_m_gaussian=}\n\n{sigma_m_vals}\n\n")
     if verbose:
         print(f"Plotting truth 2D grid for gain offset")
     dev.plot_3d_data_as_2d_hist(
@@ -369,7 +354,6 @@ def main(calibrate : bool = True,
         second_plot_label = "skycal",
     )
 
-# TODO: Add args for git and time IDs
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"Gain Error Offset Analysis")
     parser.add_argument(
