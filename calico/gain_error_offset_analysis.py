@@ -25,10 +25,12 @@ def main(calibrate : bool = True,
     image_path  = 'calico/images'
     file_suffix = ""
 
+    top_start_time = time.time()
+
     if calibrate:
         scaling_factors = [0.1, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 15, 17/3)
-        sigma_m_scales  = np.arange(-15, 15, 17/3)
+        sigma_t_scales  = np.arange(  0, 15, 7/3)
+        sigma_m_scales  = np.arange(-15, 15, 7/3)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -353,6 +355,8 @@ def main(calibrate : bool = True,
         first_plot_label  = "truth",
         second_plot_label = "skycal",
     )
+
+    print(f"\n\n\tTime taken for many error vals:\n\t{(time.time() - top_start_time)/3600} hours")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"Gain Error Offset Analysis")
