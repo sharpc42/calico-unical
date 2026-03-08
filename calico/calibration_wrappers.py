@@ -4,7 +4,7 @@ import time
 import pyuvdata
 import multiprocessing
 from calico import caldata
-
+import dev_tools
 
 def sky_based_calibration_wrapper(
     data,
@@ -787,17 +787,17 @@ def unified_calibration_wrapper(
     ulim=(-10,10),
     antenna_gain_weights=None,
     model_baseline_weights=None,
-    cutoff_threshold=None,
-    cutoff_function="sigmoid",
-    power=2,
+    simulate_visibilties=False,
+    threshold_length=None,
     sigma_t_0=0.1,
     sigma_m_0=0.1,
-    sigma_n_0=None,
-    sigma_e_0=None,
-    gain_realizations=100,
-    model_realizations=1,
     weighting_function="constant_weights",
-    scaling_factor=1,
+    scaling_factor_sim=1,
+    scaling_factor_cost=1,
+    many_realizations=False,
+    run_params_filename="",
+    suffix="",
+    metadata=None,
 ):
     """
     Top-level wrapper for running unified calibration per polarization. Function 
@@ -921,9 +921,15 @@ def unified_calibration_wrapper(
     if verbose:
         data_read_start_time = time.time()
 
+    import os
+    data_file = data
+    model_file = model
+    data_file_path = os.getcwd() + f'/calico/data/{data}.uvfits'
+    model_file_path = os.getcwd() + f'/calico/data/{model}.uvfits'
+
+    # NOTE: SEEMS REDUNDANT OR INCONSISTENT WITH ABOVE
     print_data_read_time = False
-    if isinstance(data, str):  # Read data
-        data_file_path = data
+    if isinstance(data_file_path, str):  # Read data
         data = pyuvdata.UVData()
         if data_file_path.endswith(".ms"):
             data.read_ms(
@@ -936,8 +942,7 @@ def unified_calibration_wrapper(
         else:
             data.read(data_file_path)
         print_data_read_time = True
-    if isinstance(model, str):  # Read model
-        model_file_path = model
+    if isinstance(model_file_path, str):  # Read model
         model = pyuvdata.UVData()
         if model_file_path.endswith(".ms"):
             model.read_ms(
@@ -992,10 +997,13 @@ def unified_calibration_wrapper(
         lambda_val=lambda_val,
         glim=glim,
         ulim=ulim,
-        gain_realizations=gain_realizations,
-        model_realizations=model_realizations,
         weighting_function=weighting_function,
-        scaling_factor=scaling_factor,
+        sigma_t_0=sigma_t_0,
+        sigma_m_0=sigma_m_0,
+        scaling_factor_cost=scaling_factor_cost,
+        scaling_factor_sim=scaling_factor_sim,  # still needed or move?
+        threshold_length=threshold_length,
+        simulate_visibilities=simulate_visibilties,
     )
 
     if caldata_obj.Nfreqs < 2:
@@ -1035,6 +1043,21 @@ def unified_calibration_wrapper(
         #     pool=pool,
         #     verbose=verbose,
         # )
+
+    if many_realizations:
+        dev = dev_tools.DevTools()
+        dev.calculate_many_realizations(
+            caldata_obj=caldata_obj,
+            example_data=data,
+            verbose=verbose,
+            vis_data_writeout_filename=data_file,
+            model_data_writeout_filename=model_file,
+            run_params_filename=run_params_filename,
+            suffix=suffix,
+            metadata=metadata,
+        )
+        return
+
     caldata_obj.unified_calibration(
         xtol=xtol,
         maxiter=maxiter,
@@ -1043,8 +1066,9 @@ def unified_calibration_wrapper(
         parallel=parallel,
         verbose=verbose,
         pool=pool,
-        reduction_factor=scaling_factor,
-        cutoff_threshold=cutoff_threshold,
+        scaling_factor_sim=scaling_factor_sim,
+        scaling_factor_cost=scaling_factor_cost,
+        threshold_length=threshold_length,
     )
     if verbose:
         print(
@@ -1068,4 +1092,4 @@ def unified_calibration_wrapper(
         sys.stderr = stderr_orig
         log_file_new.close()
 
-    return uvcal, caldata_obj.gain_params_realizations, caldata_obj.model_params_realizations, caldata_obj.uv_array
+    return uvcal, caldata_obj.data_visibilities[0,:,0,0], caldata_obj.model_visibilities[0,:,0,0]

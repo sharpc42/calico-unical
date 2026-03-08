@@ -11,8 +11,8 @@ import numpy as np
 from PIL import Image, PngImagePlugin
 from matplotlib.backends.backend_pdf import PdfPages
 
-from calico import cost_function_calculations, calibration_optimization as cal_opt, calibration_wrappers as calwrap
-from pyuvdata import UVData
+from calico import cost_function_calculations, calibration_optimization as cal_opt, calibration_wrappers as calwrap, caldata
+from pyuvdata import UVData, UVCal, Telescope
 import noise_and_error_simulation as sim
 import variable_weights
 
@@ -422,14 +422,17 @@ class DevTools:
 
     def calculate_many_realizations(
         self,
-        run_params_filename : str = 'baseline_dependence_runs_large_noise',
-        vis_data_writeout_filename : str = 'tutorial_full_onetime_unflagged',
+        run_params_filename          : str = 'baseline_dependence_runs_large_noise',
+        vis_data_writeout_filename   : str = 'tutorial_full_onetime_unflagged',
         model_data_writeout_filename : str = 'tutorial_full_onetime_unflagged',
-        verbose : bool = True,
-        caldata_obj : bool = None,
-        freq_ind : int = 0,
-        vis_pol_ind : int = 0,
-        feed_pol_ind : int = 0,
+        verbose                      : bool = True,
+        caldata_obj                         = None,
+        freq_ind                     : int = 0,
+        vis_pol_ind                  : int = 0,
+        feed_pol_ind                 : int = 0,
+        suffix                       : str = "",
+        metadata                     : dict = None,
+        example_data                 : UVData = None,
     ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
         #       freqs so there's no immediate issue. However we will want to get there
@@ -489,6 +492,7 @@ class DevTools:
             initial_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind])
             caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind] = copy.deepcopy(original_model_vis)
             initial_model_vis = copy.deepcopy(caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind])
+            initial_gains = copy.deepcopy(caldata_obj.gains[:,0,0])
 
             # no sim, just use vis as-is
             if num_thermal_realizations == 0: 
@@ -551,6 +555,12 @@ class DevTools:
             full_noise_realizations = np.array([])
             cost_function_realizations = []
 
+            sum_data_realizations     = np.zeros_like(initial_data_vis)
+            sum_model_realizations    = np.zeros_like(initial_model_vis)
+            sum_u_params_realizations = np.zeros_like(initial_model_vis)
+            sum_gains_realizations    = np.zeros_like(initial_gains)
+            counter                   = 0
+
             for j, data in enumerate(data_vis_realizations):
                 if verbose: print(f"Optimization - Data thermal noise realization {j+1}")
                 for k, model in enumerate(model_vis_realizations):
@@ -596,6 +606,12 @@ class DevTools:
                     cost = np.sum(caldata_obj.visibility_weights[0,:,freq_ind,vis_pol_ind] * np.abs(residual_vector) ** 2)
                     cost_function_realizations.append(cost)
 
+                    sum_data_realizations += data
+                    sum_model_realizations += model
+                    sum_u_params_realizations += u_params
+                    sum_gains_realizations += gains
+                    counter += 1
+
             if verbose:
                 print("***ARRAY SHAPE***")
                 print("\tfull data realizations\t\t", full_data_realizations.shape)
@@ -638,10 +654,49 @@ class DevTools:
                 print(f"file\n\t{file}")
                 pickle.dump(output_arrays, file)
 
+            uvd = copy.deepcopy(example_data)
+            uvm = copy.deepcopy(example_data)
+            uvu = copy.deepcopy(example_data)
+
+            uvd.data_array = sum_data_realizations[
+                ..., np.newaxis, np.newaxis
+            ] / counter
+            uvm.data_array = sum_model_realizations[
+                ..., np.newaxis, np.newaxis
+            ] / counter
+            uvu.data_array = sum_model_realizations[
+                ..., np.newaxis, np.newaxis
+            ] / counter
+
+            uvd._extra_keywords = metadata
+            uvm._extra_keywords = metadata
+            uvu._extra_keywords = metadata
+
+            # uvg = caldata_obj.convert_to_uvcal()
+            # uvg.telescope.name = "MWA"
+            # # uvg.set_telescope_params(overwrite=True)
+            # uvg.telescope.Nants = sum_gains_realizations.size
+            # uvg.telescope.antenna_names = uvg.antenna_names
+            # uvg.telescope.antenna_numbers = uvg.antenna_numbers
+            # uvg.telescope.antenna_positions = uvg.antenna_positions
+            # uvg.gain_array = sum_gains_realizations[
+            #     ..., np.newaxis, np.newaxis, np.newaxis
+            # ] / counter
+            # uvg.extra_keywords = metadata
+
+            uvfits_writeout_filename = f"many_realizations_out_{n}_avg"
+            uvd.write_uvfits(f"{uvfits_writeout_filename}_v_{suffix}.uvfits")
+            uvm.write_uvfits(f"{uvfits_writeout_filename}_m_{suffix}.uvfits")
+            uvu.write_uvfits(f"{uvfits_writeout_filename}_u_{suffix}.uvfits")
+            # uvg.write_calfits(f"{uvfits_writeout_filename}_g_{suffix}.calfits")
+
+            np.save(f"{uvfits_writeout_filename}_g_{suffix}.npy", 
+                    sum_gains_realizations / counter)
+
             if verbose:
-                print("***FINISHED THIS RUN***")
+                print(f"***FINISHED RUN {n}***")
                 finish_time = (time.time() - start_many_real_time)/3600
-                print(f"\n***Many realizations time***\n\t{finish_time:.4f} hours\n")
+                print(f"\n\t{finish_time=:.4f} hours\n")
 
     def plot_many_realizations(
         self, 
