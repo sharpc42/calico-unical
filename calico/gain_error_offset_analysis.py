@@ -27,11 +27,6 @@ def main(calibrate : bool = True,
 
     top_start_time = time.time()
 
-    starting_sigma_t_vals = []
-    starting_sigma_m_vals = []
-    result_sigma_t_vals = []
-    result_sigma_m_vals = []
-
     if calibrate:
         scaling_factors = [0.1, 1]  # skycal and truth
         sigma_t_scales  = np.arange(  0, 15, 7/3)
@@ -135,9 +130,6 @@ def main(calibrate : bool = True,
                     output_calcs = json.load(file)
                 for output_calc_dict in output_calcs:
                     output_calcs_list.append(output_calc_dict)
-                starting_sigma_t_vals.append(output_calcs[0]["sigma_re_n"])
-                starting_real_sigma_uvT = output_calcs[0]["sigma_re_u"] - output_calcs[0]["sigma_re_vT"]
-                starting_sigma_m_vals.append(starting_real_sigma_uvT)
                                    
                 if verbose:
                     print("Cleaning up calculated saved files")
@@ -206,10 +198,10 @@ def main(calibrate : bool = True,
             vT_minus_m_gaussian.append(avg_mag_vTm)
             real_sigma_t_calculated_gaussian.append(calc["sigma_re_n"])
             real_sigma_uvT_truth_gaussian.append(real_sigma_uvT)
-            real_g_minus_1_truth_gaussian.append(calc["sigma_re_g"])
+            real_g_minus_1_truth_gaussian.append(calc["avg_re_g_offset"])
         else:
             real_sigma_uvT_skycal_gaussian.append(real_sigma_uvT)
-            real_g_minus_1_skycal_gaussian.append(calc["sigma_re_g"]) 
+            real_g_minus_1_skycal_gaussian.append(calc["avg_re_g_offset"]) 
 
     vT_minus_m_gaussian              = np.asarray(vT_minus_m_gaussian)
     real_sigma_t_calculated_gaussian = np.asarray(real_sigma_t_calculated_gaussian)
@@ -217,10 +209,6 @@ def main(calibrate : bool = True,
     real_g_minus_1_skycal_gaussian   = np.asarray(real_g_minus_1_skycal_gaussian)
     real_sigma_uvT_truth_gaussian    = np.asarray(real_sigma_uvT_truth_gaussian)
     real_sigma_uvT_skycal_gaussian   = np.asarray(real_sigma_uvT_skycal_gaussian)
-    result_sigma_m_vals = vT_minus_m_gaussian
-    result_sigma_t_vals = real_sigma_t_calculated_gaussian
-    print(f"\n\n***initial sigma values***\n\n{starting_sigma_t_vals=}\n\n{starting_sigma_m_vals=}")
-    print(f"\n\n***unpacked sigma values***\n\n{result_sigma_t_vals=}\n\n{result_sigma_m_vals=}\n\n")
 
     if verbose:
         print(f"Plotting truth 2D grid for gain offset")
@@ -232,8 +220,9 @@ def main(calibrate : bool = True,
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
         plot_vmax   = 0.25,
-        plot_vmin   = -0.1,
+        plot_vmin   = -0.25,
         filename    = f'{image_path}/{filename_2d_gains}_truth_{file_suffix}_gaussian.png',
+        plot_cmap   = "PuOr",
         suffix      = file_suffix,
         metadata    = metadata,
     )
@@ -247,8 +236,9 @@ def main(calibrate : bool = True,
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
         plot_vmax   = 0.25,
-        plot_vmin   = -0.1,
+        plot_vmin   = -0.25,
         filename    = f'{image_path}/{filename_2d_gains}_skycal_{file_suffix}_gaussian.png',
+        plot_cmap   = "PuOr",
         suffix      = file_suffix,
         metadata    = metadata,
     )
@@ -265,6 +255,7 @@ def main(calibrate : bool = True,
         plot_ylabel = "$\\sigma_t (Re)$",
         log_cmap    = True,
         filename    = f'{image_path}/{filename_2d_gains}_diff_{file_suffix}_gaussian.png',
+        plot_cmap   = "PuOr",
         suffix      = file_suffix,
         metadata    = metadata,
     )
@@ -278,9 +269,9 @@ def main(calibrate : bool = True,
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
         plot_vmax   = 15,
-        plot_vmin   = -5,
+        plot_vmin   = -15,
         filename    = f'{image_path}/{filename_2d_u_err}_truth_{file_suffix}_gaussian.png',
-        plot_cmap   = "inferno",
+        plot_cmap   = "seismic",
         suffix      = file_suffix,
         metadata    = metadata,
     )
@@ -294,9 +285,9 @@ def main(calibrate : bool = True,
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
         plot_vmax   = 15,
-        plot_vmin   = -5,
+        plot_vmin   = -15,
         filename    = f'{image_path}/{filename_2d_u_err}_skycal_{file_suffix}_gaussian.png',
-        plot_cmap   = "inferno",
+        plot_cmap   = "seismic",
         suffix      = file_suffix,
         metadata    = metadata,
     )
@@ -312,9 +303,9 @@ def main(calibrate : bool = True,
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
         plot_vmax   = 15,
-        plot_vmin   = -5,
+        plot_vmin   = -15,
         filename    = f'{image_path}/{filename_2d_u_err}_diff_{file_suffix}_gaussian.png',
-        plot_cmap   = "inferno",
+        plot_cmap   = "seismic",
         suffix      = file_suffix,
         metadata    = metadata,
     )
@@ -334,7 +325,7 @@ def main(calibrate : bool = True,
         plot_zlabel       = "Re(g-1)",
         xlim_hi           = 16,    xlim_lo     = -16,
         ylim_hi           = 16,    ylim_lo     = -1,
-        zlim_hi           = 0.25,  zlim_lo     = -0.25,
+        zlim_hi           = 0.5,  zlim_lo     = -0.5,
         filename          = f'{image_path}/{filename_3d_scatter_gain}_{file_suffix}_gaussian.png',
         suffix            = file_suffix,
         metadata          = metadata,
@@ -363,7 +354,7 @@ def main(calibrate : bool = True,
         second_plot_label = "skycal",
     )
 
-    print(f"\n\n\tTime taken for many error vals:\n\t{(time.time() - top_start_time)/3600} hours")
+    print(f"\n\tTime taken for many error vals:\n\t{(time.time() - top_start_time)/3600:.4f} hours")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"Gain Error Offset Analysis")
