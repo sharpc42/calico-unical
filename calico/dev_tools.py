@@ -668,9 +668,9 @@ class DevTools:
                 ..., np.newaxis, np.newaxis
             ] / counter
 
-            uvd._extra_keywords = metadata
-            uvm._extra_keywords = metadata
-            uvu._extra_keywords = metadata
+            uvd.extra_keywords = metadata
+            uvm.extra_keywords = metadata
+            uvu.extra_keywords = metadata
 
             # uvg = caldata_obj.convert_to_uvcal()
             # uvg.telescope.name = "MWA"
@@ -2054,7 +2054,7 @@ def plot_3d_data_as_2d_hist(
     plt.xlabel(plot_xlabel)
     plt.ylabel(plot_ylabel)
     plt.tight_layout()
-    plt.savefig(filename, bbox_inches=0)
+    plt.savefig(filename, bbox_inches=0, metadata=metadata,)
     plt.close()
 
     metadata_str = "\n".join([f"{key}: {val}" for key, val in metadata.items()])
