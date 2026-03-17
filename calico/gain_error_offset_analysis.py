@@ -15,11 +15,12 @@ from datetime import datetime
     in calibration to find gain offset from Re(g)=1
     and sigma(u) - sigma(v_T)
 """
-def main(calibrate : bool = True, 
-         verbose   : bool = False,
-         show_plot : bool = False,
-         git_id    : str  = "",
-         time_id   : str  = "",
+def main(calibrate  : bool = True, 
+         verbose    : bool = False,
+         show_plot  : bool = False,
+         git_id     : str  = "",
+         time_id    : str  = "",
+         optim_type : str  = "powell",
 ) -> None:
     data_path   = 'calico/data'
     image_path  = 'calico/images'
@@ -29,8 +30,8 @@ def main(calibrate : bool = True,
 
     if calibrate:
         scaling_factors = [0.1, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 15, 7/3)
-        sigma_m_scales  = np.arange(-15, 15, 7/3)
+        sigma_t_scales  = np.arange(  0, 30, 7/3)
+        sigma_m_scales  = np.arange(-30, 30, 7/3)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -41,6 +42,8 @@ def main(calibrate : bool = True,
         git_time_suffix = f"g{git_hash}_t{start_time_suffix}"
         file_suffix = git_time_suffix
         weighting_function = "constant_weights"
+        if optim_type is None:
+            optim_type = "powell"
 
         start_time_dt = datetime.fromtimestamp(start_time)
         metadata = {
@@ -117,6 +120,7 @@ def main(calibrate : bool = True,
                     reconstruct_model            = False,
                     metadata                     = this_metadata,
                     suffix                       = suffix,
+                    optimization_scheme          = optim_type,
                 )
                 if verbose:
                     print("Finished realizations.")
@@ -180,6 +184,10 @@ def main(calibrate : bool = True,
     real_g_minus_1_skycal_gaussian   = []
     real_sigma_uvT_truth_gaussian    = []
     real_sigma_uvT_skycal_gaussian   = []
+    avg_mag_e_calculated_gaussian    = []
+    avg_mag_n_calculated_gaussian    = []
+    avg_mag_m_calculated_gaussian    = []
+    avg_mag_vT_calculated_gaussian   = []
 
     filename_2d_gains = 'gain_error_vs_model_error_vs_thermal_noise_2d'
     filename_2d_u_err = 'u_error_vs_model_error_vs_thermal_noise_2d'
@@ -199,6 +207,10 @@ def main(calibrate : bool = True,
             real_sigma_t_calculated_gaussian.append(calc["sigma_re_n"])
             real_sigma_uvT_truth_gaussian.append(real_sigma_uvT)
             real_g_minus_1_truth_gaussian.append(calc["avg_re_g_offset"])
+            avg_mag_e_calculated_gaussian.append(calc["avg_mag_e"])
+            avg_mag_n_calculated_gaussian.append(calc["avg_mag_n"])
+            avg_mag_m_calculated_gaussian.append(calc["avg_mag_model"])
+            avg_mag_vT_calculated_gaussian.append(calc["avg_mag_vT"])
         else:
             real_sigma_uvT_skycal_gaussian.append(real_sigma_uvT)
             real_g_minus_1_skycal_gaussian.append(calc["avg_re_g_offset"]) 
@@ -209,6 +221,19 @@ def main(calibrate : bool = True,
     real_g_minus_1_skycal_gaussian   = np.asarray(real_g_minus_1_skycal_gaussian)
     real_sigma_uvT_truth_gaussian    = np.asarray(real_sigma_uvT_truth_gaussian)
     real_sigma_uvT_skycal_gaussian   = np.asarray(real_sigma_uvT_skycal_gaussian)
+    avg_mag_e_calculated_gaussian    = np.asarray(avg_mag_e_calculated_gaussian)
+    avg_mag_n_calculated_gaussian    = np.asarray(avg_mag_n_calculated_gaussian)
+    avg_mag_m_calculated_gaussian    = np.asarray(avg_mag_m_calculated_gaussian)
+    avg_mag_vT_calculated_gaussian   = np.asarray(avg_mag_vT_calculated_gaussian)
+
+    predicted_gain_offset_right = ((avg_mag_m_calculated_gaussian
+                                    + avg_mag_e_calculated_gaussian
+                                    + avg_mag_n_calculated_gaussian)
+                                   / avg_mag_m_calculated_gaussian) - 1
+    predicted_gain_offset_left  = ((avg_mag_vT_calculated_gaussian
+                                    + avg_mag_n_calculated_gaussian)
+                                  / (avg_mag_vT_calculated_gaussian
+                                    + avg_mag_e_calculated_gaussian)) - 1
 
     if verbose:
         print(f"Plotting truth 2D grid for gain offset")
@@ -216,11 +241,11 @@ def main(calibrate : bool = True,
         x_array     = vT_minus_m_gaussian,
         y_array     = real_sigma_t_calculated_gaussian,
         z_array     = real_g_minus_1_truth_gaussian,
-        plot_title  = "Gain Offset vs Model Error\nand Thermal Noise (Truth)",
+        plot_title  = "Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated - Truth)",
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
-        plot_vmax   = 0.25,
-        plot_vmin   = -0.25,
+        plot_vmax   = 1,
+        plot_vmin   = -1,
         filename    = f'{image_path}/{filename_2d_gains}_truth_{file_suffix}_gaussian.png',
         plot_cmap   = "PuOr",
         suffix      = file_suffix,
@@ -232,11 +257,11 @@ def main(calibrate : bool = True,
         x_array     = vT_minus_m_gaussian,
         y_array     = real_sigma_t_calculated_gaussian,
         z_array     = real_g_minus_1_skycal_gaussian,
-        plot_title  = "Gain Offset vs Model Error\nand Thermal Noise (Skycal)",
+        plot_title  = "Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated - Skycal)",
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
-        plot_vmax   = 0.25,
-        plot_vmin   = -0.25,
+        plot_vmax   = 1,
+        plot_vmin   = -1,
         filename    = f'{image_path}/{filename_2d_gains}_skycal_{file_suffix}_gaussian.png',
         plot_cmap   = "PuOr",
         suffix      = file_suffix,
@@ -250,11 +275,43 @@ def main(calibrate : bool = True,
         x_array     = vT_minus_m_gaussian,
         y_array     = real_sigma_t_calculated_gaussian,
         z_array     = real_g_minus_1_diff,
-        plot_title  = "Gain Offset (Truth - Skycal) \nvs Model Error and Thermal Noise",
+        plot_title  = "Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated - Truth Skycal Diff)",
         plot_xlabel = "$Re(v_T - m)$",
         plot_ylabel = "$\\sigma_t (Re)$",
         log_cmap    = True,
         filename    = f'{image_path}/{filename_2d_gains}_diff_{file_suffix}_gaussian.png',
+        plot_cmap   = "PuOr",
+        suffix      = file_suffix,
+        metadata    = metadata,
+    )
+    if verbose:
+        print(f"Plotting prediction 2D grid (left) for gain offset")
+    dev.plot_3d_data_as_2d_hist(
+        x_array     = vT_minus_m_gaussian,
+        y_array     = real_sigma_t_calculated_gaussian,
+        z_array     = predicted_gain_offset_left,
+        plot_title  = "Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Predicted - Skycal)",
+        plot_xlabel = "$Re(v_T - m)$",
+        plot_ylabel = "$\\sigma_t (Re)$",
+        plot_vmax   = 1,
+        plot_vmin   = -1,
+        filename    = f'{image_path}/{filename_2d_gains}_predict_left_{file_suffix}_gaussian.png',
+        plot_cmap   = "PuOr",
+        suffix      = file_suffix,
+        metadata    = metadata,
+    )
+    if verbose:
+        print(f"Plotting prediction 2D grid (right) for gain offset")
+    dev.plot_3d_data_as_2d_hist(
+        x_array     = vT_minus_m_gaussian,
+        y_array     = real_sigma_t_calculated_gaussian,
+        z_array     = predicted_gain_offset_right,
+        plot_title  = "Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Predicted)",
+        plot_xlabel = "$Re(v_T - m)$",
+        plot_ylabel = "$\\sigma_t (Re)$",
+        plot_vmax   = 1,
+        plot_vmin   = -1,
+        filename    = f'{image_path}/{filename_2d_gains}_predict_right_{file_suffix}_gaussian.png',
         plot_cmap   = "PuOr",
         suffix      = file_suffix,
         metadata    = metadata,
@@ -382,6 +439,10 @@ if __name__ == "__main__":
         "--git", type=str,
         help="git ID for loading saved calibration run",
     )
+    parser.add_argument(
+        "--optim", type=str,
+        help="type of optimization scheme to use for calibration"
+    )
     args = parser.parse_args()
 
     main(
@@ -390,4 +451,5 @@ if __name__ == "__main__":
         show_plot=args.s,
         time_id=args.time,
         git_id=args.git,
+        optim_type=args.optim,
     )
