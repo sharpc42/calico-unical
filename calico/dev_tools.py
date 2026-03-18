@@ -433,6 +433,7 @@ class DevTools:
         suffix                       : str = "",
         metadata                     : dict = None,
         example_data                 : UVData = None,
+        optimization_scheme          : str = "powell"
     ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
         #       freqs so there's no immediate issue. However we will want to get there
@@ -576,7 +577,10 @@ class DevTools:
                         sigma_m_0=run_params['sigma_m'],
                         threshold_length=caldata_obj.threshold_length
                     )
-                    caldata_obj.unified_calibration(verbose=verbose)
+                    caldata_obj.unified_calibration(
+                        verbose=verbose,
+                        optimization_scheme=optimization_scheme,
+                    )
                     
                     # store data
                     full_data_realizations = np.concatenate((full_data_realizations, data))
@@ -1261,6 +1265,29 @@ class DevTools:
                 fontsize="13",
             )
 
+            e_arr_mag = np.abs(vT_arr - m_arr)
+            avg_re_g_left = np.mean(
+                np.sqrt(
+                    np.sqrt(
+                        np.abs(vT_arr)**2 + np.abs(n_arr)**2
+                    ) /
+                    np.sqrt(
+                        np.abs(vT_arr)**2 + e_arr_mag**2
+                    )
+                )
+            ).real
+            avg_re_g_right = np.mean(
+                np.sqrt(
+                    np.sqrt(
+                        np.sqrt(
+                            np.abs(m_arr)**2 + e_arr_mag**2
+                        ) +
+                        np.abs(n_arr)**2
+                    ) /
+                    np.abs(m_arr)
+                )
+            ).real
+
             this_output_dict = {
                 "sigma_re_m"      : sigma_re_m,
                 "avg_mag_model"   : avg_mag_model,
@@ -1280,6 +1307,8 @@ class DevTools:
                 "avg_mag_u"       : avg_mag_u,
                 "sigma_re_u"      : sigma_re_u,
                 "sigma_re_vT"     : sigma_re_vT,
+                "avg_re_g_left"   : avg_re_g_left,
+                "avg_re_g_right"  : avg_re_g_right,
             }
             output_dicts.append(this_output_dict)
             
@@ -2006,6 +2035,10 @@ def plot_3d_data_as_2d_hist(
     plot_title  : str = "",
     plot_xlabel : str = "",
     plot_ylabel : str = "",
+    plot_xlim_h : int | float = None,
+    plot_xlim_l : int | float = None,
+    plot_ylim_h : int | float = None,
+    plot_ylim_l : int | float = None,
     plot_vmax   : int | float = 1, 
     plot_vmin   : int | float = 0,     
     filename    : str = "",   
@@ -2025,7 +2058,8 @@ def plot_3d_data_as_2d_hist(
         method = 'linear',
     )
     if log_cmap:
-        plt.imshow(
+        max_abs = np.max(np.abs(data_gridded))
+        im = plt.imshow(
             data_gridded,
             cmap=plot_cmap,
             extent=[np.min(x_array),
@@ -2034,10 +2068,12 @@ def plot_3d_data_as_2d_hist(
                     np.max(y_array)],
             aspect='equal',
             origin='lower',
-            norm=colors.SymLogNorm(10**-4),
+            norm=colors.SymLogNorm(10**-4, 
+                                   vmin=-1*max_abs,
+                                   vmax=max_abs,),
         )
     else:
-        plt.imshow(
+        im = plt.imshow(
             data_gridded,
             cmap=plot_cmap,
             vmax=plot_vmax,
@@ -2049,7 +2085,7 @@ def plot_3d_data_as_2d_hist(
             aspect='equal',
             origin='lower',
         )
-    plt.colorbar()
+    plt.colorbar(im)
     plt.title(plot_title)
     plt.xlabel(plot_xlabel)
     plt.ylabel(plot_ylabel)
