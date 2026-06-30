@@ -2077,15 +2077,16 @@ def generate_files():
 # so this function assumes the scale factors are w.r.t sigma
 # itself and so must be converted accordingly.
 def generate_custom_file(
-    filename: str,
-    scaling_factors: list,
-    sigma_t: float = fhd_runs_medium_noise_015_m / 10,
-    sigma_n: float = fhd_runs_medium_noise_015_m / 10,
-    sigma_m: float = fhd_runs_medium_noise_015_m,
-    sigma_e: float = fhd_runs_medium_noise_015_m,
-    thermal_realizations: int = max_realizations,
-    model_realizations: int = 0,
-    weighting_function: str = "constant_weights",
+    filename : str,
+    scaling_factors : list,
+    sigma_t : float = fhd_runs_medium_noise_015_m / 10,
+    sigma_n : float = fhd_runs_medium_noise_015_m / 10,
+    sigma_m : float = fhd_runs_medium_noise_015_m,
+    sigma_e : float = fhd_runs_medium_noise_015_m,
+    thermal_realizations : int = max_realizations,
+    model_realizations : int = 0,
+    weighting_function : str = "constant_weights",
+    scaling_factor_sim : int = 1,
 ) -> None:
     custom_file = []
     for scaling_factor in scaling_factors:
@@ -2100,6 +2101,7 @@ def generate_custom_file(
                 "model_error_realizations": model_realizations,
                 "weighting_function": weighting_function,
                 "scaling_factor_cost": scaling_factor,
+                "scaling_factor_sim": scaling_factor_sim,
             },
         )
     cwd = os.getcwd()
