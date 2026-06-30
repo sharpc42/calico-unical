@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import sys
 from calico import utils
 import time
@@ -37,15 +38,12 @@ def cost_skycal(
     cost : float
         Value of the cost function.
     """
-
     gains_expanded = (gains[ant1_inds] * np.conj(gains[ant2_inds]))[np.newaxis, :]
     res_vec = model_visibilities - gains_expanded * data_visibilities
     cost = np.sum(visibility_weights * np.abs(res_vec) ** 2)
-
     if lambda_val > 0:
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
-
     return cost
 
 
@@ -84,7 +82,7 @@ def jacobian_skycal(
         Jacobian of the chi-squared cost function, shape (Nants,). The real part
         corresponds to derivatives with respect to the real part of the gains;
         the imaginary part corresponds to derivatives with respect to the
-        imaginary part of the gains.
+        imaginary part of the gains.    
     """
 
     start_jac = time.time()
@@ -1118,18 +1116,21 @@ def reformat_to_matrix(
     return rect_matrix
 
 def cost_unical(
-    gains,
-    fit_vis,
-    data_vis,
-    model_vis,
-    vis_weights,
-    model_weights,
-    ant1_inds,
-    ant2_inds,
-    lambda_val,
-):
+    gains         : np.ndarray[complex],
+    fit_vis       : np.ndarray[complex],
+    data_vis      : np.ndarray[complex],
+    model_vis     : np.ndarray[complex],
+    vis_weights   : np.ndarray[float],
+    model_weights : np.ndarray[float],
+    ant1_inds     : np.ndarray[int],
+    ant2_inds     : np.ndarray[int],
+    lambda_val    : float,
+    force_skycal  : bool = False,
+    gmm           : bool = True,
+) -> float:
     """
     Calculate the cost function (chi-squared) value.
+    Friendly to Scipy (real variables) optimization.
 
     Parameters
     ----------
@@ -1157,29 +1158,97 @@ def cost_unical(
     cost : float
         Value of the cost function.
     """
-
     gains_expanded = (gains[ant1_inds] * np.conj(gains[ant2_inds]))[np.newaxis, :]
-    res_vec_1 = data_vis - gains_expanded * fit_vis
-    res_vec_2 = fit_vis - model_vis
-    cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
-
+    if not force_skycal:
+        if gmm:
+            res_vec_1 = data_vis - gains_expanded * fit_vis
+        else:
+            res_vec_1 = fit_vis - gains_expanded * data_vis
+        res_vec_2 = fit_vis - model_vis
+        cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
+    else:
+        res_vec_1 = data_vis - gains_expanded * model_vis
+        cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2)
     if lambda_val > 0:
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
 
     return cost
 
+def cost_unical_torch(
+    params        : torch.Tensor,
+    data_vis      : torch.Tensor,
+    model_vis     : torch.Tensor,
+    vis_weights   : torch.Tensor,
+    model_weights : torch.Tensor,
+    ant_inds      : torch.Tensor,
+    ant1_inds     : torch.Tensor,
+    ant2_inds     : torch.Tensor,
+    num_ants      : int,
+    lambda_val    : float,
+) -> float:
+    """
+    Calculate the cost function (chi-squared) value.
+    Friendly to PyTorch (complex variables) optimization.
+
+    Parameters
+    ----------
+    params : tensor of complex
+        Shape (Nants + Nbls,).
+    model_vis :  tensor of complex
+        Shape (Ntimes, Nbls,).
+    data_vis: tensor of complex
+        Shape (Ntimes, Nbls,).
+    vis_weights : tensor of float
+        Shape (Ntimes, Nbls,).
+    model_weights : tensor of float
+        Shape (Ntimes, Nbls,).
+    ant_inds : tensor of int
+        Shape (Nants_unflagged,).
+    ant1_inds : tensor of int
+        Shape (Nbls,).
+    ant2_inds : tensor of int
+        Shape (Nbls,).
+    num_ants : int
+        number of total antennas, flagged or unflagged
+    lambda_val : float
+        Weight of the phase regularization term; must be positive.
+
+    Returns
+    -------
+    cost : float
+        Value of the cost function.
+    """
+    # gains_reshaped = params[:len(ant_inds)]
+    # gains = torch.ones((num_ants), dtype=torch.complex64)
+    # gains[ant_inds] = gains_reshaped
+    gains = params[:len(ant_inds)]
+    fit_vis = params[len(ant_inds):]
+
+    gains_expanded = (gains[ant1_inds] * torch.conj((gains[ant2_inds])))[None, :]
+    res_vec_1 = data_vis - gains_expanded * fit_vis
+    res_vec_2 = fit_vis - model_vis
+    cost_1 = vis_weights * (res_vec_1.real ** 2 + res_vec_1.imag ** 2)
+    cost_2 = model_weights * (res_vec_2.real ** 2 + res_vec_2.imag ** 2)
+    cost = torch.sum(cost_1) + torch.sum(cost_2)
+
+    if lambda_val > 0:
+        regularization_term = lambda_val * torch.sum(torch.angle(gains)) ** 2.0
+        cost += regularization_term
+
+    return cost
+
 def jacobian_unical(
-    gains,
-    fit_vis,
-    data_vis,
-    model_vis,
-    vis_weights,
-    model_weights,
-    ant1_inds,
-    ant2_inds,
-    lambda_val,
-):
+    gains         : np.ndarray[complex],
+    fit_vis       : np.ndarray[complex],
+    data_vis      : np.ndarray[complex],
+    model_vis     : np.ndarray[complex],
+    vis_weights   : np.ndarray[float],
+    model_weights : np.ndarray[float],
+    ant1_inds     : np.ndarray[int],
+    ant2_inds     : np.ndarray[int],
+    lambda_val    : float,
+) -> np.ndarray[complex]:
     """
     Calculate the Jacobian of the cost function.
 
@@ -1265,27 +1334,26 @@ def jacobian_unical(
 
     jac = np.hstack((jac_gains, jac_vis))
 
-    end_jac = time.time()
-    # print("***JACOBIAN TIME***", (end_jac - start_jac)/60.)
+    print(f"Jacobian time - {(time.time()-start_jac)/60} minutes")
 
     return jac
 
 
 def hessian_unical(
-    gains,
-    fit_vis,
-    Nants,
-    Nbls,
-    Ntimes,
-    data_vis,
-    model_vis,
-    vis_weights,
-    model_weights,
-    ant1_inds,
-    ant2_inds,
-    bl_inds,
-    lambda_val,
-):
+    gains         : np.ndarray[complex],
+    fit_vis       : np.ndarray[complex],
+    Nants         : int,
+    Nbls          : int,
+    Ntimes        : int,
+    data_vis      : np.ndarray[complex],
+    model_vis     : np.ndarray[complex],
+    vis_weights   : np.ndarray[float],
+    model_weights : np.ndarray[float],
+    ant1_inds     : np.ndarray[int],
+    ant2_inds     : np.ndarray[int],
+    bl_inds       : np.ndarray[int],
+    lambda_val    : float,
+) -> tuple[np.ndarray[float], ...]:
     """
     Calculate the Hessian of the cost function.
 
@@ -1502,8 +1570,7 @@ def hessian_unical(
     fit_gain_hess_realu_imagg = fit_gain_hess_components[:, :, 2]
     fit_gain_hess_imagu_imagg = fit_gain_hess_components[:, :, 3]
 
-    end_hess = time.time()
-    # print("***HESSIAN TIME***", (end_hess - start_hess)/60.)
+    print(f"Hessian time - {(time.time()-start_hess)/60} minutes")
 
     return gain_hess_real_real, gain_hess_real_imag, gain_hess_imag_imag, \
         fit_hess_real_real, fit_hess_real_imag, fit_hess_imag_imag, \

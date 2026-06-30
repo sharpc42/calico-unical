@@ -84,7 +84,7 @@ def simulate_model_error(Nbls,
         #     print("Initial model error failed. Was sigma_e set correctly?")
     elif sigma_e_0 is not None and weighting_function == 'constant_weights':
         if verbose:
-            print("***CONSTANT WEIGHTING FUNCTION IN SIMULATION***")
+            print(f"Constant weighting function in simulation")
         model_error_real = np.random.normal(
             0.0,
             sigma_e_0,

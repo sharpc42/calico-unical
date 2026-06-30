@@ -239,14 +239,14 @@ def sky_based_calibration_wrapper(
         optimization_start_time = time.time()
 
     for ant_flag_iter in range(antenna_flagging_iterations):
-        # caldata_obj.sky_based_calibration(
-        #     xtol=xtol / 10,  # Lower tolerance for antenna flagging
-        #     maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
-        #     get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
-        #     parallel=parallel,
-        #     verbose=verbose,
-        #     pool=pool,
-        # )
+        caldata_obj.sky_based_calibration(
+            xtol=xtol / 10,  # Lower tolerance for antenna flagging
+            maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
+            get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
+            parallel=parallel,
+            verbose=verbose,
+            pool=pool,
+        )
         if verbose:
             print(
                 f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
@@ -787,17 +787,17 @@ def unified_calibration_wrapper(
     ulim=(-10,10),
     antenna_gain_weights=None,
     model_baseline_weights=None,
-    simulate_visibilties=False,
     threshold_length=None,
     sigma_t_0=0.1,
     sigma_m_0=0.1,
     weighting_function="constant_weights",
-    scaling_factor_sim=1,
     scaling_factor_cost=1,
     many_realizations=False,
     run_params_filename="",
     suffix="",
     metadata=None,
+    optimization_scheme="powell",
+    calibration_type="unical",
 ):
     """
     Top-level wrapper for running unified calibration per polarization. Function 
@@ -1001,9 +1001,7 @@ def unified_calibration_wrapper(
         sigma_t_0=sigma_t_0,
         sigma_m_0=sigma_m_0,
         scaling_factor_cost=scaling_factor_cost,
-        scaling_factor_sim=scaling_factor_sim,  # still needed or move?
         threshold_length=threshold_length,
-        simulate_visibilities=simulate_visibilties,
     )
 
     if caldata_obj.Nfreqs < 2:
@@ -1044,20 +1042,6 @@ def unified_calibration_wrapper(
         #     verbose=verbose,
         # )
 
-    if many_realizations:
-        dev = dev_tools.DevTools()
-        dev.calculate_many_realizations(
-            caldata_obj=caldata_obj,
-            example_data=data,
-            verbose=verbose,
-            vis_data_writeout_filename=data_file,
-            model_data_writeout_filename=model_file,
-            run_params_filename=run_params_filename,
-            suffix=suffix,
-            metadata=metadata,
-        )
-        return
-
     caldata_obj.unified_calibration(
         xtol=xtol,
         maxiter=maxiter,
@@ -1066,7 +1050,6 @@ def unified_calibration_wrapper(
         parallel=parallel,
         verbose=verbose,
         pool=pool,
-        scaling_factor_sim=scaling_factor_sim,
         scaling_factor_cost=scaling_factor_cost,
         threshold_length=threshold_length,
     )

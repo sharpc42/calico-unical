@@ -66,21 +66,19 @@ class VariableWeightsArray:
 
     def __init__(self):
         self.uv_norm_array = None
-        self.threshold_length = 0.0
+        self.threshold_length = None
         self.weighting_function = ""
         self.power = 0
         self.scaling_factor = 0.0,
         self.thermal_noise_weight_array = None,
         self.model_error_weight_array = None,
 
-    def set_weights(
+    def set_algorithm_weights(
         self,
         caldata_obj,
         sigma_t_0 = 0.1,
         sigma_m_0 = 0.1,
-        sigma_n_0 = None,
-        sigma_e_0 = None,
-        threshold_length = 50.0,
+        threshold_length = None,
         weighting_function = "constant_weights",
         power = 2,
         scaling_factor = 1,
@@ -103,18 +101,6 @@ class VariableWeightsArray:
             * It is important that the user makes the scale and units
             comparable to sigma_m_0 since in unified calibration the
             two cost function terms are coupled by the u parameters.
-        sigma_n_0 : float
-            * The characteristic thermal noise to be used in simulating
-            data visibilities with thermal noise. The default value of
-            None will set this equal to sigma_t_0. 
-            * NOTE: Most users will not need to use this unless writing
-            their own unified calibration implementations.
-        sigma_e_0 : float
-            * The characteristic thermal noise to be used in simulating
-            data visibilities with thermal noise. The default value of
-            None will set this equal to sigma_t_0. 
-            * NOTE: Most users will not need to use this unless writing
-            their own unified calibration implementations.
         weighting_function : string
             * One of several functions for distributing weights as a
             function of baseline length and the threshold baseline
@@ -151,11 +137,11 @@ class VariableWeightsArray:
             string exactly matches the function name, and the necessary
             parameters are added as class attributes.
         """
+        if threshold_length == None:
+            raise ValueError(f"Need threshold length even if zero -- Variable Weights")
+        
         caldata_obj.sigma_t_0 = sigma_t_0
         caldata_obj.sigma_m_0 = sigma_m_0
-        # for simulations
-        caldata_obj.sigma_n_0 = sigma_n_0 if sigma_n_0 else sigma_t_0
-        caldata_obj.sigma_e_0 = sigma_e_0 if sigma_e_0 else sigma_m_0
 
         self.power = power
         self.weighting_function = weighting_function
