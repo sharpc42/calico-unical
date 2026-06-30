@@ -34,7 +34,7 @@ def main(calibrate            : bool = True,
     if calibrate:
         scaling_factors = [0.001, 1]  # skycal and truth
         sigma_t_scales  = np.arange(  0, 10, 0.5)
-        sigma_m_scales  = np.arange(0, 10, 0.5)
+        sigma_m_scales  = np.arange(-10, 10, 0.5)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
