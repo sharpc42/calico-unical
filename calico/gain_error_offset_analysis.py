@@ -24,6 +24,7 @@ def main(calibrate            : bool = True,
          cal_type             : str  = "unical",
          gains_multiply_model : bool = False,
          test_torch           : bool = False,
+         give_gains_guess     : bool = False,
 ) -> None:
     data_path   = 'calico/data'
     image_path  = 'calico/images'
@@ -32,9 +33,13 @@ def main(calibrate            : bool = True,
     top_start_time = time.time()
 
     if calibrate:
+        if give_gains_guess:
+            if len(git_id) == 0 or len(time_id) == 0:
+                raise ValueError("Need values passed for git and time IDs")
+            guess_git_time_suffix = f"g{git_id}_t{time_id}"
         scaling_factors = [0.001, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 10, 0.5, dtype=float)
-        sigma_m_scales  = np.arange(-10, 10, 0.5, dtype=float)
+        sigma_t_scales  = np.arange(  0, 10, 2, dtype=float)
+        sigma_m_scales  = np.arange(0, 10, 2, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -72,9 +77,13 @@ def main(calibrate            : bool = True,
                     sigma_m = 0.1
                 if verbose:
                     print(f"Creating settings files\n\tsigma_m {sigma_m}\tsigma_t {sigma_t}")
-                suffix = f"{int(sigma_t*100):d}_{int(sigma_m*10):d}"
-                suffix += git_time_suffix
+                sigma_suffix = f"{int(sigma_t*100):d}_{int(sigma_m*10):d}"
+                suffix = sigma_suffix + git_time_suffix
+                if give_gains_guess: 
+                    guess_suffix = sigma_suffix + guess_git_time_suffix
                 filename = f"gain_error_offset_analysis_{suffix}",
+                if give_gains_guess: 
+                    guess_filename = f"gain_error_offset_analysis_{guess_suffix}"
                 custom_file = []
                 for scaling_factor in scaling_factors:
                     scaling_factor_cost = 1 / scaling_factor**2
@@ -111,7 +120,16 @@ def main(calibrate            : bool = True,
                     "Git Hash"            : git_hash,
                     "Scaling Factor Sim"  : scaling_factor_sim,
                     "Scaling Factor Cost" : scaling_factor_cost,
+                    "Gain Guess Given"    : give_gains_guess,
                 }
+                gains_real_guess = None
+                if give_gains_guess:
+                    with open(
+                        f"{cwd}/calico/data/{guess_filename}_settings.json",
+                        mode="r"
+                    ) as file:
+                        guess_dict = json.load(file)
+                    gains_real_guess = guess_dict["g_arr_real"]
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
                     sav_data_filename            = 'tutorial_full_onetime_unflagged',
@@ -131,6 +149,7 @@ def main(calibrate            : bool = True,
                     gains_multiply_model         = gains_multiply_model,
                     threshold_length             = 0,
                     force_fit_to_true_vis        = test_torch,
+                    gains_real_guess             = gains_real_guess,
                 )
                 if verbose:
                     print("Finished realizations.")
@@ -966,6 +985,10 @@ if __name__ == "__main__":
         "--test", action="store_true",
         help="test pytorch optim by forcing u = v_T"
     )
+    parser.add_argument(
+        "--guess", action="store_true",
+        help="give initial guess for the gains"
+    )
     args = parser.parse_args()
 
     main(
@@ -977,4 +1000,6 @@ if __name__ == "__main__":
         optim_type=args.optim,
         cal_type=args.caltype,
         gains_multiply_model=args.gmm,
+        test_torch=args.test,
+        give_gains_guess=args.guess,
     )

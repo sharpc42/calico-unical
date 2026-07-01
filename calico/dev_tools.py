@@ -438,6 +438,7 @@ class DevTools:
         xtol                         : float  = 1e-5,
         maxiter                      : int    = 200,
         force_fit_to_true_vis        : bool   = False,
+        gains_real_guess                      = None,
     ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
         #       freqs so there's no immediate issue. However we will want to get there
@@ -579,6 +580,8 @@ class DevTools:
                     caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind] = model
                     if force_fit_to_true_vis:
                         caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind] = original_data_vis
+                    if gains_real_guess is not None:
+                        caldata_obj.gains[:,freq_ind,feed_pol_ind].real = gains_real_guess
                     vwa = variable_weights.VariableWeightsArray()
                     vwa.set_algorithm_weights(
                         caldata_obj,
@@ -1391,6 +1394,7 @@ class DevTools:
                 "n_m_corr_coeff_phase"      : thermal_noise_model_vis_corr_phase,
                 "e_m_corr_coeff_phase"      : model_error_model_vis_corr_phase,
                 "avg_cost_func_val"         : np.mean(cost_arr),
+                "g_arr_real"                : (g_arr.real).tolist(),
             }
             output_dicts.append(this_output_dict)
             

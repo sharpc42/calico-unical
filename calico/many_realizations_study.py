@@ -183,6 +183,7 @@ def init_many_realizations(
     gains_multiply_model=False,
     threshold_length=None,
     force_fit_to_true_vis=False,
+    gains_real_guess=None,
 ):
     dev = dev_tools.DevTools()
     if prepare_data_files(
@@ -310,6 +311,7 @@ def init_many_realizations(
                 xtol=xtol,
                 maxiter=maxiter,
                 force_fit_to_true_vis=force_fit_to_true_vis,
+                gains_real_guess=gains_real_guess,
             )
         dev.plot_many_realizations(data_filepath=model_path,
                                    run_params_filename=run_params_filename,
