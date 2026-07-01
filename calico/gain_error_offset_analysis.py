@@ -205,6 +205,8 @@ def main(calibrate            : bool = True,
     e_n_corr_coeff_phase             = []
     n_m_corr_coeff_phase             = []
     e_m_corr_coeff_phase             = []
+    avg_cost_func_val_truth          = []
+    avg_cost_func_val_skycal         = []
 
     filename_2d_gains = 'gain_error_vs_model_error_vs_thermal_noise_2d'
     filename_2d_u_err = 'u_error_vs_model_error_vs_thermal_noise_2d'
@@ -227,13 +229,14 @@ def main(calibrate            : bool = True,
             # print(f"\n\n***TRUTH SCALING FACTOR***\n\t{scaling_factor_truth}\n\n")
             real_sigma_uvT_truth_gaussian.append(real_sigma_uvT)
             real_g_minus_1_truth_gaussian.append(calc["avg_re_g_offset"])
-            avg_real_g_left_skycal_gaussian.append(calc["avg_re_g_minus_one_left"])
-            avg_real_g_right_skycal_gaussian.append(calc["avg_re_g_minus_one_right"])
+            avg_cost_func_val_truth.append(calc["avg_cost_func_val"])
         else:
             scaling_factor_skycal = read_scaling_factor
             # print(f"\n\n***SKYCAL SCALING FACTOR***\n\t{scaling_factor_skycal}\n\n")
             real_sigma_uvT_skycal_gaussian.append(real_sigma_uvT)
             real_g_minus_1_skycal_gaussian.append(calc["avg_re_g_offset"])
+            avg_real_g_left_skycal_gaussian.append(calc["avg_re_g_minus_one_left"])   # predicted vals
+            avg_real_g_right_skycal_gaussian.append(calc["avg_re_g_minus_one_right"])
             vT_minus_m_gaussian.append(avg_mag_vTm)
             real_sigma_t_calculated_gaussian.append(calc["sigma_re_n"])
             sigma_re_m.append(calc["sigma_re_m"])
@@ -245,6 +248,7 @@ def main(calibrate            : bool = True,
             e_n_corr_coeff_phase.append(calc["e_n_corr_coeff_phase"])
             n_m_corr_coeff_phase.append(calc["n_m_corr_coeff_phase"])
             e_m_corr_coeff_phase.append(calc["e_m_corr_coeff_phase"])
+            avg_cost_func_val_skycal.append(calc["avg_cost_func_val"])
 
     vT_minus_m_gaussian              = np.asarray(vT_minus_m_gaussian)
     real_sigma_t_calculated_gaussian = np.asarray(real_sigma_t_calculated_gaussian)
@@ -263,6 +267,8 @@ def main(calibrate            : bool = True,
     e_n_corr_coeff_phase             = np.asarray(e_n_corr_coeff_phase)
     n_m_corr_coeff_phase             = np.asarray(n_m_corr_coeff_phase)
     e_m_corr_coeff_phase             = np.asarray(e_m_corr_coeff_phase)
+    avg_cost_func_val_truth          = np.asarray(avg_cost_func_val_truth)
+    avg_cost_func_val_skycal         = np.asarray(avg_cost_func_val_skycal)
 
     """
     Plotting
@@ -464,6 +470,72 @@ def main(calibrate            : bool = True,
         filename      = f'{image_path}/{filename_2d_gains}_e_m_corr_coeff_phase_{file_suffix}_gaussian.png',
         plot_cmap     = "viridis",
         cmap_label    = "Phase e-m CorrCoef",
+        suffix        = file_suffix,
+        metadata      = metadata,
+    )
+    if verbose:
+        print(f"Plotting unical 2D grid for final cost function value")
+    dev.plot_3d_data_as_2d_hist(
+        x_array       = vT_minus_m_gaussian,
+        y_array       = real_sigma_t_calculated_gaussian,
+        z_array       = avg_cost_func_val_truth,
+        num_y_vals    = len(sigma_m_scales),
+        num_x_vals    = len(sigma_t_scales),
+        x_array_2     = sigma_re_m,
+        x_array_3     = sigma_re_vT,
+        plot_title    = f"Avg Final Cost Func. Value vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Unical) - {scaling_factor_truth:.2f}",
+        plot_xlabel   = "$Re(v_T - m)$",
+        # plot_xlabel_2 = "$\\sigma Re(m)$",
+        plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_ylabel   = "$\\sigma_t (Re)$",
+        plot_vmax     = min([
+                            np.abs(max(avg_cost_func_val_truth)),
+                            np.abs(min(avg_cost_func_val_truth))
+                        ]),
+        plot_vmin     = min([
+                            np.abs(max(avg_cost_func_val_truth)),
+                            np.abs(min(avg_cost_func_val_truth))
+                        ]),
+        plot_xlim_h   = max(sigma_m_scales),
+        plot_xlim_l   = min(sigma_m_scales),
+        plot_ylim_h   = max(sigma_t_scales),
+        plot_ylim_l   = min(sigma_t_scales),
+        filename      = f'{image_path}/{filename_2d_gains}_avg_cost_func_val_skycal_{file_suffix}_gaussian.png',
+        plot_cmap     = "viridis",
+        cmap_label    = "Avg. Final Cost Func. Val.",
+        suffix        = file_suffix,
+        metadata      = metadata,
+    )
+    if verbose:
+        print(f"Plotting skycal 2D grid for final cost function value")
+    dev.plot_3d_data_as_2d_hist(
+        x_array       = vT_minus_m_gaussian,
+        y_array       = real_sigma_t_calculated_gaussian,
+        z_array       = avg_cost_func_val_skycal,
+        num_y_vals    = len(sigma_m_scales),
+        num_x_vals    = len(sigma_t_scales),
+        x_array_2     = sigma_re_m,
+        x_array_3     = sigma_re_vT,
+        plot_title    = f"Avg Final Cost Func. Value vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
+        plot_xlabel   = "$Re(v_T - m)$",
+        # plot_xlabel_2 = "$\\sigma Re(m)$",
+        plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_ylabel   = "$\\sigma_t (Re)$",
+        plot_vmax     = min([
+                            np.abs(max(avg_cost_func_val_skycal)),
+                            np.abs(min(avg_cost_func_val_skycal))
+                        ]),
+        plot_vmin     = min([
+                            np.abs(max(avg_cost_func_val_skycal)),
+                            np.abs(min(avg_cost_func_val_skycal))
+                        ]),
+        plot_xlim_h   = max(sigma_m_scales),
+        plot_xlim_l   = min(sigma_m_scales),
+        plot_ylim_h   = max(sigma_t_scales),
+        plot_ylim_l   = min(sigma_t_scales),
+        filename      = f'{image_path}/{filename_2d_gains}_avg_cost_func_val_skycal_{file_suffix}_gaussian.png',
+        plot_cmap     = "viridis",
+        cmap_label    = "Avg. Final Cost Func. Val.",
         suffix        = file_suffix,
         metadata      = metadata,
     )

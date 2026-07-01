@@ -1390,6 +1390,7 @@ class DevTools:
                 "e_n_corr_coeff_phase"      : model_error_thermal_noise_corr_phase,
                 "n_m_corr_coeff_phase"      : thermal_noise_model_vis_corr_phase,
                 "e_m_corr_coeff_phase"      : model_error_model_vis_corr_phase,
+                "avg_cost_func_val"         : np.mean(cost_arr),
             }
             output_dicts.append(this_output_dict)
             
