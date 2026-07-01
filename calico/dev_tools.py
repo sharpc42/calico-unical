@@ -2237,6 +2237,9 @@ def plot_3d_data_as_2d_hist(
     ax.set_ylabel(plot_ylabel)
     plt.xlim(plot_xlim_l, plot_xlim_h)
     plt.ylim(plot_ylim_l, plot_ylim_h)
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    ax.text(0.95, 0.95, box_text, transform=ax.transAxes, fontsize=14,
+        verticalalignment='top', bbox=props)
     # plt.grid(visible=True, axis='both', which='major', color='black', linewidth=1)
     plt.tight_layout()
     plt.savefig(filename, bbox_inches='tight', metadata=metadata,)

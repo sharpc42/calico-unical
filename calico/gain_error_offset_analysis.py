@@ -121,6 +121,7 @@ def main(calibrate            : bool = True,
                     "Scaling Factor Sim"  : scaling_factor_sim,
                     "Scaling Factor Cost" : scaling_factor_cost,
                     "Gain Guess Given"    : give_gains_guess,
+                    "Optimizer"           : optim_type,
                 }
                 gains_real_guess = None
                 if give_gains_guess:
@@ -326,6 +327,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "|e|-|n| CorrCoef",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for n-m correlation (abs)")
@@ -359,6 +361,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "|n|-|m| CorrCoef",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for e-m correlation (abs)")
@@ -392,6 +395,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "|e|-|m| CorrCoef",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for e-n correlation (phase)")
@@ -425,6 +429,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "Phase e-n CorrCoef",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for n-m correlation (phase)")
@@ -458,6 +463,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "Phase n-m CorrCoef",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for e-m correlation (phase)")
@@ -491,6 +497,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "Phase e-m CorrCoef",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting unical 2D grid for final cost function value")
@@ -524,6 +531,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "Avg. Final Cost Func. Val.",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for final cost function value")
@@ -557,6 +565,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "Avg. Final Cost Func. Val.",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting truth 2D grid for gain offset")
@@ -593,6 +602,7 @@ def main(calibrate            : bool = True,
         suffix      = file_suffix,
         metadata    = metadata,
         angle       = angle,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for gain offset")
@@ -629,6 +639,7 @@ def main(calibrate            : bool = True,
         suffix        = file_suffix,
         metadata      = metadata,
         angle         = angle,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting truth-skycal diff 2D grid for gain offset")
@@ -665,6 +676,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "$<Re(g)>-1$",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     dev.plot_3d_data_as_2d_hist(
         x_array       = vT_minus_m_gaussian,
@@ -695,6 +707,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "$<Re(g)>-1$",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting prediction 2D grid (left) for gain offset")
@@ -730,6 +743,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "$<Re(g)>-1$",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting prediction 2D grid (right) for gain offset")
@@ -765,6 +779,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "$<Re(g)>-1$",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     # if verbose:
     #     print(f"Plotting prediction 2D grid (joined) for gain offset")
@@ -815,6 +830,7 @@ def main(calibrate            : bool = True,
         cmap_label    = "$Std Phase Re(g)-1$",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting truth 2D grid for u offset")
@@ -841,6 +857,7 @@ def main(calibrate            : bool = True,
         plot_cmap     = "seismic",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting skycal 2D grid for u offset")
@@ -867,6 +884,7 @@ def main(calibrate            : bool = True,
         plot_cmap     = "seismic",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print(f"Plotting truth-skycal diff 2D grid for u offset")
@@ -895,6 +913,7 @@ def main(calibrate            : bool = True,
         plot_cmap     = "seismic",
         suffix        = file_suffix,
         metadata      = metadata,
+        box_text      = f"Optimizer: {optim_type}",
     )
     if verbose:
         print("Creating 3D plot.")
