@@ -4,7 +4,7 @@ import time
 import pyuvdata
 import multiprocessing
 from calico import caldata
-
+import dev_tools
 
 def sky_based_calibration_wrapper(
     data,
@@ -764,7 +764,7 @@ def unified_calibration_wrapper(
     gains_multiply_model=False,
     gain_init_to_vis_ratio=True,
     gain_init_stddev=0.0,
-    u_params_init_stddev=0.0,
+    fit_vis_init_stddev=0.0,
     N_feed_pols=None,
     feed_polarization_array=None,
     min_cal_baseline_m=None,
@@ -782,6 +782,22 @@ def unified_calibration_wrapper(
     max_processes=40,
     verbose=False,
     log_file_path=None,
+    # dev
+    glim=(-1,1),
+    ulim=(-10,10),
+    antenna_gain_weights=None,
+    model_baseline_weights=None,
+    threshold_length=None,
+    sigma_t_0=0.1,
+    sigma_m_0=0.1,
+    weighting_function="constant_weights",
+    scaling_factor_cost=1,
+    many_realizations=False,
+    run_params_filename="",
+    suffix="",
+    metadata=None,
+    optimization_scheme="powell",
+    calibration_type="unical",
 ):
     """
     Top-level wrapper for running unified calibration per polarization. Function 
@@ -905,9 +921,15 @@ def unified_calibration_wrapper(
     if verbose:
         data_read_start_time = time.time()
 
+    import os
+    data_file = data
+    model_file = model
+    data_file_path = os.getcwd() + f'/calico/data/{data}.uvfits'
+    model_file_path = os.getcwd() + f'/calico/data/{model}.uvfits'
+
+    # NOTE: SEEMS REDUNDANT OR INCONSISTENT WITH ABOVE
     print_data_read_time = False
-    if isinstance(data, str):  # Read data
-        data_file_path = data
+    if isinstance(data_file_path, str):  # Read data
         data = pyuvdata.UVData()
         if data_file_path.endswith(".ms"):
             data.read_ms(
@@ -920,8 +942,7 @@ def unified_calibration_wrapper(
         else:
             data.read(data_file_path)
         print_data_read_time = True
-    if isinstance(model, str):  # Read model
-        model_file_path = model
+    if isinstance(model_file_path, str):  # Read model
         model = pyuvdata.UVData()
         if model_file_path.endswith(".ms"):
             model.read_ms(
@@ -966,7 +987,7 @@ def unified_calibration_wrapper(
         gain_init_to_vis_ratio=gain_init_to_vis_ratio,
         gains_multiply_model=gains_multiply_model,
         gain_init_stddev=gain_init_stddev,
-        u_params_init_stddev=u_params_init_stddev,
+        fit_vis_init_stddev=fit_vis_init_stddev,
         N_feed_pols=N_feed_pols,
         feed_polarization_array=feed_polarization_array,
         min_cal_baseline_m=min_cal_baseline_m,
@@ -974,6 +995,13 @@ def unified_calibration_wrapper(
         min_cal_baseline_lambda=min_cal_baseline_lambda,
         max_cal_baseline_lambda=max_cal_baseline_lambda,
         lambda_val=lambda_val,
+        glim=glim,
+        ulim=ulim,
+        weighting_function=weighting_function,
+        sigma_t_0=sigma_t_0,
+        sigma_m_0=sigma_m_0,
+        scaling_factor_cost=scaling_factor_cost,
+        threshold_length=threshold_length,
     )
 
     if caldata_obj.Nfreqs < 2:
@@ -990,25 +1018,23 @@ def unified_calibration_wrapper(
         sys.stdout.flush()
         optimization_start_time = time.time()
 
-    # print("***CAL WRAP - ITERATIONS***", antenna_flagging_iterations)
     # for ant_flag_iter in range(antenna_flagging_iterations):
-    #     print("***CAL WRAP - INSIDE ANT FLAG ITERATION LOOP***")
-    #     caldata_obj.unified_calibration(
-    #         xtol=xtol / 10,  # Lower tolerance for antenna flagging
-    #         maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
-    #         get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
-    #         parallel=parallel,
-    #         verbose=verbose,
-    #         pool=pool,
-    #     )
-    #     if verbose:
-    #         print(
-    #             f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
-    #         )
-    #         print(
-    #             f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
-    #         )
-    #         sys.stdout.flush()
+        # caldata_obj.unified_calibration(
+        #     xtol=xtol / 10,  # Lower tolerance for antenna flagging
+        #     maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
+        #     get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
+        #     parallel=parallel,
+        #     verbose=verbose,
+        #     pool=pool,
+        # )
+        # if verbose:
+        #     print(
+        #         f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
+        #     )
+        #     print(
+        #         f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
+        #     )
+        #     sys.stdout.flush()
         # caldata_obj.flag_antennas_from_per_ant_cost(
         #     flagging_threshold=antenna_flagging_threshold,
         #     parallel=parallel,
@@ -1016,7 +1042,6 @@ def unified_calibration_wrapper(
         #     verbose=verbose,
         # )
 
-    # print("***CAL WRAP - OUTSIDE OF ITERATION LOOP***")
     caldata_obj.unified_calibration(
         xtol=xtol,
         maxiter=maxiter,
@@ -1025,6 +1050,8 @@ def unified_calibration_wrapper(
         parallel=parallel,
         verbose=verbose,
         pool=pool,
+        scaling_factor_cost=scaling_factor_cost,
+        threshold_length=threshold_length,
     )
     if verbose:
         print(
@@ -1048,4 +1075,4 @@ def unified_calibration_wrapper(
         sys.stderr = stderr_orig
         log_file_new.close()
 
-    return uvcal
+    return uvcal, caldata_obj.data_visibilities[0,:,0,0], caldata_obj.model_visibilities[0,:,0,0]

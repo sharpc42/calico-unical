@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import pyuvdata
 from astropy.units import Quantity
-from calico import calibration_qa, calibration_optimization
+from calico import calibration_qa, calibration_optimization, dev_tools, variable_weights, noise_and_error_simulation as sim
 import multiprocessing
 
 
@@ -134,6 +134,7 @@ class CalData:
         self.antenna_numbers = None
         self.antenna_positions = None
         self.uv_array = None
+        self.uv_norm = None
         self.channel_width = None
         self.freq_array = None
         self.integration_time = None
@@ -152,7 +153,20 @@ class CalData:
         self.ant_inds = None
         self.bl_inds = None
         self.gain_init_stddev = 0.0
-        self.fit_vis_init_stddev = 0.0
+        # dev
+        self.data_vis_orig = None
+        self.fit_vis_orig = None
+        self.gains_orig = None
+        self.glim = None
+        self.ulim = None
+        self.sigma_t_0 = None
+        self.sigma_m_0 = None
+        self.antpos_enu = None
+        self.threshold_length = 0
+        self.threshold_mask = None,
+        self.thermal_noise_real = None,
+        self.model_error_real_long = None,
+        self.model_error_real_short = None,
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -204,7 +218,6 @@ class CalData:
         gain_init_to_vis_ratio=True,
         gains_multiply_model=False,
         gain_init_stddev=0.0,
-        fit_vis_init_stddev=0.0,
         N_feed_pols=None,
         feed_polarization_array=None,
         min_cal_baseline_m=None,
@@ -212,6 +225,14 @@ class CalData:
         min_cal_baseline_lambda=None,
         max_cal_baseline_lambda=None,
         lambda_val=100,
+        glim=(-1,1),
+        ulim=(-10,10),
+        weighting_function="constant_weights",
+        scaling_factor_cost=1,
+        sigma_t_0=0.1,
+        sigma_m_0=0.1,
+        threshold_length=0,
+        simulate_visibilities=False,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -241,9 +262,6 @@ class CalData:
         gain_init_stddev : float
             Default 0.0. Standard deviation of a random complex Gaussian
             perturbation to the initial gains.
-        fit_vis_init_stddev : float
-            Default 0.0. Standard deviation of a random complex Gaussian
-            perturbation to the initial fitted visibility values.
         N_feed_pols : int
             Default min(2, N_vis_pols). Number of feed polarizations, equal to
             the number of gain values to be calculated per antenna.
@@ -378,6 +396,10 @@ class CalData:
         self.Nfreqs = data.Nfreqs
         self.N_vis_pols = data.Npols
 
+        uvw_array = data.uvw_array
+        self.uv_array = uvw_array[:, :2]
+        self.uv_norm = np.linalg.norm(self.uv_array, axis=1)
+
         # Format visibilities
         self.data_visibilities = np.zeros(
             (
@@ -423,14 +445,22 @@ class CalData:
 
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
-            self.model_visibilities[time_ind, :, :, :] = np.reshape(
-                model_copy.data_array,
-                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-            )
-            self.data_visibilities[time_ind, :, :, :] = np.reshape(
-                data_copy.data_array,
-                (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
-            )
+
+            # use visibilities from file or simulate with Gaussian throw
+            if simulate_visibilities:
+                print("Simulating visibilities (not reading from file)")
+                sim.simulate_visibilities(self, time_ind)
+            else:
+                print("We ain't simulating no visibilities (reading from file)")
+                self.model_visibilities[time_ind, :, :, :] = np.reshape(
+                    model_copy.data_array,
+                    (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+                )
+                self.data_visibilities[time_ind, :, :, :] = np.reshape(
+                    data_copy.data_array,
+                    (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+                )
+
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(
                     [
@@ -455,9 +485,12 @@ class CalData:
         self.freq_array = np.reshape(metadata_reference.freq_array, (self.Nfreqs))
         self.integration_time = np.mean(metadata_reference.integration_time)
         self.time = np.mean(metadata_reference.time_array)
-        self.telescope_name = metadata_reference.telescope_name
+        # self.telescope_name = metadata_reference.telescope_name
+        self.telescope_name = "MWA"
         self.lst = np.mean(metadata_reference.lst_array)
-        self.telescope_location = metadata_reference.telescope_location
+        # self.telescope_location = metadata_reference.telescope_location
+        from astropy.coordinates import EarthLocation
+        location = EarthLocation.from_geodetic(0, 0, 0)
 
         if (min_cal_baseline_lambda is not None) or (
             max_cal_baseline_lambda is not None
@@ -496,34 +529,35 @@ class CalData:
             )[0]
 
         # Get ordered list of antenna names
-        self.antenna_names = np.array(
-            [
-                np.array(metadata_reference.antenna_names)[
-                    np.where(metadata_reference.antenna_numbers == ant_num)[0][0]
-                ]
-                for ant_num in self.antenna_numbers
-            ]
-        )
-        self.antenna_positions = np.array(
-            [
-                np.array(metadata_reference.antenna_positions)[
-                    np.where(metadata_reference.antenna_numbers == ant_num)[0][0], :
-                ]
-                for ant_num in self.antenna_numbers
-            ]
-        )
+        # self.antenna_names = np.array(
+        #     [
+        #         np.array(metadata_reference.antenna_names)[
+        #             np.where(metadata_reference.antenna_numbers == ant_num)[0][0]
+        #         ]
+        #         for ant_num in self.antenna_numbers
+        #     ]
+        # )
+        # self.antenna_positions = np.array(
+        #     [
+        #         np.array(metadata_reference.antenna_positions)[
+        #             np.where(metadata_reference.antenna_numbers == ant_num)[0][0], :
+        #         ]
+        #         for ant_num in self.antenna_numbers
+        #     ]
+        # )
 
-        # Get UV locations
-        antpos_ecef = self.antenna_positions + Quantity(
-            metadata_reference.telescope.location.geocentric
-        ).to_value(
-            "m"
-        )  # Get antennas positions in ECEF
-        antpos_enu = pyuvdata.utils.ENU_from_ECEF(
-            antpos_ecef, center_loc=metadata_reference.telescope.location
-        )  # Convert to topocentric (East, North, Up or ENU) coords.
-        uvw_array = antpos_enu[self.ant1_inds, :] - antpos_enu[self.ant2_inds, :]
-        self.uv_array = uvw_array[:, :2]
+        # # Get UV locations
+        # antpos_ecef = self.antenna_positions + Quantity(
+        #     metadata_reference.telescope.location.geocentric
+        # ).to_value(
+        #     "m"
+        # )  # Get antennas positions in ECEF
+        # self.antpos_enu = pyuvdata.utils.ENU_from_ECEF(
+        #     antpos_ecef, center_loc=metadata_reference.telescope.location
+        # )  # Convert to topocentric (East, North, Up or ENU) coords.
+        # uvw_array = self.antpos_enu[self.ant1_inds, :] - self.antpos_enu[self.ant2_inds, :]
+        # self.uv_array = uvw_array[:, :2]
+        # self.uv_norm = np.linalg.norm(self.uv_array, axis=1)
 
         # Get polarization ordering
         self.vis_polarization_array = np.array(metadata_reference.polarization_array)
@@ -625,78 +659,59 @@ class CalData:
 
         # Random perturbation of initial gains
         self.gain_init_stddev = gain_init_stddev
-        if gain_init_stddev != 0.0:
-            self.gains += np.random.normal(
-                0.0,
-                gain_init_stddev,
-                size=(
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            ) + 1.0j * np.random.normal(
-                0.0,
-                gain_init_stddev,
-                size=(
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            )
+        # if gain_init_stddev != 0.0:
+        #     self.gains += np.random.normal(
+        #         0.0,
+        #         gain_init_stddev,
+        #         size=(
+        #             self.Nants,
+        #             self.Nfreqs,
+        #             self.N_feed_pols,
+        #         ),
+        #     ) + 1.0j * np.random.normal(
+        #         0.0,
+        #         gain_init_stddev,
+        #         size=(
+        #             self.Nants,
+        #             self.Nfreqs,
+        #             self.N_feed_pols,
+        #         ),
+        #     )
 
         # Initialize abscal parameters
         self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
         self.abscal_params[0, :, :] = 1.0
 
         # Initialize unical fitted visibility parameters
-        # self.fit_vis = np.zeros((self.Ntimes, self.Nbls, self.Nfreqs, self.N_feed_pols), dtype=complex)
-        self.fit_vis = self.model_visibilities
-        # Random perturbation with stddev passed by user
-        self.fit_vis_init_stddev = fit_vis_init_stddev
-        if fit_vis_init_stddev != 0.0:
-            self.fit_vis += np.random.normal(
-                0.0,
-                fit_vis_init_stddev,
-                size=(
-                    self.Nbls,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            ) + 1.0j * np.random.normal(
-                0.0,
-                fit_vis_init_stddev,
-                size=(
-                    self.Nbls,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            )
+        self.fit_vis = self.model_visibilities.copy()
 
-        # Define visibility weights
-        self.visibility_weights = np.ones(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=float,
-        )
-        # if np.max(flag_array):  # Apply flagging
-        #     self.visibility_weights[np.where(flag_array)] = 0.0
+        # NOTE: Incorporate this into VWA
+        if np.max(flag_array):  # Apply flagging
+            self.visibility_weights[np.where(flag_array)] = 0.0
 
-        # Define model weights (this feels like the user should set)
-        self.model_weights = np.zeros(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=float,
+        # Initialize data and model weights
+        self.threshold_length = threshold_length
+        self.uv_norm
+        vwa = variable_weights.VariableWeightsArray()
+        vwa.set_algorithm_weights(
+            self,
+            weighting_function=weighting_function,
+            scaling_factor=scaling_factor_cost,
+            sigma_t_0=sigma_t_0,
+            sigma_m_0=sigma_m_0,
+            threshold_length=self.threshold_length
         )
+        # vwa.plot_weights_per_baseline(self, scaling_factor=scaling_factor_cost)
 
         self.lambda_val = lambda_val
+
+        # DEV: make copies of original data vis, fit vis, and gains
+        self.data_vis_orig = self.data_visibilities.copy() 
+        self.fit_vis_orig = self.fit_vis.copy()
+        self.gains_orig = self.gains.copy()
+
+        self.glim = glim
+        self.ulim = ulim
 
     def expand_in_frequency(self):
         """
@@ -1320,7 +1335,7 @@ class CalData:
 
     def pack(self, freq_ind, feed_pol_ind, unical=False):
         """
-        This function packs the parameters (for now gains, in future the u-params)
+        This function packs the parameters (both gains and fitted visibilities)
         both real and imaginary parts into a single flattened array for use in
         the optimizing function.
         Parameters
@@ -1338,27 +1353,34 @@ class CalData:
         self.fit_vis_real = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].real
         self.fit_vis_imag = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].imag
 
-        if unical:
-            params_flattened = np.hstack(
-                (
-                    np.ravel(self.gains_real),
-                    np.ravel(self.gains_imag),
-                    np.ravel(self.fit_vis_real),
-                    np.ravel(self.fit_vis_imag),
-                )
-            )
-        else:
-            params_flattened = np.stack(
+        # interweave real and imaginary parts of gains
+        gains_flattened = np.stack(
                 (
                     self.gains_real,
                     self.gains_imag,
                 ),
                 axis=1,
             ).flatten()
-        # print("***CALDATA - PARAMS FLATTENED***", params_flattened.shape)
-        return params_flattened
+        if not unical:
+            return gains_flattened
+        else:
+            # interweave real and imaginary parts of u's
+            fit_vis_flattened = np.stack(
+                (
+                    self.fit_vis_real,
+                    self.fit_vis_imag,
+                ),
+                axis=1,
+            ).flatten()
+            params_flattened = np.hstack(
+                (
+                    gains_flattened,
+                    fit_vis_flattened,
+                )
+            )
+            return params_flattened
 
-    def reshape_data(self, freq_ind, vis_pol_ind,unical=False):
+    def reshape_data(self, freq_ind, vis_pol_ind, unical=False):
         """
         This function reshapes data and model visibilities as well
         as visibility weights (and in the future, model weights)
@@ -1382,21 +1404,15 @@ class CalData:
             self.model_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
         )
-        # self.model_vis_reshaped = np.zeros((1,self.Nbls))
-        # self.model_vis_reshaped[0,:] = self.model_visibilities
         self.vis_weights_reshaped = np.reshape(
             self.visibility_weights[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
         )
-        # self.vis_weights_reshaped = np.zeros((1,self.Nbls))
-        # self.vis_weights_reshaped[0,:] = self.visibility_weights
         if unical:
             self.model_weights_reshaped = np.reshape(
                 self.model_weights[:, :, freq_ind, vis_pol_ind],
                 (self.Ntimes, self.Nbls),
             )
-            # self.model_weights_reshaped = np.zeros((1,self.Nbls))
-            # self.model_weights_reshaped = self.model_weights
     
     def set_ant_inds(self, freq_ind, feed_pol_ind):
         """
@@ -1444,75 +1460,6 @@ class CalData:
         # fit_vis_uvdata._Nants_data = len(self.ant_inds)
         # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
 
-    def temp_test(self, before_arr_gains, before_arr_u):
-        import matplotlib.pyplot as plt
-        import subprocess
-
-        print("***CALDATA - GAINS ERROR MIN***", np.min(np.abs(self.gains - 1)))
-        print("***CALDATA - GAINS ERROR MAX***", np.max(np.abs(self.gains - 1)))
-        print("***CALDATA - U PARAMS ERROR MIN***", np.min(self.fit_vis - self.model_visibilities))
-        print("***CALDATA - U PARAMS ERROR MAX***", np.max(self.fit_vis - self.model_visibilities))
-        print("***CALDATA - GAINS REAL TRAJECTORY***", before_arr_gains.real - self.gains.real)
-        print("***CALDATA - GAINS IMAG TRAJECTORY***", before_arr_gains.imag - self.gains.real)
-
-        # plot gains parameters trajectory
-        fig1, ax1 = plt.subplots()
-        for i in range(self.Nants):
-            ax1.annotate("",
-                        xytext=(
-                            before_arr_gains.real[i],
-                            before_arr_gains.imag[i],
-                        ),
-                        xy=(
-                            self.gains.real[i],
-                            self.gains.imag[i]
-                        ),
-                        arrowprops=dict(arrowstyle="->"),
-                        )
-        ax1.set_xlabel("Real")
-        ax1.set_ylabel("Imag")
-        ax1.set_title("Gains Trajectory Plot")
-        ax1.set_xlim(0.5,2)
-        ax1.set_ylim(-0.25,0.25)
-        # fig1.savefig("images/gains-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
-        #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
-        #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
-        #             bbox_inches=0,)
-        fig1.savefig('images/gains_'
-                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                     +'.png',
-                     bbox_inches=0,)
-        plt.close()
-
-        # plot fitted visibility parameters trajectory
-        fig2, ax2 = plt.subplots()
-        for i in range(self.Nbls):
-            ax2.annotate("",
-                        xytext=(
-                            before_arr_u.real[i],
-                            before_arr_u.imag[i],
-                        ),
-                        xy=(
-                            self.fit_vis.real[:1,i,0,0],
-                            self.fit_vis.imag[:1,i,0,0]
-                        ),
-                        arrowprops=dict(arrowstyle="->"),
-                        )
-        ax2.set_xlabel("Real")
-        ax2.set_ylabel("Imag")
-        ax2.set_title("Fitted Visibilities Trajectory Plot")
-        # ax2.set_xlim(-1,3)
-        # ax2.set_ylim(-1,1)
-        # fig2.savefig("images/fit-vis-error_gains-var_"+str(self.gain_init_stddev)+"_u-var_"+ \
-        #             str(self.fit_vis_init_stddev)+"_vis-weight_"+str(np.max(self.visibility_weights))+ \
-        #                 "_model-weight_"+str(np.max(self.model_weights))+".png",
-        #             bbox_inches=0,)
-        fig2.savefig('images/fit-vis_'
-                     +subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
-                     +'.png',
-                     bbox_inches=0,)
-        plt.close()
-
     def unified_calibration(
         self,
         xtol=1e-5,
@@ -1523,6 +1470,7 @@ class CalData:
         max_processes=40,
         pool=None,
         verbose=False,
+        optimization_scheme="powell",
     ):
         """
         Run calibration per polarization. Updates the gains attribute and u parameters with
@@ -1556,7 +1504,7 @@ class CalData:
         verbose : bool
             Set to True to print optimization outputs. Default False.
         """
-
+        
         if np.max(self.visibility_weights) == 0.0:
             print("ERROR: All data flagged.")
             sys.stdout.flush()
@@ -1592,33 +1540,19 @@ class CalData:
                 if pool is None:  # Leave things how we found them
                     use_pool.terminate()
             else:
-                # freq_ind=0  # testing on just one freq for now
-                # gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
-                #     self,
-                #     xtol,
-                #     maxiter,
-                #     freq_ind=freq_ind,
-                #     verbose=verbose,
-                #     get_crosspol_phase=get_crosspol_phase,
-                #     crosspol_phase_strategy=crosspol_phase_strategy,
-                # )
-                # self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                # self.fit_vis[:, [freq_ind], :] = fit_vis_fit[:, np.newaxis, :]
-                # self.write_fit_vis()
-                
                 for freq_ind in range(self.Nfreqs):
-                    before_arr_gains = self.gains[:, [freq_ind], :]
-                    before_arr_u = self.fit_vis[:, :1, [freq_ind], :]
+                    dev = dev_tools.DevTools()
                     gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
                         self,
                         xtol,
                         maxiter,
-                        freq_ind=freq_ind,
-                        verbose=verbose,
-                        get_crosspol_phase=get_crosspol_phase,
-                        crosspol_phase_strategy=crosspol_phase_strategy,
+                        freq_ind                = freq_ind,
+                        verbose                 = verbose,
+                        get_crosspol_phase      = get_crosspol_phase,
+                        crosspol_phase_strategy = crosspol_phase_strategy,
+                        optimization_scheme     = optimization_scheme
                     )
-                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
-                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[:, np.newaxis, :]
-                    self.temp_test(before_arr_gains, before_arr_u)
+                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
+                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
+
                     #self.write_fit_vis()
