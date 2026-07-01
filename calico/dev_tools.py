@@ -2180,58 +2180,14 @@ def plot_3d_data_as_2d_hist(
     # rotate grid
     z_grid_rot = ndimage.rotate(z_grid, angle=angle)
     print(f"Rotated z grid\n\n{z_grid_rot}\n\n")
-    # NOTE: below not being used, only z_grid
-    xx, yy = np.meshgrid(range(int(np.min(x_array) - 1), int(np.max(x_array) + 1)), 
-                            range(int(np.min(y_array) - 1), int(np.max(y_array) + 1)))
-    fig, ax = plt.subplots()
     if z_array_2 is None:
-        data_gridded = griddata(
-            (x_array, y_array),
-            z_array,
-            (xx, yy),
-            method = 'nearest',
-        )
+        # NOTE: Move above code here?
+        ...
     else:
         # merging left and right arrays
-        data_gridded_r = griddata(
-            (x_array[x_array >= 0], y_array[x_array >= 0]),
-            z_array[x_array >= 0],
-            (xx, yy),
-            method = 'linear',
-        )
-        data_gridded_r_nearest = griddata(
-            (x_array[x_array >= 0], y_array[x_array >= 0]),
-            z_array[x_array >= 0],
-            (xx, yy),
-            method = 'nearest',
-        )
-        data_gridded_r = np.where(
-            np.isnan(data_gridded_r),
-            data_gridded_r_nearest,
-            data_gridded_r,
-        )
-        # assume second array is left side
-        data_gridded_l = griddata(
-            (x_array[x_array < 0], y_array[x_array < 0]),
-            z_array_2[x_array < 0],
-            (xx, yy),
-            method = 'linear',
-        )
-        data_gridded_l_nearest = griddata(
-            (x_array[x_array < 0], y_array[x_array < 0]),
-            z_array_2[x_array < 0],
-            (xx, yy),
-            method = 'nearest',
-        )
-        data_gridded_l = np.where(
-            np.isnan(data_gridded_l),
-            data_gridded_l_nearest,
-            data_gridded_l,
-        )
-        # combine
-        data_gridded = np.where(xx >= 0, data_gridded_r, data_gridded_l)
+        ...
     if log_cmap:
-        max_abs = np.max(np.abs(data_gridded))
+        max_abs = np.max(np.abs(z_grid_rot))
         im = plt.imshow(
             z_grid_rot,
             cmap=plot_cmap,
