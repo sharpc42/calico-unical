@@ -686,23 +686,23 @@ class DevTools:
                 print(f"file\n\t{file}")
                 pickle.dump(output_arrays, file)
 
-            uvd = copy.deepcopy(example_data)
-            uvm = copy.deepcopy(example_data)
-            uvu = copy.deepcopy(example_data)
+            # uvd = copy.deepcopy(example_data)
+            # uvm = copy.deepcopy(example_data)
+            # uvu = copy.deepcopy(example_data)
 
-            uvd.data_array = sum_data_realizations[
-                ..., np.newaxis, np.newaxis
-            ] / counter
-            uvm.data_array = sum_model_realizations[
-                ..., np.newaxis, np.newaxis
-            ] / counter
-            uvu.data_array = sum_model_realizations[
-                ..., np.newaxis, np.newaxis
-            ] / counter
+            # uvd.data_array = sum_data_realizations[
+            #     ..., np.newaxis, np.newaxis
+            # ] / counter
+            # uvm.data_array = sum_model_realizations[
+            #     ..., np.newaxis, np.newaxis
+            # ] / counter
+            # uvu.data_array = sum_model_realizations[
+            #     ..., np.newaxis, np.newaxis
+            # ] / counter
 
-            uvd.extra_keywords = metadata
-            uvm.extra_keywords = metadata
-            uvu.extra_keywords = metadata
+            # uvd.extra_keywords = metadata
+            # uvm.extra_keywords = metadata
+            # uvu.extra_keywords = metadata
 
             # uvg = caldata_obj.convert_to_uvcal()
             # uvg.telescope.name = "MWA"

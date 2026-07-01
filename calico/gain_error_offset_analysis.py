@@ -147,7 +147,7 @@ def main(calibrate            : bool = True,
                                    
                 if verbose:
                     print("Cleaning up calculated saved files")
-                os.system(f"rm {data_path}/gain_error_offset_analysis_output_calcs.json")
+                os.system(f"rm {data_path}/output_calcs_{suffix}.json")
 
         if verbose:
             print("Calibration tests done.")
