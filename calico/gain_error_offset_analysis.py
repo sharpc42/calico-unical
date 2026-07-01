@@ -33,8 +33,8 @@ def main(calibrate            : bool = True,
 
     if calibrate:
         scaling_factors = [0.001, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 10, 0.5)
-        sigma_m_scales  = np.arange(-10, 10, 0.5)
+        sigma_t_scales  = np.arange(  0, 10, 0.5, dtype=float)
+        sigma_m_scales  = np.arange(-10, 10, 0.5, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -80,10 +80,10 @@ def main(calibrate            : bool = True,
                     scaling_factor_cost = 1 / scaling_factor**2
                     custom_file.append(
                         {
-                            "sigma_t"                    : sigma_t,
-                            "sigma_n"                    : sigma_t,
-                            "sigma_m"                    : sigma_m,
-                            "sigma_e"                    : sigma_m,
+                            "sigma_t"                    : float(sigma_t),
+                            "sigma_n"                    : float(sigma_t),
+                            "sigma_m"                    : float(sigma_m),
+                            "sigma_e"                    : float(sigma_m),
                             "thermal_noise_realizations" : thermal_noise_realizations,
                             "model_error_realizations"   : model_error_realizations,
                             "weighting_function"         : weighting_function,
