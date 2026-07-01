@@ -2170,6 +2170,7 @@ def plot_3d_data_as_2d_hist(
     suffix        : str = "",
     metadata      : dict = None,
     angle         : int | float = 0,
+    box_text      : str = ""
 ) -> None:
     from scipy.interpolate import griddata
     from scipy import ndimage
@@ -2180,6 +2181,7 @@ def plot_3d_data_as_2d_hist(
     # rotate grid
     z_grid_rot = ndimage.rotate(z_grid, angle=angle)
     print(f"Rotated z grid\n\n{z_grid_rot}\n\n")
+    fig, ax = plt.subplots()
     if z_array_2 is None:
         # NOTE: Move above code here?
         ...
