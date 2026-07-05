@@ -1,4 +1,5 @@
 import numpy as np
+import hickle as hkl
 
 import dev_tools as dev
 
@@ -38,8 +39,8 @@ def main(calibrate            : bool = True,
                 raise ValueError("Need values passed for git and time IDs")
             guess_git_time_suffix = f"g{git_id}_t{time_id}"
         scaling_factors = [0.001, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 10, 2, dtype=float)
-        sigma_m_scales  = np.arange(0, 10, 2, dtype=float)
+        sigma_t_scales  = np.arange(  0, 10, 0.1, dtype=float)
+        sigma_m_scales  = np.arange(0, 10, 0.1, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -69,23 +70,23 @@ def main(calibrate            : bool = True,
 
         if verbose:
             print("Beginning sigma loops")
-        for sigma_t in sigma_t_scales:
+        for i, sigma_t in enumerate(sigma_t_scales):
             if np.abs(sigma_t) - 0.0 < 1e-5:
                 sigma_t = 0.1
-            for sigma_m in sigma_m_scales:
+            for j, sigma_m in enumerate(sigma_m_scales):
                 if np.abs(sigma_m) - 0.0 < 1e-5:
                     sigma_m = 0.1
                 if verbose:
                     print(f"Creating settings files\n\tsigma_m {sigma_m}\tsigma_t {sigma_t}")
                 sigma_suffix = f"{int(sigma_t*100):d}_{int(sigma_m*10):d}"
                 suffix = sigma_suffix + git_time_suffix
-                if give_gains_guess: 
-                    guess_suffix = sigma_suffix + guess_git_time_suffix
+                # if give_gains_guess: 
+                #     guess_suffix = sigma_suffix + guess_git_time_suffix
                 filename = f"gain_error_offset_analysis_{suffix}",
                 if give_gains_guess: 
-                    guess_filename = f"gain_error_offset_analysis_{guess_suffix}"
+                    guess_filename = f"output_calcs_list_{guess_git_time_suffix}"
                 custom_file = []
-                for scaling_factor in scaling_factors:
+                for k, scaling_factor in enumerate(scaling_factors):
                     scaling_factor_cost = 1 / scaling_factor**2
                     custom_file.append(
                         {
@@ -103,12 +104,20 @@ def main(calibrate            : bool = True,
                         },
                     )
                 cwd = os.getcwd()
-                with open(
-                    f'{cwd}/calico/data/{filename}_settings.json', 
-                    mode='w',
-                    encoding='utf-8' 
-                ) as file:
-                    json.dump(custom_file, file)
+                # with open(
+                #     f'{cwd}/calico/data/{filename}_settings.hkl',
+                #     mode='wb',
+                # ) as file:
+                #     hkl.dump(
+                #         custom_file, 
+                #         file, 
+                #         compression='gzip',
+                #     )
+                hkl.dump(
+                    custom_file, 
+                    f'{cwd}/calico/data/{filename}_settings.hkl', 
+                    compression='gzip',
+                )
 
                 if verbose:
                     print("Beginning realizations")
@@ -124,13 +133,14 @@ def main(calibrate            : bool = True,
                     "Optimizer"           : optim_type,
                 }
                 gains_real_guess = None
+                # TODO: Change back to hickle after trial run
                 if give_gains_guess:
                     with open(
-                        f"{cwd}/calico/data/{guess_filename}_settings.json",
-                        mode="r"
+                        f"{cwd}/calico/data/{guess_filename}.json",
+                        mode='r',
                     ) as file:
                         guess_dict = json.load(file)
-                    gains_real_guess = guess_dict["g_arr_real"]
+                    gains_real_guess = guess_dict[i+j+k]["g_arr_real"]
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
                     sav_data_filename            = 'tutorial_full_onetime_unflagged',
@@ -157,55 +167,48 @@ def main(calibrate            : bool = True,
 
                 if verbose:
                     print("Reading in calculations...")
-                with open(
-                    f'{data_path}/output_calcs_{suffix}.json',
-                    mode='r'
-                ) as file:
-                    output_calcs = json.load(file)
+                # with open(
+                #     f'{data_path}/output_calcs_{suffix}.hkl',
+                #     mode='r',
+                # ) as file:
+                output_calcs = hkl.load(f'{data_path}/output_calcs_{suffix}.hkl')
                 for output_calc_dict in output_calcs:
                     output_calcs_list.append(output_calc_dict)
                                    
                 if verbose:
                     print("Cleaning up calculated saved files")
-                os.system(f"rm {data_path}/output_calcs_{suffix}.json")
+                os.system(f"rm {data_path}/output_calcs_{suffix}.hkl")
 
         if verbose:
             print("Calibration tests done.")
 
         if verbose:
             print(f"Writing out collection of output calcs...")
-        with open(
-            f'{data_path}/output_calcs_list_{file_suffix}.json',
-            mode='w',
-        ) as file:
-            json.dump(output_calcs_list, file)
+        hkl.dump(output_calcs_list, f'{data_path}/output_calcs_list_{file_suffix}.hkl', compression='gzip')
 
         if verbose:
             print(f"Writing out initial metadata...")
-        with open(
-            f'{data_path}/metadata_{file_suffix}.json',
-            mode='w',
-        ) as file:
-            json.dump(metadata, file)
+        # with open(f'{data_path}/metadata_{file_suffix}.hkl') as file:
+        hkl.dump(metadata, f'{data_path}/metadata_{file_suffix}.hkl', compression='gzip')
         if verbose:
             print(f"Calibration tests done.\n\n*Git ID* {git_hash}\t*Start time ID* {start_time_suffix}\n")
     else:
         file_suffix = f"g{git_id}_t{time_id}"
         if verbose:
             print(f"Reading in initial metadata...")
-        with open(
-            f'{data_path}/metadata_{file_suffix}.json',
-            mode='r',
-        ) as file:
-            metadata = json.load(file) 
+        # with open(
+        #     f'{data_path}/metadata_{file_suffix}.hkl',
+        #     mode='r',
+        # ) as file:
+        metadata = hkl.load(f'{data_path}/metadata_{file_suffix}.hkl') 
 
     if verbose:
         print(f"Reading in output calcs...")
-    with open(
-        f'{data_path}/output_calcs_list_{file_suffix}.json',
-        mode='r',
-    ) as file:
-        output_calcs_list = json.load(file)
+    # with open(
+    #     f'{data_path}/output_calcs_list_{file_suffix}.hkl',
+    #     mode='r',
+    # ) as file:
+    output_calcs_list = hkl.load(f'{data_path}/output_calcs_list_{file_suffix}.hkl')
 
     vT_minus_m_gaussian              = []
     real_sigma_t_calculated_gaussian = []
@@ -526,7 +529,7 @@ def main(calibrate            : bool = True,
         plot_xlim_l   = min(sigma_m_scales),
         plot_ylim_h   = max(sigma_t_scales),
         plot_ylim_l   = min(sigma_t_scales),
-        filename      = f'{image_path}/{filename_2d_gains}_avg_cost_func_val_skycal_{file_suffix}_gaussian.png',
+        filename      = f'{image_path}/{filename_2d_gains}_avg_cost_func_val_unical_{file_suffix}_gaussian.png',
         plot_cmap     = "viridis",
         cmap_label    = "Avg. Final Cost Func. Val.",
         suffix        = file_suffix,

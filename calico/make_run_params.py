@@ -1,6 +1,8 @@
 import pickle
 import os
 
+import hickle as hkl
+
 max_realizations = 1
 fhd_runs_medium_noise_01_m = 1.03
 fhd_runs_medium_noise_015_m = 1.53
@@ -510,8 +512,8 @@ many_sigma_combos = [
             },
         ]
 
-with open('calico/data/original_many_realizations.pkl', 'wb') as file:
-    pickle.dump(many_sigma_combos, file)
+# with open('calico/data/original_many_realizations.hkl', mode='wb') as file:
+hkl.dump(many_sigma_combos, 'calico/data/original_many_realizations.hkl', compression='gzip')
 
 baseline_dependence_runs_large_noise = [
             {
@@ -2034,42 +2036,42 @@ fhd_runs_large_noise_1 = [
 
 def generate_files():
     cwd = os.getcwd()
-    with open(f'{cwd}/calico/data/sigma_combos_many_realizations.pkl', 'wb') as file:
-        pickle.dump(many_sigma_combos, file)
-    with open(f'{cwd}/calico/data/baseline_dependence_runs_large_noise.pkl', 'wb') as file:
-        pickle.dump(baseline_dependence_runs_large_noise, file)
-    with open(f'{cwd}/calico/data/baseline_dependence_runs_small_noise.pkl', 'wb') as file:
-        pickle.dump(baseline_dependence_runs_small_noise, file)
-    with open(f'{cwd}/calico/data/add_gaussian_error_large_noise.pkl', 'wb') as file:
-        pickle.dump(add_gaussian_error_large_noise, file)
-    with open(f'{cwd}/calico/data/add_gaussian_error_medium_noise.pkl', 'wb') as file:
-        pickle.dump(add_gaussian_error_medium_noise, file)
-    with open(f'{cwd}/calico/data/add_gaussian_error_small_noise.pkl', 'wb') as file:
-        pickle.dump(add_gaussian_error_small_noise, file)
-    with open(f'{cwd}/calico/data/fhd_runs_medium_noise_01.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_medium_noise_01, file)
-    with open(f'{cwd}/calico/data/fhd_runs_medium_noise_015.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_medium_noise_015, file)
-    with open(f'{cwd}/calico/data/fhd_runs_medium_noise_05.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_medium_noise_05, file)
-    with open(f'{cwd}/calico/data/fhd_runs_medium_noise_1.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_medium_noise_1, file)
-    with open(f'{cwd}/calico/data/fhd_runs_small_noise_01.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_small_noise_01, file)
-    with open(f'{cwd}/calico/data/fhd_runs_small_noise_015.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_small_noise_015, file)
-    with open(f'{cwd}/calico/data/fhd_runs_small_noise_05.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_small_noise_05, file)
-    with open(f'{cwd}/calico/data/fhd_runs_small_noise_1.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_small_noise_1, file)
-    with open(f'{cwd}/calico/data/fhd_runs_large_noise_01.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_large_noise_01, file)
-    with open(f'{cwd}/calico/data/fhd_runs_large_noise_015.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_large_noise_015, file)
-    with open(f'{cwd}/calico/data/fhd_runs_large_noise_05.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_large_noise_05, file)
-    with open(f'{cwd}/calico/data/fhd_runs_large_noise_1.pkl', 'wb') as file:
-        pickle.dump(fhd_runs_large_noise_1, file)
+    # with open(f'{cwd}/calico/data/sigma_combos_many_realizations.hkl', 'wb') as file:
+    hkl.dump(many_sigma_combos, f'{cwd}/calico/data/sigma_combos_many_realizations.hkl', compression='gzip')
+    # with open(f'{cwd}/calico/data/baseline_dependence_runs_large_noise.hkl', 'wb') as file:
+    #     hkl.dump(baseline_dependence_runs_large_noise, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/baseline_dependence_runs_small_noise.hkl', 'wb') as file:
+    #     hkl.dump(baseline_dependence_runs_small_noise, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/add_gaussian_error_large_noise.hkl', 'wb') as file:
+    #     hkl.dump(add_gaussian_error_large_noise, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/add_gaussian_error_medium_noise.hkl', 'wb') as file:
+    #     hkl.dump(add_gaussian_error_medium_noise, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/add_gaussian_error_small_noise.hkl', 'wb') as file:
+    #     hkl.dump(add_gaussian_error_small_noise, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_medium_noise_01.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_medium_noise_01, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_medium_noise_015.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_medium_noise_015, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_medium_noise_05.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_medium_noise_05, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_medium_noise_1.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_medium_noise_1, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_small_noise_01.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_small_noise_01, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_small_noise_015.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_small_noise_015, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_small_noise_05.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_small_noise_05, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_small_noise_1.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_small_noise_1, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_large_noise_01.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_large_noise_01, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_large_noise_015.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_large_noise_015, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_large_noise_05.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_large_noise_05, file, compression='gzip')
+    # with open(f'{cwd}/calico/data/fhd_runs_large_noise_1.hkl', 'wb') as file:
+    #     hkl.dump(fhd_runs_large_noise_1, file, compression='gzip')
 
 # Programmatically generate a custom file for a range of
 # scaling factors passed by the user; the function using
@@ -2105,5 +2107,5 @@ def generate_custom_file(
             },
         )
     cwd = os.getcwd()
-    with open(f'{cwd}/calico/data/{filename}_run_params.pkl', 'wb') as file:
-        pickle.dump(custom_file, file)
+    with open(f'{cwd}/calico/data/{filename}_run_params.hkl', 'wb') as file:
+        hkl.dump(custom_file, file, compression='gzip')

@@ -6,6 +6,7 @@ import os
 import copy
 
 from scipy.differentiate import jacobian
+import hickle as hkl
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, PngImagePlugin
@@ -460,8 +461,8 @@ class DevTools:
         run_params_path = os.getcwd() + f'/calico/data/{run_params_filename}'
         if verbose:
             print("settings path", run_params_path)
-        with open(f'{run_params_path}.json', 'r') as file:
-            run_params_list = json.load(file)
+        # with open(f'{run_params_path}.hkl', 'r') as file:
+        run_params_list = hkl.load(f'{run_params_path}.hkl')
 
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind])
@@ -681,13 +682,10 @@ class DevTools:
             except:
                 if verbose:
                     print(f"No baseline dependent model error realizations to write")
-            with open(
-                f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.pkl', 
-                mode='wb'
-            ) as file:
-                print(f"data path {model_path}")
-                print(f"file\n\t{file}")
-                pickle.dump(output_arrays, file)
+            # with open(f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl') as file:
+                # print(f"data path {model_path}")
+                # print(f"file\n\t{file}")
+            hkl.dump(output_arrays, f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl', compression='gzip')
 
             # uvd = copy.deepcopy(example_data)
             # uvm = copy.deepcopy(example_data)
@@ -746,11 +744,11 @@ class DevTools:
         save_plot           : bool = True,
     ) -> None:
 
-        with open(
-            f'calico/data/{run_params_filename}.json', 
-            mode='r',
-        ) as file:
-            run_params_list = json.load(file)
+        # with open(
+        #     f'calico/data/{run_params_filename}.hkl', 
+        #     mode='r',
+        # ) as file:
+        run_params_list = hkl.load(f'calico/data/{run_params_filename}.hkl')
 
         output_dicts = []
 
@@ -763,10 +761,10 @@ class DevTools:
         
         for run, run_params in enumerate(run_params_list):
             with open(
-                f'{data_filepath}_many_reals_output_data_{run_params_filename}_{run}.pkl', 
+                f'{data_filepath}_many_reals_output_data_{run_params_filename}_{run}.hkl', 
                 mode='rb',
             ) as file:
-                output_arrays = pickle.load(file)
+                output_arrays = hkl.load(file)
 
             g_arr    = output_arrays['g runs'] - 1
             u_arr    = output_arrays['u runs']
@@ -1448,15 +1446,12 @@ class DevTools:
         # img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
         # img.save(filename, pnginfo=img_metadata)        
 
-        with open(
-            f'calico/data/output_calcs_{suffix}.json',
-            mode='w'
-        ) as file:
-            if verbose:
-                print(f"***calculated values***")
-                print(f"data path {data_filepath}")
-                print(f"file\n\t{file}")
-            json.dump(output_dicts, file)
+        # with open(f'calico/data/output_calcs_{suffix}.hkl') as file:
+        #     if verbose:
+        #         print(f"***calculated values***")
+        #         print(f"data path {data_filepath}")
+        #         print(f"file\n\t{file}")
+        hkl.dump(output_dicts, f'calico/data/output_calcs_{suffix}.hkl', compression='gzip')
 
     def test_function(self) -> None:
         return 'Returning a new and beautiful string, some say the best string, from within dev tools test function'
