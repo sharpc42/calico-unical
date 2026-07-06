@@ -2174,8 +2174,8 @@ def plot_3d_data_as_2d_hist(
     np.set_printoptions(precision=4, suppress=True, linewidth=500)
     print(f"Original z grid\n\n{z_grid}\n\n")
     # rotate grid
-    z_grid_rot = ndimage.rotate(z_grid, angle=angle)
-    print(f"Rotated z grid\n\n{z_grid_rot}\n\n")
+    # z_grid_rot = ndimage.rotate(z_grid, angle=angle)
+    # print(f"Rotated z grid\n\n{z_grid_rot}\n\n")
     fig, ax = plt.subplots()
     if z_array_2 is None:
         # NOTE: Move above code here?
@@ -2184,9 +2184,11 @@ def plot_3d_data_as_2d_hist(
         # merging left and right arrays
         ...
     if log_cmap:
-        max_abs = np.max(np.abs(z_grid_rot))
+        # max_abs = np.max(np.abs(z_grid_rot))
+        max_abs = np.max(np.abs(z_grid))
         im = plt.imshow(
-            z_grid_rot,
+            # z_grid_rot,
+            z_grid,
             cmap=plot_cmap,
             extent=[np.min(x_array),
                     np.max(x_array),
@@ -2200,7 +2202,8 @@ def plot_3d_data_as_2d_hist(
         )
     else:
         im = plt.imshow(
-            z_grid_rot,
+            # z_grid_rot,
+            z_grid,
             cmap=plot_cmap,
             vmax=plot_vmax,
             vmin=plot_vmin,

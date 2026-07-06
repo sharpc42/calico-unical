@@ -35,12 +35,12 @@ def main(calibrate            : bool = True,
 
     if calibrate:
         if give_gains_guess:
-            if len(git_id) == 0 or len(time_id) == 0:
+            if git_id is None or time_id is None:
                 raise ValueError("Need values passed for git and time IDs")
             guess_git_time_suffix = f"g{git_id}_t{time_id}"
         scaling_factors = [0.001, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 10, 0.1, dtype=float)
-        sigma_m_scales  = np.arange(0, 10, 0.1, dtype=float)
+        sigma_t_scales  = np.arange(  0, 10, 0.3, dtype=float)
+        sigma_m_scales  = np.arange(0, 10, 0.3, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -133,13 +133,12 @@ def main(calibrate            : bool = True,
                     "Optimizer"           : optim_type,
                 }
                 gains_real_guess = None
-                # TODO: Change back to hickle after trial run
                 if give_gains_guess:
-                    with open(
-                        f"{cwd}/calico/data/{guess_filename}.json",
-                        mode='r',
-                    ) as file:
-                        guess_dict = json.load(file)
+                    # with open(
+                    #     f"{cwd}/calico/data/{guess_filename}.json",
+                    #     mode='r',
+                    # ) as file:
+                    guess_dict = hkl.load(f"{cwd}/calico/data/{guess_filename}.hkl")
                     gains_real_guess = guess_dict[i+j+k]["g_arr_real"]
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
@@ -585,16 +584,16 @@ def main(calibrate            : bool = True,
         # plot_xlabel_2 = "$\\sigma Re(m)$",
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel = "$\\sigma_t (Re)$",
-        # plot_vmax     = min([
-        #                     np.abs(max(real_g_minus_1_truth_gaussian)),
-        #                     np.abs(min(real_g_minus_1_truth_gaussian))
-        #                 ]),
-        # plot_vmin     = -min([
-        #                     np.abs(max(real_g_minus_1_truth_gaussian)),
-        #                     np.abs(min(real_g_minus_1_truth_gaussian))
-        #                 ]),
-        plot_vmin = -0.001,
-        plot_vmax = 0.001,
+        plot_vmax     = min([
+                            np.abs(max(real_g_minus_1_truth_gaussian)),
+                            np.abs(min(real_g_minus_1_truth_gaussian))
+                        ]),
+        plot_vmin     = -min([
+                            np.abs(max(real_g_minus_1_truth_gaussian)),
+                            np.abs(min(real_g_minus_1_truth_gaussian))
+                        ]),
+        # plot_vmin = -0.001,
+        # plot_vmax = 0.001,
         plot_xlim_h = max(sigma_m_scales),
         plot_xlim_l = min(sigma_m_scales),
         plot_ylim_h = max(sigma_t_scales),
@@ -622,16 +621,16 @@ def main(calibrate            : bool = True,
         # plot_xlabel_2 = "$\\sigma Re(m)$",
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel   = "$\\sigma_t (Re)$",
-        # plot_vmax     = min([
-        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
-        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
-        #                 ]),
-        # plot_vmin     = -min([
-        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
-        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
-        #                 ]),
-        plot_vmax=0.001,
-        plot_vmin=-0.001,
+        plot_vmax     = min([
+                            np.abs(max(real_g_minus_1_skycal_gaussian)),
+                            np.abs(min(real_g_minus_1_skycal_gaussian))
+                        ]),
+        plot_vmin     = -min([
+                            np.abs(max(real_g_minus_1_skycal_gaussian)),
+                            np.abs(min(real_g_minus_1_skycal_gaussian))
+                        ]),
+        # plot_vmax=0.001,
+        # plot_vmin=-0.001,
         plot_xlim_h   = max(sigma_m_scales),
         plot_xlim_l   = min(sigma_m_scales),
         plot_ylim_h   = max(sigma_t_scales),
@@ -664,16 +663,16 @@ def main(calibrate            : bool = True,
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel   = "$\\sigma_t (Re)$",
         # log_cmap      = True,
-        # plot_vmax     = min([
-        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
-        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
-        #                 ]),
-        # plot_vmin     = -min([
-        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
-        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
-        #                 ]),
-        plot_vmax=0.001,
-        plot_vmin=-0.001,
+        plot_vmax     = min([
+                            np.abs(max(real_g_minus_1_skycal_gaussian)),
+                            np.abs(min(real_g_minus_1_skycal_gaussian))
+                        ]),
+        plot_vmin     = -min([
+                            np.abs(max(real_g_minus_1_skycal_gaussian)),
+                            np.abs(min(real_g_minus_1_skycal_gaussian))
+                        ]),
+        # plot_vmax=0.001,
+        # plot_vmin=-0.001,
         filename      = f'{image_path}/{filename_2d_gains}_diff_{file_suffix}_gaussian.png',
         plot_cmap     = "PuOr",
         cmap_label    = "$<Re(g)>-1$",
@@ -695,16 +694,16 @@ def main(calibrate            : bool = True,
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel   = "$\\sigma_t (Re)$",
         # log_cmap      = True,
-        # plot_vmax     = min([
-        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
-        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
-        #                 ]),
-        # plot_vmin     = -min([
-        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
-        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
-        #                 ]),
-        plot_vmax=0.001,
-        plot_vmin=-0.001,
+        plot_vmax     = min([
+                            np.abs(max(real_g_minus_1_skycal_gaussian)),
+                            np.abs(min(real_g_minus_1_skycal_gaussian))
+                        ]),
+        plot_vmin     = -min([
+                            np.abs(max(real_g_minus_1_skycal_gaussian)),
+                            np.abs(min(real_g_minus_1_skycal_gaussian))
+                        ]),
+        # plot_vmax=0.001,
+        # plot_vmin=-0.001,
         filename      = f'{image_path}/{filename_2d_gains}_diff_abs_{file_suffix}_gaussian.png',
         plot_cmap     = "PuOr",
         cmap_label    = "$<Re(g)>-1$",
