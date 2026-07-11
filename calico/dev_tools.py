@@ -579,10 +579,12 @@ class DevTools:
                     if verbose: print(f"Optimization - Model error realization {k+1}")
                     caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind] = data
                     caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind] = model
-                    if force_fit_to_true_vis:
-                        caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind] = original_data_vis
+                    # if force_fit_to_true_vis:
+                    #     caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind] = original_data_vis
                     if gains_real_guess is not None:
-                        caldata_obj.gains[:,freq_ind,feed_pol_ind].real = gains_real_guess
+                        caldata_obj.gains[:,freq_ind,feed_pol_ind] = gains_real_guess
+                        if len(gains_real_guess) != caldata_obj.Nants:
+                            raise ValueError(f"Gains guess length must be the same as Nants for this run")
                     vwa = variable_weights.VariableWeightsArray()
                     vwa.set_algorithm_weights(
                         caldata_obj,
@@ -1392,7 +1394,8 @@ class DevTools:
                 "n_m_corr_coeff_phase"      : thermal_noise_model_vis_corr_phase,
                 "e_m_corr_coeff_phase"      : model_error_model_vis_corr_phase,
                 "avg_cost_func_val"         : np.mean(cost_arr),
-                "g_arr_real"                : (g_arr.real).tolist(),
+                "g_arr_real"                : (g_arr.real + 1).tolist(),
+                "g_arr_imag"                : (g_arr.imag).tolist(),
             }
             output_dicts.append(this_output_dict)
             
