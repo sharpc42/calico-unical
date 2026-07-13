@@ -394,6 +394,87 @@ class TestStringMethods(unittest.TestCase):
         plt.ylabel("$Re<g_u> - Re<g_s>$")
         plt.show()
 
+    def compare_optimizers():
+        import copy
+        import time
+        import noise_and_error_simulation as sim
+        import variable_weights
+        import matplotlib.pyplot as plt
+        model = pyuvdata.UVData()
+        model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
+        data = model.copy()
+        caldata_obj = caldata.CalData()
+        caldata_obj.load_data(
+            data,
+            model,
+        )
+        org_gains = copy.deepcopy(caldata_obj.gains[:,0,0])
+        org_fit_vis = copy.deepcopy(caldata_obj.fit_vis[0,:,0,0])
+        n_real, n_imag = sim.simulate_thermal_noise(
+            sigma_t_0=3, 
+            Nbls=caldata_obj.Nbls, 
+            seed=int(time.time()),
+        )
+        e_real, e_imag, _, _ = sim.simulate_model_error(
+            Nbls=caldata_obj.Nbls, 
+            sigma_e_0=3, 
+            uv_norm_array=caldata_obj.uv_norm,
+            threshold_length=0,
+            weighting_function="constant_weights",
+            scaling_factor=1,
+            seed=int(time.time()),
+        )
+        caldata_obj.data_visibilities[0,:,0,0] += n_real + 1j*n_imag
+        caldata_obj.model_visibilities[0,:,0,0] += e_real + 1j*e_imag
+        # caldata_obj.data_visibilities[0,:,0,0] += e_real + 1j*e_imag
+        caldata_obj.gains_multiply_model = True
+        vwa = variable_weights.VariableWeightsArray()
+        vwa.set_algorithm_weights(
+            caldata_obj,
+            sigma_t_0 = 4.5,
+            sigma_m_0 = 1.5,
+            threshold_length = 0,
+            weighting_function = "constant_weights",
+            scaling_factor = 1e4,
+        )
+        optimizers = [
+            # "powell",
+            "pytorch",
+            "powell",
+        ]
+        opt_gains = []
+        for optimizer in optimizers:
+            caldata_obj.gains[:,0,0] = org_gains
+            caldata_obj.fit_vis[0,:,0,0] = org_fit_vis
+            gains, _ = calibration_optimization.run_unical_optimization(
+                caldata_obj=caldata_obj,
+                xtol=1e-5,
+                maxiter=200,
+                optimization_scheme=optimizer,
+            )
+            print(f"{optimizer=}\n\n{gains=}")
+            opt_gains.append(gains)
+        powell_gains = opt_gains[0]
+        lbfgs_gains = opt_gains[1]
+        powell_minus_lbfgs = np.abs(powell_gains) - np.abs(lbfgs_gains)
+        print(f"***Diff Statistics***")
+        print(f"\tAvg {powell_minus_lbfgs.mean}")
+        print(f"\tAvg Abs {powell_minus_lbfgs.mean}")
+        print(f"\tMax Abs {np.max(np.abs(powell_minus_lbfgs))}")
+        print(f"\tMin Abs {np.min(np.abs(powell_minus_lbfgs))}")
+        print(f"Plotting simple diff plot")
+        x_arr = [x for x in range(powell_minus_lbfgs.size)]
+        plt.plot(x_arr, np.abs(powell_minus_lbfgs))
+        plt.title("$|g_P| - |g_L|$ per antenna")
+        plt.ylabel("$|g_P| - |g_L|$")
+        plt.xlabel("Antennas")
+        plt.savefig(f"calico/images/powell_lbfgs_diff_{int(time.time())}.png")
+        plt.close()
+        print(f"Plotting scatter plot in nsew-plane")
+        en_plane = caldata_obj.antenna_positions[:,:-1]
+        print(f"en-plane shape - {en_plane.shape}")
+
+
     def plot_aggregate_montecarlos():
         import matplotlib.pyplot as plt
         ne5_arr = [
@@ -619,6 +700,6 @@ class TestStringMethods(unittest.TestCase):
 
 if __name__ == "__main__":
     # unittest.main()
-    TestStringMethods.calibration_grid_search()
+    TestStringMethods.compare_optimizers()
     # TestStringMethods.plot_skycal_unical_diff_per_scaling_factor()
     # TestStringMethods.plot_montecarlos()
