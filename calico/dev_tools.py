@@ -677,6 +677,8 @@ class DevTools:
                 'e runs'    : full_error_realizations,
                 'uv array'  : uv_array,
                 'cost runs' : np.asarray(cost_function_realizations),
+                'sigma_e'   : run_params['sigma_e'],
+                'sigma_n'   : run_params['sigma_n'],
             }
             try:
                 output_arrays['e runs long']  = model_err_realizations_long[0]
@@ -1396,6 +1398,8 @@ class DevTools:
                 "avg_cost_func_val"         : np.mean(cost_arr),
                 "g_arr_real"                : (g_arr.real + 1).tolist(),
                 "g_arr_imag"                : (g_arr.imag).tolist(),
+                "sigma_n"                   : output_arrays['sigma_n'],
+                "sigma_e"                   : output_arrays['sigma_e'],
             }
             output_dicts.append(this_output_dict)
             

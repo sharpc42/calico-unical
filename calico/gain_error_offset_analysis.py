@@ -39,8 +39,8 @@ def main(calibrate            : bool = True,
                 raise ValueError("Need values passed for git and time IDs")
             guess_git_time_suffix = f"g{git_id}_t{time_id}"
         scaling_factors = [0.001, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(  0, 10, 1.5, dtype=float)
-        sigma_m_scales  = np.arange(0, 10, 1.5, dtype=float)
+        sigma_t_scales  = np.arange(  0, 1, 0.05, dtype=float)
+        sigma_m_scales  = np.arange(0, 1, 0.05, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -136,17 +136,18 @@ def main(calibrate            : bool = True,
                 if give_gains_guess:
                     start_load_gains_guess_time = time.time()
                     print(f"Loading gains guess")
-                    # with open(
-                    #     f"{cwd}/calico/data/{guess_filename}.json",
-                    #     mode='r',
-                    # ) as file:
-                    guess_dict = hkl.load(f"{cwd}/calico/data/{guess_filename}.hkl")
-                    num_sigma_m  = len(sigma_m_scales)
-                    num_scalfact = len(scaling_factors)
-                    k_guess = 0  # 0 skycal, 1 truth
-                    guess_index = (i * num_sigma_m + j) * num_scalfact + k_guess
-                    gains_real_guess = np.asarray(guess_dict[guess_index]["g_arr_real"]) + \
-                                       1.0j*np.asarray(guess_dict[guess_index]["g_arr_imag"])
+                    guess_list = hkl.load(f"{cwd}/calico/data/{guess_filename}.hkl")
+                    target_sf = 1000000.0   # 1.0 for unical, 1000000.0 for skycal
+                    candidates = [
+                        g for g in guess_list
+                        if np.isclose(g["scaling_factor_cost"], target_sf)
+                    ]
+                    sigma_n = np.array([c["sigma_n"] for c in candidates])
+                    sigma_e = np.array([c["sigma_e"] for c in candidates])
+                    distance  = (sigma_n - sigma_t)**2 + (sigma_e - sigma_m)**2
+                    best_idx = int(np.argmin(distance))
+                    gains_real_guess = np.asarray(candidates[best_idx]["g_arr_real"]) + \
+                                       1.0j*np.asarray(candidates[best_idx]["g_arr_imag"])
                     print(f"Loading gains guess time - {time.time() - start_load_gains_guess_time:.3f} seconds")
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
