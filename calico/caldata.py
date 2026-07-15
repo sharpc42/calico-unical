@@ -477,6 +477,8 @@ class CalData:
                 axis=0,
             )
 
+        self.antenna_positions, _ = data.get_enu_data_ants()
+
         # Free memory
         data = model = data_copy = model_copy = None
 

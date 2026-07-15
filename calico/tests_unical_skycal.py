@@ -425,20 +425,19 @@ class TestStringMethods(unittest.TestCase):
             seed=int(time.time()),
         )
         caldata_obj.data_visibilities[0,:,0,0] += n_real + 1j*n_imag
-        caldata_obj.model_visibilities[0,:,0,0] += e_real + 1j*e_imag
-        # caldata_obj.data_visibilities[0,:,0,0] += e_real + 1j*e_imag
+        # caldata_obj.model_visibilities[0,:,0,0] += e_real + 1j*e_imag  # m > v_T
+        caldata_obj.data_visibilities[0,:,0,0] += e_real + 1j*e_imag  # m < v_T
         caldata_obj.gains_multiply_model = True
         vwa = variable_weights.VariableWeightsArray()
         vwa.set_algorithm_weights(
             caldata_obj,
-            sigma_t_0 = 4.5,
-            sigma_m_0 = 1.5,
+            sigma_t_0 = 0.45,
+            sigma_m_0 = 0.6,
             threshold_length = 0,
             weighting_function = "constant_weights",
             scaling_factor = 1e4,
         )
         optimizers = [
-            # "powell",
             "pytorch",
             "powell",
         ]
@@ -454,26 +453,54 @@ class TestStringMethods(unittest.TestCase):
             )
             print(f"{optimizer=}\n\n{gains=}")
             opt_gains.append(gains)
-        powell_gains = opt_gains[0]
-        lbfgs_gains = opt_gains[1]
-        powell_minus_lbfgs = np.abs(powell_gains) - np.abs(lbfgs_gains)
-        print(f"***Diff Statistics***")
-        print(f"\tAvg {powell_minus_lbfgs.mean}")
-        print(f"\tAvg Abs {powell_minus_lbfgs.mean}")
-        print(f"\tMax Abs {np.max(np.abs(powell_minus_lbfgs))}")
-        print(f"\tMin Abs {np.min(np.abs(powell_minus_lbfgs))}")
-        print(f"Plotting simple diff plot")
-        x_arr = [x for x in range(powell_minus_lbfgs.size)]
-        plt.plot(x_arr, np.abs(powell_minus_lbfgs))
+        lbfgs_gains = opt_gains[0]
+        powell_gains = opt_gains[1]  # make sure these track the correct optimizer order...
+        plot_time = int(time.time())
+        abs_powell_minus_lbfgs = np.abs(powell_gains) - np.abs(lbfgs_gains)
+        print(f"Plotting abs diff plot")
+        x_arr = [x for x in range(abs_powell_minus_lbfgs.size)]
+        plt.plot(x_arr, abs_powell_minus_lbfgs)
         plt.title("$|g_P| - |g_L|$ per antenna")
         plt.ylabel("$|g_P| - |g_L|$")
         plt.xlabel("Antennas")
-        plt.savefig(f"calico/images/powell_lbfgs_diff_{int(time.time())}.png")
+        plt.savefig(f"calico/images/powell_lbfgs_diff_abs_{plot_time}.png")
         plt.close()
-        print(f"Plotting scatter plot in nsew-plane")
+        real_powell_minus_lbfgs = powell_gains.real - lbfgs_gains.real
+        print(f"Plotting real diff plot")
+        x_arr = [x for x in range(real_powell_minus_lbfgs.size)]
+        plt.plot(x_arr, real_powell_minus_lbfgs)
+        plt.title("$Re(g_P) - Re(g_L)$ per antenna")
+        plt.ylabel("$Re(g_P) - Re(g_L)$")
+        plt.xlabel("Antennas")
+        plt.savefig(f"calico/images/powell_lbfgs_diff_real_{plot_time}.png")
+        plt.close()
+        imag_powell_minus_lbfgs = powell_gains.imag - lbfgs_gains.imag
+        print(f"Plotting imag diff plot")
+        x_arr = [x for x in range(imag_powell_minus_lbfgs.size)]
+        plt.plot(x_arr, imag_powell_minus_lbfgs)
+        plt.title("$Im(g_P) - Im(g_L)$ per antenna")
+        plt.ylabel("$Im(g_P) - Im(g_L)$")
+        plt.xlabel("Antennas")
+        plt.savefig(f"calico/images/powell_lbfgs_diff_imag_{plot_time}.png")
+        plt.close()
+        print(f"Plotting scatter plot in nsew-plane (abs diff)")
         en_plane = caldata_obj.antenna_positions[:,:-1]
         print(f"en-plane shape - {en_plane.shape}")
-
+        max_diff = np.max([np.max(abs_powell_minus_lbfgs), np.abs(np.min(abs_powell_minus_lbfgs))])
+        scatter_plot = plt.scatter(
+            x=en_plane[:,0], 
+            y=en_plane[:,1],
+            c=abs_powell_minus_lbfgs,
+            vmax=max_diff,
+            vmin=-max_diff,
+        )
+        cbar = plt.colorbar(scatter_plot)
+        cbar.set_label("$|g_P| - |g_L|$")
+        plt.title("$|g_P| - |g_L|$ per antenna in en-plane")
+        plt.xlabel("East")
+        plt.ylabel("North")
+        plt.savefig(f"calico/images/powell_lbfgs_en_plane_{plot_time}.png")
+        plt.close()
 
     def plot_aggregate_montecarlos():
         import matplotlib.pyplot as plt
