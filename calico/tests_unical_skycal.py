@@ -394,7 +394,12 @@ class TestStringMethods(unittest.TestCase):
         plt.ylabel("$Re<g_u> - Re<g_s>$")
         plt.show()
 
-    def compare_optimizers():
+    def compare_optimizers(
+        self,
+        sigma_m=0.1,
+        sigma_t=0.1,
+        maxiter=20,
+    ):
         import copy
         import time
         import noise_and_error_simulation as sim
@@ -445,10 +450,14 @@ class TestStringMethods(unittest.TestCase):
         for optimizer in optimizers:
             caldata_obj.gains[:,0,0] = org_gains
             caldata_obj.fit_vis[0,:,0,0] = org_fit_vis
+            if optimizer == "powell":
+                this_maxiter = 200
+            else:
+                this_maxiter = maxiter
             gains, _ = calibration_optimization.run_unical_optimization(
                 caldata_obj=caldata_obj,
                 xtol=1e-5,
-                maxiter=200,
+                maxiter=this_maxiter,  # is this actually showing up in PyTorch?
                 optimization_scheme=optimizer,
             )
             print(f"{optimizer=}\n\n{gains=}")
@@ -463,7 +472,7 @@ class TestStringMethods(unittest.TestCase):
         plt.title("$|g_P| - |g_L|$ per antenna")
         plt.ylabel("$|g_P| - |g_L|$")
         plt.xlabel("Antennas")
-        plt.savefig(f"calico/images/powell_lbfgs_diff_abs_{plot_time}.png")
+        plt.savefig(f"calico/images/powell_lbfgs_diff_abs_{plot_time}_maxiter{maxiter}.png")
         plt.close()
         real_powell_minus_lbfgs = powell_gains.real - lbfgs_gains.real
         print(f"Plotting real diff plot")
@@ -501,6 +510,27 @@ class TestStringMethods(unittest.TestCase):
         plt.ylabel("North")
         plt.savefig(f"calico/images/powell_lbfgs_en_plane_{plot_time}.png")
         plt.close()
+        return abs_powell_minus_lbfgs
+
+    def elbow_plot(self):
+        import matplotlib.pyplot as plt
+        diffs = []
+        maxiter_arr = []
+        for i in range(0,100,10):
+            diffs.append(
+                self.compare_optimizers(
+                    TestStringMethods,
+                    maxiter=i,
+                    sigma_m=1,
+                    sigma_t=0.5,
+                ).mean()
+            )
+            maxiter_arr.append(i)
+        plt.plot(maxiter_arr, diffs)
+        plt.title(f"$|g_P| - |g_L|$ as function of max iterations")
+        plt.ylabel(f"$|g_P| - |g_L|$")
+        plt.xlabel(f"Maxiter")
+        plt.savefig(f"calico/images/powell_lbfgs_diff_elbow_plot.png")
 
     def plot_aggregate_montecarlos():
         import matplotlib.pyplot as plt
@@ -726,7 +756,7 @@ class TestStringMethods(unittest.TestCase):
         plt.show()
 
 if __name__ == "__main__":
-    # unittest.main()
-    TestStringMethods.compare_optimizers()
+    # unittest.main()]
+    TestStringMethods.elbow_plot(TestStringMethods)
     # TestStringMethods.plot_skycal_unical_diff_per_scaling_factor()
     # TestStringMethods.plot_montecarlos()
