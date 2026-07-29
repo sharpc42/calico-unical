@@ -1291,13 +1291,13 @@ def run_unical_optimization(
                     Do PyTorch L-BFGS optimization
                     (use complex variables directly)
                 """
-                if torch.backends.mps.is_available():
-                    device = torch.device("mps")
-                else:
-                    device = torch.device("cpu")
-                    if verbose:
-                        print ("MPS device not found.")
-                    sys.stdout.flush()
+                # if torch.backends.mps.is_available():
+                #     device = torch.device("mps")
+                # else:
+                device = torch.device("cpu")
+                if verbose:
+                    print ("MPS device not found.")
+                sys.stdout.flush()
                 start_optimize = time.time()
                 # main params arrays as tensors
                 gains_fit_tensor = torch.from_numpy(
@@ -1308,7 +1308,7 @@ def run_unical_optimization(
                     ].copy(), 
                 ).to(
                     device=device,
-                    dtype=torch.complex64,
+                    dtype=torch.complex128,
                 )
                 fit_vis_fit_tensor = torch.from_numpy(
                     caldata_obj.fit_vis[
@@ -1319,39 +1319,39 @@ def run_unical_optimization(
                     ].copy(),
                 ).to(
                     device=device,
-                    dtype=torch.complex64,
+                    dtype=torch.complex128,
                 )
                 params_tensor = torch.concatenate(
                     (gains_fit_tensor, 
                     fit_vis_fit_tensor)
                 ).to(
                     device=device,
-                    dtype=torch.complex64,
+                    dtype=torch.complex128,
                 )
                 # additional arrays as tensors
                 data_tensor = torch.from_numpy(
                     caldata_obj.data_vis_reshaped.copy(),
                 ).to(
                     device=device,
-                    dtype=torch.complex64,
+                    dtype=torch.complex128,
                 )
                 model_tensor = torch.from_numpy(
                     caldata_obj.model_vis_reshaped.copy(),
                 ).to(
                     device=device,
-                    dtype=torch.complex64,
+                    dtype=torch.complex128,
                 )
                 vis_weights_tensor = torch.from_numpy(
                     caldata_obj.vis_weights_reshaped.copy(),
                 ).to(
                     device=device,
-                    dtype=torch.float32,
+                    dtype=torch.float64,
                 )
                 model_weights_tensor = torch.from_numpy(
                     caldata_obj.model_weights_reshaped.copy(),
                 ).to(
                     device=device,
-                    dtype=torch.float32,
+                    dtype=torch.float64,
                 )
                 ant_inds_tensor = torch.from_numpy(
                     caldata_obj.ant_inds.copy(),
@@ -1372,12 +1372,12 @@ def run_unical_optimization(
                     dtype=int,
                 )
                 params_tensor.requires_grad_(True)
-                tolerance_grad   = 1e-7
+                tolerance_grad   = 1e-9
                 tolerance_change = 1e-9
                 optimizer = torch.optim.LBFGS(
                     [params_tensor], 
                     lr               = 1.0, 
-                    max_iter         = 20,
+                    max_iter         = 100,
                     history_size     = 10,
                     tolerance_grad   = tolerance_grad,
                     tolerance_change = tolerance_change,
@@ -1398,15 +1398,32 @@ def run_unical_optimization(
                         lambda_val    = caldata_obj.lambda_val,
                     )
                     loss.backward()
-                    # grad_real = torch.view_as_real(params_tensor.grad)  # shape (..., 2) float32
-                    # grad_norm = grad_real.norm().item()
-                    # max_norm = 1e3
-                    # if grad_norm > max_norm:
-                    #     params_tensor.grad.mul_(max_norm / grad_norm)
+                    if params_tensor.grad is not None:
+                        grad_real = torch.view_as_real(params_tensor.grad)
+                        grad_norm = grad_real.norm()
+                        max_norm = 1e3
+                        if not torch.isfinite(grad_norm):
+                            params_tensor.grad.zero_()
+                        elif grad_norm > max_norm:
+                            params_tensor.grad.mul_(max_norm / grad_norm)
                     return loss
+                best_loss = np.inf
+                best_params = params_tensor.detach().clone()
                 previous_loss = None
                 for i in range(20):
                     loss = optimizer.step(closure)
+                    loss_val = loss.item()
+                    params_finite = torch.isfinite(
+                        torch.view_as_real(params_tensor)
+                    ).all()
+                    if not np.isfinite(loss_val) or not params_finite:
+                        if verbose:
+                            print(f"Non-finite at iteration {i}; "
+                                  f"keeping best finite solution (loss={best_loss:.3e}).")
+                        break
+                    if loss_val < best_loss:
+                        best_loss = loss_val
+                        best_params = params_tensor.detach().clone()
                     if (previous_loss is not None 
                         and abs(previous_loss - loss.item()) < tolerance_change):
                         print(f"Converged at iteration {i}")
