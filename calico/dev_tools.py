@@ -428,7 +428,7 @@ class DevTools:
         model_data_writeout_filename : str    = 'tutorial_full_onetime_unflagged',
         verbose                      : bool   = True,
         caldata_obj                           = None,
-        freq_ind                     : int    = 0,
+        num_freqs                    : int    = 1,
         vis_pol_ind                  : int    = 0,
         feed_pol_ind                 : int    = 0,
         suffix                       : str    = "",
@@ -465,8 +465,9 @@ class DevTools:
         run_params_list = hkl.load(f'{run_params_path}.hkl')
 
         # preserve deep copies of original data and model from uvfits file
-        original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind])
-        original_model_vis = copy.deepcopy(caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind])
+        original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,:num_freqs,vis_pol_ind])
+        original_model_vis = copy.deepcopy(caldata_obj.model_visibilities[0,:,:num_freqs,vis_pol_ind])
+        print(f"***ORIGINAL DATA VIS SHAPE***\n\n\t{original_data_vis.shape}\n\n")
         print(f"\n\n\n***ORIGINAL DATA VIS AVG***\n\t{np.mean(np.abs(original_data_vis))}\n\n\n")
         print(f"\n\n\n***ORIGINAL MODEL VIS AVG***\n\t{np.mean(np.abs(original_model_vis))}\n\n\n")
 
@@ -499,11 +500,11 @@ class DevTools:
             # reset caldata obj data and model arrays to originals and initialize new
             # data and model arrays for this run (NOTE: true_vis=model is set as an arg
             # in simulate_visibilities() in noise_and_error_simulation.py)
-            caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind] = copy.deepcopy(original_data_vis)
-            initial_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind])
-            caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind] = copy.deepcopy(original_model_vis)
-            initial_model_vis = copy.deepcopy(caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind])
-            initial_gains = copy.deepcopy(caldata_obj.gains[:,0,0])
+            caldata_obj.data_visibilities[0,:,:num_freqs,vis_pol_ind] = copy.deepcopy(original_data_vis)
+            initial_data_vis = copy.deepcopy(caldata_obj.data_visibilities[0,:,:num_freqs,vis_pol_ind])
+            caldata_obj.model_visibilities[0,:,:num_freqs,vis_pol_ind] = copy.deepcopy(original_model_vis)
+            initial_model_vis = copy.deepcopy(caldata_obj.model_visibilities[0,:,:num_freqs,vis_pol_ind])
+            initial_gains = copy.deepcopy(caldata_obj.gains[:,:num_freqs,0])
 
             # no sim, just use vis as-is
             if num_thermal_realizations == 0: 
@@ -520,6 +521,7 @@ class DevTools:
                     print(f"Creating model error realization {i+1}")
                 model_error_real, model_error_imag, me_real_long, me_real_short = sim.simulate_model_error(
                                                                                       Nbls=caldata_obj.Nbls,
+                                                                                      Nfreqs=num_freqs,
                                                                                       sigma_e_0=np.abs(run_params['sigma_e']),
                                                                                       uv_norm_array=caldata_obj.uv_norm,
                                                                                       threshold_length=threshold_length,
@@ -548,6 +550,7 @@ class DevTools:
                 thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
                                                              sigma_t_0=run_params['sigma_t'],
                                                              Nbls=caldata_obj.Nbls,
+                                                             Nfreqs=num_freqs,
                                                              seed=i+2,)
                 if thermal_noise_real is None:
                     if verbose: 
@@ -558,13 +561,13 @@ class DevTools:
                 data_vis_realizations.append(initial_data_vis + this_thermal_noise)
                 noise_realizations.append(thermal_noise_real)
 
-            full_data_realizations = np.array([])
-            full_model_realizations = np.array([])
-            gain_params_realizations = np.array([])
-            model_params_realizations = np.array([])
-            true_sky_realizations = np.array([])
-            full_noise_realizations = np.array([])
-            full_error_realizations = np.array([])
+            full_data_realizations = np.empty((0,num_freqs))
+            full_model_realizations = np.empty((0,num_freqs))
+            gain_params_realizations = np.empty((0,num_freqs))
+            model_params_realizations = np.empty((0,num_freqs))
+            true_sky_realizations = np.empty((0,num_freqs))
+            full_noise_realizations = np.empty((0,num_freqs))
+            full_error_realizations = np.empty((0,num_freqs))
             cost_function_realizations = []
 
             sum_data_realizations     = np.zeros_like(initial_data_vis)
@@ -577,12 +580,13 @@ class DevTools:
                 if verbose: print(f"Optimization - Data thermal noise realization {j+1}")
                 for k, model in enumerate(model_vis_realizations):
                     if verbose: print(f"Optimization - Model error realization {k+1}")
-                    caldata_obj.data_visibilities[0,:,freq_ind,vis_pol_ind] = data
-                    caldata_obj.model_visibilities[0,:,freq_ind,vis_pol_ind] = model
+                    caldata_obj.data_visibilities[0,:,:num_freqs,vis_pol_ind] = data
+                    caldata_obj.model_visibilities[0,:,:num_freqs,vis_pol_ind] = model
                     # if force_fit_to_true_vis:
-                    #     caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind] = original_data_vis
+                    #     caldata_obj.fit_vis[0,:,num_freqs-1,vis_pol_ind] = original_data_vis
                     if gains_real_guess is not None:
-                        caldata_obj.gains[:,freq_ind,feed_pol_ind] = gains_real_guess
+                        # NOTE: Does this work for multiple frequencies? Seems not
+                        caldata_obj.gains[:,num_freqs-1,feed_pol_ind] = gains_real_guess
                         if len(gains_real_guess) != caldata_obj.Nants:
                             raise ValueError(f"Gains guess length must be the same as Nants for this run")
                     vwa = variable_weights.VariableWeightsArray()
@@ -613,9 +617,9 @@ class DevTools:
                     # store data
                     full_data_realizations = np.concatenate((full_data_realizations, data))
                     full_model_realizations = np.concatenate((full_model_realizations, model))
-                    gains = copy.deepcopy(caldata_obj.gains[:,freq_ind,feed_pol_ind])
+                    gains = copy.deepcopy(caldata_obj.gains[:,:num_freqs,feed_pol_ind])
                     gain_params_realizations = np.concatenate((gain_params_realizations, gains))
-                    u_params = copy.deepcopy(caldata_obj.fit_vis[0,:,freq_ind,vis_pol_ind])
+                    u_params = copy.deepcopy(caldata_obj.fit_vis[0,:,:num_freqs,vis_pol_ind])
                     # print(f"***U PARAMS***\n{u_params}\n\n")
                     model_params_realizations = np.concatenate((model_params_realizations, u_params))
                     true_sky_realizations = np.concatenate((true_sky_realizations, initial_data_vis))
@@ -639,7 +643,7 @@ class DevTools:
                     # get value of first cost function term g*gv-u
                     gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
                     residual_vector = data - gains_expanded * u_params
-                    cost = np.sum(caldata_obj.visibility_weights[0,:,freq_ind,vis_pol_ind] * np.abs(residual_vector) ** 2)
+                    cost = np.sum(caldata_obj.visibility_weights[0,:,num_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
                     cost_function_realizations.append(cost)
 
                     sum_data_realizations += data
@@ -668,13 +672,13 @@ class DevTools:
                 print("\tuv array\t\t\t", uv_array.shape)
                 print("\tcost function realizations\t\t", len(cost_function_realizations))
             output_arrays = {
-                'v runs'    : full_data_realizations,
-                'm runs'    : full_model_realizations,
-                'g runs'    : gain_params_realizations,
-                'u runs'    : model_params_realizations,
-                'vT runs'   : true_sky_realizations,
-                'n runs'    : full_noise_realizations,
-                'e runs'    : full_error_realizations,
+                'v runs'    : full_data_realizations[:,0],
+                'm runs'    : full_model_realizations[:,0],
+                'g runs'    : gain_params_realizations[:,0],
+                'u runs'    : model_params_realizations[:,0],
+                'vT runs'   : true_sky_realizations[:,0],
+                'n runs'    : full_noise_realizations[:,0],
+                'e runs'    : full_error_realizations[:,0],
                 'uv array'  : uv_array,
                 'cost runs' : np.asarray(cost_function_realizations),
                 'sigma_e'   : run_params['sigma_e'],
@@ -1315,15 +1319,19 @@ class DevTools:
                     np.abs(vT_arr)**2 + np.abs(e_arr)**2
                 )
             )
-            g_squared_right = np.sqrt(
-                np.sqrt(
-                    np.abs(m_arr)**2 + np.abs(e_arr)**2
+            # g_squared_right = np.sqrt(
+            g_squared_right = (
+                # np.sqrt(
+                (
+                    np.abs(m_arr)**2 + (m_arr * (e_arr + n_arr)).real
+                    # (m_arr * (e_arr + n_arr)).real
                     # np.abs(vT_arr**2) + e_arr_mag**2 + 
                     # np.abs(n_arr)**2
                 ) /
                 # np.abs(m_arr)
-                np.sqrt(
-                    np.abs(m_arr)**2 + np.abs(n_arr)**2
+                # np.sqrt(
+                (
+                    np.abs(m_arr)**2
                 )
             )
             # using calculated thermal noise and model error
@@ -1386,7 +1394,7 @@ class DevTools:
                 "sigma_re_u"                : sigma_re_u,
                 "sigma_re_vT"               : sigma_re_vT,
                 "avg_re_g_minus_one_left"   : avg_re_g_minus_one_left,
-                "avg_re_g_minus_one_right"  : avg_g_offset_predict_right,
+                "avg_re_g_minus_one_right"  : avg_re_g_minus_one_right,
                 "std_gain_phase"            : std_gain_phase,
                 "scaling_factor_cost"       : run_params["scaling_factor_cost"],
                 "e_n_corr_coeff"            : model_error_thermal_noise_corr_abs,
@@ -2072,12 +2080,12 @@ class DevTools:
     def get_freq_ind(
         self
     ) -> int:
-        return self.freq_ind
+        return self.num_freqs-1
     
     def set_freq_ind(self,
                      val : int,
     ) -> None:
-        self.freq_ind = val
+        self.num_freqs = val+1
 
     # vis_pol_ind
     def get_vis_pol_ind(

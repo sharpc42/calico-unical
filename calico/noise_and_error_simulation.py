@@ -1,21 +1,22 @@
 import numpy as np
 import sys
 
-def simulate_thermal_noise(sigma_t_0, 
+def simulate_thermal_noise(sigma_t_0,
                            Nbls, 
                            seed,
-                           verbose=True,):
+                           verbose=True,
+                           Nfreqs=1,):
     np.random.seed(seed)
     try:
         thermal_noise_real = np.random.normal(
             0.0,
             sigma_t_0,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )
         thermal_noise_imag = np.random.normal(
             0.0,
             sigma_t_0,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )
         return thermal_noise_real, thermal_noise_imag
     except:
@@ -30,7 +31,8 @@ def simulate_model_error(Nbls,
                          weighting_function, 
                          scaling_factor,
                          seed=42,
-                         verbose=True,):
+                         verbose=True,
+                         Nfreqs=1,):
     np.random.seed(seed)
     if sigma_e_0 is not None and weighting_function == 'step_down_weights':
         if verbose:
@@ -46,22 +48,22 @@ def simulate_model_error(Nbls,
         model_error_real_hi[~threshold_mask] += np.random.normal(
             0.0,
             1,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )[~threshold_mask]
         model_error_imag_hi[~threshold_mask] += np.random.normal(
             0.0,
             1,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )[~threshold_mask]
         model_error_real_lo[threshold_mask] += np.random.normal(
             0.0,
             1,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )[threshold_mask]
         model_error_imag_lo[threshold_mask] += np.random.normal(
             0.0,
             1,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )[threshold_mask]
         model_error_real = (model_error_real_hi + model_error_real_lo / np.sqrt(scaling_factor)) * sigma_e_0
         model_error_imag = (model_error_imag_hi + model_error_imag_lo / np.sqrt(scaling_factor)) * sigma_e_0
@@ -71,12 +73,12 @@ def simulate_model_error(Nbls,
         model_error_real_hi = np.random.normal(
             0.0,
             sigma_e_0,
-            size=(Nbls),
+            size=(Nbls,Nfreqs,),
         )
         model_error_imag_hi = np.random.normal(
             0.0,
             sigma_e_0,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )
         return model_error_real_hi, model_error_imag_hi, model_error_real_long, model_error_real_short
         # except:
@@ -88,12 +90,12 @@ def simulate_model_error(Nbls,
         model_error_real = np.random.normal(
             0.0,
             sigma_e_0,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )
         model_error_imag = np.random.normal(
             0.0,
             sigma_e_0,
-            size=(Nbls),
+            size=(Nbls,Nfreqs),
         )
         return model_error_real, model_error_imag, np.array([]), np.array([])
     else:
