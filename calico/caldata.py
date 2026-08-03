@@ -1351,7 +1351,7 @@ class CalData:
         """
         self.gains_real = self.gains[self.ant_inds, freq_ind, feed_pol_ind].real
         self.gains_imag = self.gains[self.ant_inds, freq_ind, feed_pol_ind].imag
-        # first time only for now, slice all times eventually
+        # NOTE: one time step only for now
         self.fit_vis_real = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].real
         self.fit_vis_imag = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].imag
 

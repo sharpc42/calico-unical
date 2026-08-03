@@ -897,6 +897,8 @@ def unified_calibration_wrapper(
         Set to True to print optimization outputs. Default False.
     log_file_path : str or None
         Path to the log file. Default None.
+    optimization_scheme : str or None
+        Optimizer to use for minimization. Default "powell" for Powell optimizer in SciPy.
 
     Returns
     -------
@@ -987,7 +989,6 @@ def unified_calibration_wrapper(
         gain_init_to_vis_ratio=gain_init_to_vis_ratio,
         gains_multiply_model=gains_multiply_model,
         gain_init_stddev=gain_init_stddev,
-        fit_vis_init_stddev=fit_vis_init_stddev,
         N_feed_pols=N_feed_pols,
         feed_polarization_array=feed_polarization_array,
         min_cal_baseline_m=min_cal_baseline_m,
@@ -1050,8 +1051,7 @@ def unified_calibration_wrapper(
         parallel=parallel,
         verbose=verbose,
         pool=pool,
-        scaling_factor_cost=scaling_factor_cost,
-        threshold_length=threshold_length,
+        optimization_scheme=optimization_scheme,
     )
     if verbose:
         print(
