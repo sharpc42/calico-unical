@@ -422,6 +422,10 @@ class CalData:
         flag_array = np.zeros(
             (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=bool
         )
+        if simulate_visibilities:
+            print("Simulating visibilities (not reading from file)")
+        else:
+            print("We ain't simulating no visibilities (reading from file)")
         for time_ind, time_val in enumerate(np.unique(data.time_array)):
             data_copy = data.select(times=time_val, inplace=False)
             model_times = list(set(model.time_array))
@@ -448,10 +452,8 @@ class CalData:
 
             # use visibilities from file or simulate with Gaussian throw
             if simulate_visibilities:
-                print("Simulating visibilities (not reading from file)")
                 sim.simulate_visibilities(self, time_ind)
             else:
-                print("We ain't simulating no visibilities (reading from file)")
                 self.model_visibilities[time_ind, :, :, :] = np.reshape(
                     model_copy.data_array,
                     (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
@@ -687,10 +689,6 @@ class CalData:
         # Initialize unical fitted visibility parameters
         self.fit_vis = self.model_visibilities.copy()
 
-        # NOTE: Incorporate this into VWA
-        if np.max(flag_array):  # Apply flagging
-            self.visibility_weights[np.where(flag_array)] = 0.0
-
         # Initialize data and model weights
         self.threshold_length = threshold_length
         self.uv_norm
@@ -703,6 +701,9 @@ class CalData:
             sigma_m_0=sigma_m_0,
             threshold_length=self.threshold_length
         )
+        # NOTE: Incorporate this into VWA
+        if np.max(flag_array) is not None:  # Apply flagging
+            self.visibility_weights[np.where(flag_array)] = 0.0
         # vwa.plot_weights_per_baseline(self, scaling_factor=scaling_factor_cost)
 
         self.lambda_val = lambda_val
@@ -1351,9 +1352,8 @@ class CalData:
         """
         self.gains_real = self.gains[self.ant_inds, freq_ind, feed_pol_ind].real
         self.gains_imag = self.gains[self.ant_inds, freq_ind, feed_pol_ind].imag
-        # NOTE: one time step only for now
-        self.fit_vis_real = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].real
-        self.fit_vis_imag = self.fit_vis[0, self.bl_inds, freq_ind, feed_pol_ind].imag
+        self.fit_vis_real = self.fit_vis[:, self.bl_inds, freq_ind, feed_pol_ind].real
+        self.fit_vis_imag = self.fit_vis[:, self.bl_inds, freq_ind, feed_pol_ind].imag
 
         # interweave real and imaginary parts of gains
         gains_flattened = np.stack(
@@ -1372,7 +1372,7 @@ class CalData:
                     self.fit_vis_real,
                     self.fit_vis_imag,
                 ),
-                axis=1,
+                axis=2,
             ).flatten()
             params_flattened = np.hstack(
                 (
@@ -1395,9 +1395,6 @@ class CalData:
         vis_pol_ind : int
             Visibility polarization index.
         """
-        print("***CALDATA - DATA VIS SHAPE***", self.data_visibilities.shape)
-        print("***CALDATA - FREQ IND***", freq_ind)
-        print("***CALDATA - VIS POL IND***", vis_pol_ind)
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
             (self.Ntimes, self.Nbls),
@@ -1445,10 +1442,10 @@ class CalData:
         )
         self.ant_inds = np.where(weight_per_ant > 0.0)[0]
 
-    def set_bl_inds(self, freq_ind, feed_pol_ind):
+    def set_bl_inds(self, freq_ind, vis_pol_ind):
         weights_summed = np.sum(
-            (self.model_weights[:, :, freq_ind, feed_pol_ind]
-                + self.visibility_weights[:, :, freq_ind, feed_pol_ind]),
+            (self.model_weights[:, :, freq_ind, vis_pol_ind]
+                + self.visibility_weights[:, :, freq_ind, vis_pol_ind]),
             axis=0,
         )
         self.bl_inds = np.where(weights_summed > 0.0)[0]
@@ -1555,6 +1552,6 @@ class CalData:
                         optimization_scheme     = optimization_scheme
                     )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
-                    self.fit_vis[:1, :, [freq_ind], :] = fit_vis_fit[np.newaxis, :, :, np.newaxis].copy()
+                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, :, np.newaxis].copy()
 
                     #self.write_fit_vis()

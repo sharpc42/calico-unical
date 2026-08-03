@@ -117,11 +117,13 @@ class TestStringMethods(unittest.TestCase):
         )
         n_real, n_imag = sim.simulate_thermal_noise(
             sigma_t_0=3, 
-            Nbls=caldata_obj.Nbls, 
+            n_bls=caldata_obj.Nbls, 
+            n_times=caldata_obj.Ntimes,
             seed=int(time.time()),
         )
         e_real, e_imag, _, _ = sim.simulate_model_error(
-            Nbls=caldata_obj.Nbls, 
+            n_bls=caldata_obj.Nbls, 
+            n_times=caldata_obj.Ntimes,
             sigma_e_0=4, 
             uv_norm_array=caldata_obj.uv_norm,
             threshold_length=0,
@@ -195,7 +197,8 @@ class TestStringMethods(unittest.TestCase):
                 caldata_obj.data_visibilities[0,:,0,0] = original_data
                 caldata_obj.model_visibilities[0,:,0,0] = original_model
                 e_real, e_imag, _, _ = sim.simulate_model_error(
-                    Nbls=caldata_obj.Nbls, 
+                    n_bls=caldata_obj.Nbls, 
+                    n_times=caldata_obj.Ntimes,
                     sigma_e_0=max(np.abs(sigma_m),0.1), 
                     uv_norm_array=caldata_obj.uv_norm,
                     threshold_length=0,
@@ -210,7 +213,8 @@ class TestStringMethods(unittest.TestCase):
                     caldata_obj.data_visibilities[0,:,0,0] += e_real + 1j*e_imag
                 n_real, n_imag = sim.simulate_thermal_noise(
                     sigma_t_0=max(sigma_t,0.1), 
-                    Nbls=caldata_obj.Nbls, 
+                    n_bls=caldata_obj.Nbls, 
+                    n_times=caldata_obj.Ntimes,
                     seed=1,
                 )
                 data_vT = caldata_obj.data_visibilities[0,:,0,0].copy()
@@ -341,11 +345,13 @@ class TestStringMethods(unittest.TestCase):
         )
         n_real, n_imag = sim.simulate_thermal_noise(
             sigma_t_0=3, 
-            Nbls=caldata_obj.Nbls, 
+            n_bls=caldata_obj.Nbls,
+            n_times=caldata_obj.Ntimes, 
             seed=int(time.time()),
         )
         e_real, e_imag, _, _ = sim.simulate_model_error(
-            Nbls=caldata_obj.Nbls, 
+            n_bls=caldata_obj.Nbls, 
+            n_times=caldata_obj.Ntimes,
             sigma_e_0=8, 
             uv_norm_array=caldata_obj.uv_norm,
             threshold_length=0,
@@ -417,11 +423,13 @@ class TestStringMethods(unittest.TestCase):
         org_fit_vis = copy.deepcopy(caldata_obj.fit_vis[0,:,0,0])
         n_real, n_imag = sim.simulate_thermal_noise(
             sigma_t_0=3, 
-            Nbls=caldata_obj.Nbls, 
+            n_bls=caldata_obj.Nbls, 
+            n_times=caldata_obj.Ntimes,
             seed=int(time.time()),
         )
         e_real, e_imag, _, _ = sim.simulate_model_error(
-            Nbls=caldata_obj.Nbls, 
+            n_bls=caldata_obj.Nbls, 
+            n_times=caldata_obj.Ntimes,
             sigma_e_0=3, 
             uv_norm_array=caldata_obj.uv_norm,
             threshold_length=0,
@@ -429,9 +437,9 @@ class TestStringMethods(unittest.TestCase):
             scaling_factor=1,
             seed=int(time.time()),
         )
-        caldata_obj.data_visibilities[0,:,0,0] += n_real + 1j*n_imag
-        # caldata_obj.model_visibilities[0,:,0,0] += e_real + 1j*e_imag  # m > v_T
-        caldata_obj.data_visibilities[0,:,0,0] += e_real + 1j*e_imag  # m < v_T
+        caldata_obj.data_visibilities[:,:,0,0] += n_real + 1j*n_imag
+        # caldata_obj.model_visibilities[:,:,0,0] += e_real + 1j*e_imag  # m > v_T
+        caldata_obj.data_visibilities[:,:,0,0] += e_real + 1j*e_imag  # m < v_T
         caldata_obj.gains_multiply_model = True
         vwa = variable_weights.VariableWeightsArray()
         vwa.set_algorithm_weights(
@@ -755,8 +763,76 @@ class TestStringMethods(unittest.TestCase):
         # plt.tight_layout()
         plt.show()
 
+    def test_pack_reshape_multiple_times(self):
+        data = pyuvdata.UVData()
+        data.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        model = data.copy()
+        caldata_obj = caldata.CalData()
+        caldata_obj.load_data(data, 
+                              model, 
+                              gains_multiply_model=True, 
+                              weighting_function="constant_weights",
+                              sigma_t_0=1, 
+                              sigma_m_0=1,
+                              scaling_factor_cost=1, 
+                              threshold_length=0, 
+                              lambda_val=100,
+                              simulate_visibilities=True)
+        caldata_obj.set_ant_inds(0,0) ; caldata_obj.set_bl_inds(0,0)
+        known = caldata_obj.model_visibilities[:, :, 0, 0]
+        packed = caldata_obj.pack(0, 0, unical=True)
+        u_part = packed[2*len(caldata_obj.ant_inds):]
+
+        # how the cost wrapper reads it
+        try:
+            fit_vis = np.reshape(u_part, (caldata_obj.Ntimes * len(caldata_obj.bl_inds), 2))
+            fit_vis = fit_vis[:, 0] + 1j*fit_vis[:, 1]
+            print(f"\nCost-wrapper unpack OK, shape {fit_vis.shape}")
+        except Exception as e:
+            print(f"\nCost-wrapper unpack FAILS\n  {type(e).__name__}: {e}\n")
+
+        # how the result reshape reads it; should equal `known`
+        fit_vis2 = np.reshape(u_part, (caldata_obj.Ntimes, len(caldata_obj.bl_inds), 2))
+        fit_vis2 = fit_vis2[:, :, 0] + 1j*fit_vis2[:, :, 1]
+        print(f"Pack\n  result-reshape consistent? "
+            f"{np.allclose(fit_vis2, known[:, caldata_obj.bl_inds])}\n")
+
+    def test_calibration_completes_multiple_times(self):
+        data = pyuvdata.UVData()
+        data.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        model = data.copy()
+        caldata_obj = caldata.CalData()
+        caldata_obj.load_data(
+            data, 
+            model, 
+            gains_multiply_model=True, 
+            weighting_function="constant_weights",
+            sigma_t_0=1, 
+            sigma_m_0=1,
+            scaling_factor_cost=1, 
+            threshold_length=0, 
+            lambda_val=100,
+            simulate_visibilities=True
+        )
+        caldata_obj.set_ant_inds(0,0) ; caldata_obj.set_bl_inds(0,0)
+        optimizers = [
+            "powell",
+            "pytorch",
+        ]
+        for optimizer in optimizers:
+            try: 
+                caldata_obj.unified_calibration(
+                        verbose=True,
+                        optimization_scheme=optimizer,
+                    )
+                print(f"\nCalibration for {optimizer} SUCCEEDS")
+            except Exception as e:
+                print(f"\nCalibration for {optimizer} FAILS\n  {type(e).__name__}: {e}\n\n")
+
 if __name__ == "__main__":
     # unittest.main()]
-    TestStringMethods.elbow_plot(TestStringMethods)
+    # TestStringMethods.elbow_plot(TestStringMethods)
+    # TestStringMethods.test_multiple_time_steps_unical(TestStringMethods)
+    TestStringMethods.test_calibration_completes_multiple_times(TestStringMethods)
     # TestStringMethods.plot_skycal_unical_diff_per_scaling_factor()
     # TestStringMethods.plot_montecarlos()
