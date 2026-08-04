@@ -702,8 +702,8 @@ def cost_unical_wrapper(
     if dev_type == "test gains rolled":
         return gains_reshaped
     # reshape u params
-    fit_vis_flat = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
-    fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
+    fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
+    fit_vis_reshaped = fit_vis_reshaped[:,:,0] + 1.0j * fit_vis_reshaped[:,:,1]
     if dev_type == "test fit vis rolled":
         return fit_vis_reshaped
     if dev_type == "test gains one run skycal":
@@ -1324,13 +1324,13 @@ def run_unical_optimization(
                     device=device,
                     dtype=torch.complex128,
                 )
-                params_tensor = torch.concatenate(
-                    (gains_fit_tensor, 
-                    fit_vis_fit_tensor)
-                ).to(
-                    device=device,
-                    dtype=torch.complex128,
-                )
+                # params_tensor = torch.concatenate(
+                #     (gains_fit_tensor, 
+                #     fit_vis_fit_tensor)
+                # ).to(
+                #     device=device,
+                #     dtype=torch.complex128,
+                # )
                 # additional arrays as tensors
                 data_tensor = torch.from_numpy(
                     caldata_obj.data_vis_reshaped.copy(),
@@ -1374,11 +1374,13 @@ def run_unical_optimization(
                     device=device,
                     dtype=int,
                 )
-                params_tensor.requires_grad_(True)
+                gains_fit_tensor.requires_grad_(True)
+                fit_vis_fit_tensor.requires_grad_(True)
+                params = [gains_fit_tensor, fit_vis_fit_tensor]
                 tolerance_grad   = 1e-9
                 tolerance_change = 1e-9
                 optimizer = torch.optim.LBFGS(
-                    [params_tensor], 
+                    params, 
                     lr               = 1.0, 
                     max_iter         = 100,
                     history_size     = 10,
@@ -1386,10 +1388,27 @@ def run_unical_optimization(
                     tolerance_change = tolerance_change,
                     line_search_fn   = "strong_wolfe",
                 )
+                # helper functions for two tensor grads
+                def _all_finite(tensors):
+                    return all(
+                        torch.isfinite(torch.view_as_real(tensor)).all() for tensor in tensors
+                    )
+                def _grads_finite(tensors):
+                    return all(
+                        tensor.grad is not None and
+                        torch.isfinite(torch.view_as_real(tensor.grad)).all() for tensor in tensors
+                    )
+                # Euclidean norm across two tensor grads
+                def _joint_grad_norm(tensors):
+                    return torch.sqrt(
+                        sum(torch.view_as_real(tensor.grad).pow(2).sum()
+                          for tensor in tensors if tensor.grad is not None)
+                    )
                 def closure():
                     optimizer.zero_grad()
                     loss = cost_function_calculations.cost_unical_torch(
-                        params        = params_tensor,
+                        gains         = gains_fit_tensor,
+                        fit_vis       = fit_vis_fit_tensor,
                         data_vis      = data_tensor,
                         model_vis     = model_tensor,
                         vis_weights   = vis_weights_tensor,
@@ -1401,47 +1420,48 @@ def run_unical_optimization(
                         lambda_val    = caldata_obj.lambda_val,
                     )
                     loss.backward()
-                    if params_tensor.grad is not None:
-                        grad_real = torch.view_as_real(params_tensor.grad)
-                        grad_norm = grad_real.norm()
-                        max_norm = 1e3
-                        if not torch.isfinite(grad_norm):
-                            params_tensor.grad.zero_()
-                        elif grad_norm > max_norm:
-                            params_tensor.grad.mul_(max_norm / grad_norm)
+                    max_norm = 1e3
+                    if not _grads_finite(params):
+                        for p in params:
+                            if p.grad is not None:
+                                p.grad.zero_()
+                    else:
+                        grad_norm = _joint_grad_norm(params)
+                        if grad_norm > max_norm:
+                            for p in params:
+                                if p.grad is not None:
+                                    p.grad.mul_(max_norm / grad_norm)
                     return loss
                 best_loss = np.inf
-                best_params = params_tensor.detach().clone()
+                best_params = [p.detach().clone() for p in params]
                 previous_loss = None
                 for i in range(20):
                     loss = optimizer.step(closure)
                     loss_val = loss.item()
-                    params_finite = torch.isfinite(
-                        torch.view_as_real(params_tensor)
-                    ).all()
-                    if not np.isfinite(loss_val) or not params_finite:
+                    if not np.isfinite(loss_val) or not _all_finite(params):
                         if verbose:
                             print(f"Non-finite at iteration {i}; "
-                                  f"keeping best finite solution (loss={best_loss:.3e}).")
+                                  "keeping best finite solution (loss={best_loss:.3e}).")
                         break
                     if loss_val < best_loss:
                         best_loss = loss_val
-                        best_params = params_tensor.detach().clone()
+                        best_params = [p.detach().clone() for p in params]
                     if (previous_loss is not None 
                         and abs(previous_loss - loss.item()) < tolerance_change):
                         print(f"Converged at iteration {i}")
                         break
-                    previous_loss = loss.item()
-                final_params = params_tensor.detach().cpu().numpy().astype(gains_fit.dtype)
+                    previous_loss = loss_val
+                gains_best, fit_vis_best = best_params
+                gains_final   = gains_best.detach().cpu().numpy().astype(gains_fit.dtype)      # (Nants_unflagged,)
+                fit_vis_final = fit_vis_best.detach().cpu().numpy().astype(fit_vis_fit.dtype)  # (Ntimes, Nbls)
                 if verbose:
                     # recreate scipy 
-                    print(f"***PyTorch Result***")
-                    state = optimizer.state[params_tensor]
+                    print(f"***PyTorch Result***") 
+                    state = optimizer.state[gains_fit_tensor]
                     print(f"\tIterations:         {state.get('n_iter', 'N/A')}")
                     print(f"\tFunction evals:     {state.get('func_evals', 'N/A')}")
-                    grad = params_tensor.grad
-                    if grad is not None:
-                        grad_norm = grad.abs().max().item()
+                    if _grads_finite(params):
+                        grad_norm = _joint_grad_norm(params).item() 
                         print(f"Max gradient norm:  {grad_norm:.3e}")
                         if grad_norm < tolerance_grad:
                             print("Message: Gradient tolerance reached (converged)")
@@ -1452,15 +1472,8 @@ def run_unical_optimization(
                     print(f"\tOptimization time:  {(time.time()
                                                   - start_optimize) / 60} minutes")
                 sys.stdout.flush()
-                gains_fit[
-                    caldata_obj.ant_inds, 
-                    feed_pol_ind
-                ] = final_params[:len(caldata_obj.ant_inds)]
-                fit_vis_fit[
-                    caldata_obj.Ntimes, 
-                    caldata_obj.bl_inds, 
-                    vis_pol_ind
-                ] = final_params[len(caldata_obj.ant_inds):]
+                gains_fit[caldata_obj.ant_inds, feed_pol_ind]    = gains_final
+                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = fit_vis_final
 
             if (optimization_scheme == "powell" or
                 optimization_scheme == "scipy powell" or

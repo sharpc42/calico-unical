@@ -1176,7 +1176,8 @@ def cost_unical(
     return cost
 
 def cost_unical_torch(
-    params        : torch.Tensor,
+    gains         : torch.Tensor,
+    fit_vis       : torch.Tensor,
     data_vis      : torch.Tensor,
     model_vis     : torch.Tensor,
     vis_weights   : torch.Tensor,
@@ -1193,8 +1194,10 @@ def cost_unical_torch(
 
     Parameters
     ----------
-    params : tensor of complex
-        Shape (Nants + Nbls,).
+    gains : tensor of complex
+        Shape (Nants,).
+    fit_vis : tensor of complex
+        Shape (Ntimes, Nbls,).
     model_vis :  tensor of complex
         Shape (Ntimes, Nbls,).
     data_vis: tensor of complex
@@ -1219,11 +1222,6 @@ def cost_unical_torch(
     cost : float
         Value of the cost function.
     """
-    # gains_reshaped = params[:len(ant_inds)]
-    # gains = torch.ones((num_ants), dtype=torch.complex64)
-    # gains[ant_inds] = gains_reshaped
-    gains = params[:len(ant_inds)]
-    fit_vis = params[len(ant_inds):]
 
     gains_expanded = (gains[ant1_inds] * torch.conj((gains[ant2_inds])))[None, :]
     res_vec_1 = data_vis - gains_expanded * fit_vis
@@ -1233,11 +1231,7 @@ def cost_unical_torch(
     cost = torch.sum(cost_1) + torch.sum(cost_2)
 
     if lambda_val > 0:
-<<<<<<< HEAD
-        regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
-=======
         regularization_term = lambda_val * torch.sum(torch.angle(gains)) ** 2.0
->>>>>>> unical2
         cost += regularization_term
 
     return cost

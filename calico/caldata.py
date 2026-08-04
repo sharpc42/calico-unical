@@ -701,9 +701,11 @@ class CalData:
             sigma_m_0=sigma_m_0,
             threshold_length=self.threshold_length
         )
-        # NOTE: Incorporate this into VWA
-        if np.max(flag_array) is not None:  # Apply flagging
-            self.visibility_weights[np.where(flag_array)] = 0.0
+        # # NOTE: Incorporate this into VWA
+        # print(f"\n\n***MAX FLAG ARRAY***\n  {np.max(flag_array)=}\n\n")
+        # if np.max(flag_array):  # Apply flagging
+        #     self.visibility_weights[np.where(flag_array)] = 0.0
+        # print(f"All weights zero? {not np.any(self.visibility_weights)}\n\n")
         # vwa.plot_weights_per_baseline(self, scaling_factor=scaling_factor_cost)
 
         self.lambda_val = lambda_val
@@ -1552,6 +1554,6 @@ class CalData:
                         optimization_scheme     = optimization_scheme
                     )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
-                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, :, np.newaxis].copy()
+                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
 
                     #self.write_fit_vis()
