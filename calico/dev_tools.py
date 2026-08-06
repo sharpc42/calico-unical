@@ -461,14 +461,11 @@ class DevTools:
         run_params_path = os.getcwd() + f'/calico/data/{run_params_filename}'
         if verbose:
             print("settings path", run_params_path)
-        # with open(f'{run_params_path}.hkl', 'r') as file:
         run_params_list = hkl.load(f'{run_params_path}.hkl')
 
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind])
         original_model_vis = copy.deepcopy(caldata_obj.model_visibilities[:,:,:n_freqs,vis_pol_ind])
-        # print(f"\n\n\n***ORIGINAL DATA VIS AVG***\n\t{np.mean(np.abs(original_data_vis))}\n\n\n")
-        # print(f"\n\n\n***ORIGINAL MODEL VIS AVG***\n\t{np.mean(np.abs(original_model_vis))}\n\n\n")
 
         if verbose:
             print("len settings list", len(run_params_list))
@@ -561,17 +558,21 @@ class DevTools:
                 this_thermal_noise = thermal_noise_real + 1.0j*thermal_noise_imag
                 data_vis_realizations.append(initial_data_vis + this_thermal_noise)
                 noise_realizations.append(thermal_noise_real)
+                print(f"\n\n***AFTER BUILD***"
+                      f"\n  data   {np.max(np.abs(data_vis_realizations[-1]))}"
+                      f"\n  model  {np.max(np.abs(model_vis_realizations[-1]))}"
+                      f"\n  sigma_e {run_params['sigma_e']}\n  std(e) {np.std(this_model_error)}")
 
             n_times = caldata_obj.Ntimes
             n_bls = caldata_obj.Nbls
             n_ants = caldata_obj.Nants
-            full_data_realizations = np.empty((n_times, n_bls, n_freqs))
-            full_model_realizations = np.empty((n_times, n_bls, n_freqs))
-            gain_params_realizations = np.empty((n_ants, n_freqs))
-            model_params_realizations = np.empty((n_times, n_bls, n_freqs))
-            true_sky_realizations = np.empty((n_times, n_bls, n_freqs))
-            full_noise_realizations = np.empty((n_times, n_bls, n_freqs))
-            full_error_realizations = np.empty((n_times, n_bls, n_freqs))
+            full_data_realizations = np.empty((0, n_bls, n_freqs))
+            full_model_realizations = np.empty((0, n_bls, n_freqs))
+            gain_params_realizations = np.empty((0, n_freqs))
+            model_params_realizations = np.empty((0, n_bls, n_freqs))
+            true_sky_realizations = np.empty((0, n_bls, n_freqs))
+            full_noise_realizations = np.empty((0, n_bls, n_freqs))
+            full_error_realizations = np.empty((0, n_bls, n_freqs))
             cost_function_realizations = []
 
             sum_data_realizations     = np.zeros_like(initial_data_vis)
@@ -594,6 +595,9 @@ class DevTools:
                         if len(gains_real_guess) != caldata_obj.Nants:
                             raise ValueError(f"Gains guess length must be the same as Nants for this run")
                     vwa = variable_weights.VariableWeightsArray()
+                    print(f"\n\n***BEFORE WEIGHTING***"
+                          f"\n  data   {np.max(np.abs(caldata_obj.data_visibilities))}"
+                          f"\n  model  {np.max(np.abs(caldata_obj.model_visibilities))}")
                     vwa.set_algorithm_weights(
                         caldata_obj,
                         weighting_function=run_params['weighting_function'],
@@ -601,7 +605,11 @@ class DevTools:
                         sigma_t_0=run_params['sigma_t'],
                         sigma_m_0=run_params['sigma_m'],
                         threshold_length=caldata_obj.threshold_length
+                        
                     )
+                    print(f"\n\n***AFTER WEIGHTING***"
+                          f"\n  data   {np.max(np.abs(caldata_obj.data_visibilities))}"
+                          f"\n  model  {np.max(np.abs(caldata_obj.model_visibilities))}")
                     if calibration_type == "unical":
                         caldata_obj.unified_calibration(
                             verbose=verbose,
@@ -617,7 +625,14 @@ class DevTools:
                         )
                     else:
                         raise ValueError("Unknown calibration type -- possibilities are 'unical' and 'skycal'")
-                    
+
+                    # print(f"\n\n***BEFORE CONCATENATION***"
+                        #   f"\n  data   {np.max(np.abs(full_data_realizations))}"
+                        #   f"\n  model  {np.max(np.abs(full_model_realizations))}"
+                        #   f"\n\n  data concat shape  {full_data_realizations.shape}"
+                        #   f"\n  data array shape  {data.shape}"
+                        #   f"\n  model concat shape  {full_model_realizations.shape}"
+                        #   f"\n  model array shape  {model.shape}")
                     # store data
                     full_data_realizations = np.concatenate((full_data_realizations, data))
                     full_model_realizations = np.concatenate((full_model_realizations, model))
@@ -633,8 +648,11 @@ class DevTools:
                     ))
                     full_error_realizations = np.concatenate((
                         full_error_realizations,
-                        model_err_realizations[j]
+                        model_err_realizations[k]
                     ))
+                    print(f"\n\n***AFTER CONCATENATION***"
+                          f"\n  data   {np.max(np.abs(full_data_realizations))}"
+                          f"\n  model  {np.max(np.abs(full_model_realizations))}")
                     # full_m_err_long_realizations = np.concatenate((
                     #     full_m_err_long_realizations,
                     #     model_err_long_read_realizations[k]
@@ -647,8 +665,8 @@ class DevTools:
                     # get value of first cost function term g*gv-u
                     gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
                     residual_vector = data - gains_expanded * u_params
-                    cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
-                    cost_function_realizations.append(cost)
+                    final_cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
+                    cost_function_realizations.append(final_cost)
 
                     sum_data_realizations += data
                     sum_model_realizations += model
@@ -697,6 +715,9 @@ class DevTools:
             # with open(f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl') as file:
                 # print(f"data path {model_path}")
                 # print(f"file\n\t{file}")
+            print(f"\n\n***BEFORE HKL DUMP***"
+                  f"\n  data {np.max(np.abs(full_data_realizations))}"
+                  f"\n  model {np.max(np.abs(full_model_realizations))}")
             hkl.dump(output_arrays, f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl', compression='gzip')
 
             # uvd = copy.deepcopy(example_data)
@@ -738,6 +759,10 @@ class DevTools:
             # np.save(f"calico/data/{uvfits_writeout_filename}_g_{suffix}.npy", 
             #         sum_gains_realizations / counter)
 
+            print(f"\n\n***GIVEN SIGMAS***"
+                  f"\n  sigma_n   {run_params["sigma_t"]}"
+                  f"\n  sigma_e   {run_params["sigma_e"]}")
+
             if verbose:
                 print(f"***FINISHED RUN {run}***")
                 finish_time = (time.time() - start_many_real_time)/3600
@@ -773,7 +798,7 @@ class DevTools:
         
         for run, run_params in enumerate(run_params_list):
             with open(
-                f'{data_filepath}_many_reals_output_data_{run_params_filename}_{run}.hkl', 
+                f'{data_filepath}_many_reals_output_data_{run_params_filename}_{run}.hkl',
                 mode='rb',
             ) as file:
                 output_arrays = hkl.load(file)
@@ -891,6 +916,9 @@ class DevTools:
             # um_bins = np.arange(-um_boundary, um_boundary, um_step)
             # uvT_bins = np.arange(-uvT_boundary, uvT_boundary, uvT_step)
             # vT_bins = np.arange(-vT_boundary, vT_boundary, uvT_step)
+            print(f"\n\n***V BOUNDARY***\n  {v_boundary}\n\n")
+            print(f"\n\n***Thermal Noise***\n  {np.std(v_arr - vT_arr)}\n\n")
+            print(f"\n\n***Model Error***\n  {np.std(m_arr - vT_arr)}\n\n")
             v_bins = np.arange(-v_boundary, v_boundary, e_step)
             m_bins = np.arange(-m_boundary, m_boundary, e_step)
             n_bins = np.arange(-n_boundary, n_boundary, e_step)

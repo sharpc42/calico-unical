@@ -123,7 +123,6 @@ def plot_weights_per_baseline(caldata_obj, weight_array, scaling_factor, thresho
         )
 
 def simulate_visibilities(caldata_obj, 
-                          time_ind,
                           sigma_m=14,
                           sigma_vT=14,
                           seed=42,
@@ -133,7 +132,7 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_m,
                 size=(
-                    1,
+                    caldata_obj.Ntimes,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
@@ -143,21 +142,21 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_m,
                 size=(
-                    1,
+                    caldata_obj.Ntimes,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
                 ),
             )
-    caldata_obj.model_visibilities[time_ind, :, :, :] = real_throw + 1.0j*imag_throw
+    caldata_obj.model_visibilities[:, :, :, :] = real_throw + 1.0j*imag_throw
     if true_vis_equals_model:
         caldata_obj.data_visibilities = caldata_obj.model_visibilities.copy()
     else:
-        caldata_obj.data_visibilities[time_ind, :, :, :] = np.random.normal(
+        caldata_obj.data_visibilities[:, :, :, :] = np.random.normal(
                 0,
                 sigma_vT,
                 size=(
-                    1,
+                    caldata_obj.Ntimes,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
@@ -166,7 +165,7 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_vT,
                 size=(
-                    1,
+                    caldata_obj.Ntimes,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,

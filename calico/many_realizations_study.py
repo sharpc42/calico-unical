@@ -241,6 +241,10 @@ def init_many_realizations(
                 scaling_factor_cost=1,
                 threshold_length=0,
             )
+            print(f"\n\n***AFTER LOAD***\n  data {np.std(np.abs(caldata_obj.data_visibilities))}"
+            f"\n  model {np.std(np.abs(caldata_obj.model_visibilities))}\n\n")
+            print(f"\n\n***Nfreqs***\n  {caldata_obj.Nfreqs}\n\n")
+            print(f"\n\n***Ntimes***\n  {caldata_obj.Ntimes}\n\n")
             if verbose:
                 print(
                     f"Done. Data formatting time {(time.time() - data_format_start_time)/60.} minutes."

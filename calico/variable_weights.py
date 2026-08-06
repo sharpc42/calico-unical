@@ -76,6 +76,8 @@ class VariableWeightsArray:
     def set_algorithm_weights(
         self,
         caldata_obj,
+        freq_ind = 0,
+        pol_ind = 0,
         sigma_t_0 = 0.1,
         sigma_m_0 = 0.1,
         threshold_length = None,
@@ -199,7 +201,7 @@ class VariableWeightsArray:
             caldata_obj.threshold_mask = self.uv_norm_array < threshold_length
 
             # try:
-            getattr(self, self.weighting_function)(caldata_obj)
+            getattr(self, self.weighting_function)(caldata_obj, freq_ind, pol_ind)
             # except:
             #     print(sys.exc_info())
             #     print("Maybe you passed in a bad weighting function?")
@@ -212,26 +214,26 @@ class VariableWeightsArray:
         caldata_obj.visibility_weights /= caldata_obj.sigma_t_0**2
         caldata_obj.model_weights /= caldata_obj.sigma_m_0**2
 
-    def constant_weights(self, caldata_obj):
-        self.thermal_noise_weight_array[0,:,0,0] += 1
-        self.model_error_weight_array[0,:,0,0] += self.scaling_factor
+    def constant_weights(self, caldata_obj, freq_ind, pol_ind):
+        self.thermal_noise_weight_array[:,:,freq_ind,pol_ind] += 1
+        self.model_error_weight_array[:,:,freq_ind,pol_ind] += self.scaling_factor
 
-    def hard_cutoff_weights(self, caldata_obj):
-        self.thermal_noise_weight_array[0,:,0,0] += 1
-        self.model_error_weight_array[0,:,0,0] = np.heaviside(caldata_obj.uv_norm - self.threshold_length, 1)
+    def hard_cutoff_weights(self, caldata_obj, freq_ind, pol_ind):
+        self.thermal_noise_weight_array[:,:,freq_ind,pol_ind] += 1
+        self.model_error_weight_array[:,:,freq_ind,pol_ind] = np.heaviside(caldata_obj.uv_norm - self.threshold_length, 1)
     
-    def sigmoid_weights(self, caldata_obj):
-        self.thermal_noise_weight_array[0,:,0,0] += 1
-        self.model_error_weight_array[0,:,0,0] += 1 / (1 + np.exp(-caldata_obj.uv_norm + self.threshold_length))
+    def sigmoid_weights(self, caldata_obj, freq_ind, pol_ind):
+        self.thermal_noise_weight_array[:,:,freq_ind,pol_ind] += 1
+        self.model_error_weight_array[:,:,freq_ind,pol_ind] += 1 / (1 + np.exp(-caldata_obj.uv_norm + self.threshold_length))
 
-    def exponential_weights(self, caldata_obj):
+    def exponential_weights(self, caldata_obj, freq_ind, pol_ind):
         self.hard_cutoff_weights(caldata_obj)
         x = caldata_obj.uv_norm[caldata_obj.threshold_mask] - caldata_obj.threshold_length
-        self.model_error_weight_array[0,:,0,0][caldata_obj.threshold_mask] += np.exp(x)
+        self.model_error_weight_array[:,:,freq_ind,pol_ind][caldata_obj.threshold_mask] += np.exp(x)
 
-    def power_law_weights(self, caldata_obj):
-        self.thermal_noise_weight_array[0,:,0,0] += 1
-        self.model_error_weight_array[0,:,0,0] = np.heaviside(caldata_obj.uv_norm - caldata_obj.threshold_length, 1)
+    def power_law_weights(self, caldata_obj, freq_ind, pol_ind):
+        self.thermal_noise_weight_array[:,:,freq_ind,pol_ind] += 1
+        self.model_error_weight_array[:,:,freq_ind,pol_ind] = np.heaviside(caldata_obj.uv_norm - caldata_obj.threshold_length, 1)
         try:
             self.power = int(self.power)
         except:
@@ -240,27 +242,27 @@ class VariableWeightsArray:
             print("Defaulting to power=2")
             self.power = 2
         x = caldata_obj.uv_norm[caldata_obj.uv_norm < self.threshold_length] - self.threshold_length
-        self.model_error_weight_array[0,:,0,0][caldata_obj.threshold_mask] += (-1/x)**self.power
+        self.model_error_weight_array[:,:,freq_ind,pol_ind][caldata_obj.threshold_mask] += (-1/x)**self.power
 
-    def damped_sinusoid_weights(self, caldata_obj):
-        self.thermal_noise_weight_array[0,:,0,0] += 1
-        self.model_error_weight_array[0,:,0,0] = np.heaviside(caldata_obj.uv_norm - self.threshold_length, 1)
+    def damped_sinusoid_weights(self, caldata_obj, freq_ind, pol_ind):
+        self.thermal_noise_weight_array[:,:,freq_ind,pol_ind] += 1
+        self.model_error_weight_array[:,:,freq_ind,pol_ind] = np.heaviside(caldata_obj.uv_norm - self.threshold_length, 1)
         x = caldata_obj.uv_norm[caldata_obj.threshold_mask] - self.threshold_length
-        self.model_error_weight_array[0,:,0,0][caldata_obj.threshold_mask] += np.exp(x) * np.cos(x)**2
+        self.model_error_weight_array[:,:,freq_ind,pol_ind][caldata_obj.threshold_mask] += np.exp(x) * np.cos(x)**2
 
-    def step_down_weights(self, caldata_obj):
+    def step_down_weights(self, caldata_obj, freq_ind, pol_ind):
         self.hard_cutoff_weights(caldata_obj)
-        self.model_error_weight_array[0,:,0,0][caldata_obj.threshold_mask] += self.scaling_factor
+        self.model_error_weight_array[:,:,freq_ind,pol_ind][caldata_obj.threshold_mask] += self.scaling_factor
 
     # basic plot of weights per baseline
-    def plot_weights_per_baseline(self, caldata_obj, scaling_factor=None):
+    def plot_weights_per_baseline(self, caldata_obj, freq_ind, pol_ind, scaling_factor=None):
         if scaling_factor is None:
             scaling_factor=self.scaling_factor
         import dev_tools
         dev = dev_tools.DevTools()
         dev.plot_weights_per_baseline(
             caldata_obj.uv_norm,
-            caldata_obj.model_weights[0,:,0,0],
+            caldata_obj.model_weights[:,:,freq_ind,pol_ind],
             weighting_function=self.weighting_function,
             scaling_factor=self.scaling_factor,
             threshold_length=self.threshold_length,

@@ -424,6 +424,9 @@ class CalData:
         )
         if simulate_visibilities:
             print("Simulating visibilities (not reading from file)")
+            sim.simulate_visibilities(self)
+            print(f"\n\n***AFTER SIMULATION***\n  data {np.std(np.abs(self.data_visibilities))}"
+                  f"\n  model {np.std(np.abs(self.model_visibilities))}")
         else:
             print("We ain't simulating no visibilities (reading from file)")
         for time_ind, time_val in enumerate(np.unique(data.time_array)):
@@ -450,10 +453,8 @@ class CalData:
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
 
-            # use visibilities from file or simulate with Gaussian throw
-            if simulate_visibilities:
-                sim.simulate_visibilities(self, time_ind)
-            else:
+            # use visibilities from file if not simulating with Gaussian throw
+            if not simulate_visibilities:
                 self.model_visibilities[time_ind, :, :, :] = np.reshape(
                     model_copy.data_array,
                     (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
@@ -710,10 +711,10 @@ class CalData:
 
         self.lambda_val = lambda_val
 
-        # DEV: make copies of original data vis, fit vis, and gains
-        self.data_vis_orig = self.data_visibilities.copy() 
-        self.fit_vis_orig = self.fit_vis.copy()
-        self.gains_orig = self.gains.copy()
+        # # DEV: make copies of original data vis, fit vis, and gains
+        # self.data_vis_orig = self.data_visibilities.copy() 
+        # self.fit_vis_orig = self.fit_vis.copy()
+        # self.gains_orig = self.gains.copy()
 
         self.glim = glim
         self.ulim = ulim

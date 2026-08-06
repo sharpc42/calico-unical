@@ -820,14 +820,14 @@ class TestStringMethods(unittest.TestCase):
             "pytorch",
         ]
         for optimizer in optimizers:
-            try: 
-                caldata_obj.unified_calibration(
-                        verbose=True,
-                        optimization_scheme=optimizer,
-                    )
-                print(f"\nCalibration for {optimizer} SUCCEEDS")
-            except Exception as e:
-                print(f"\nCalibration for {optimizer} FAILS\n  {type(e).__name__}: {e}\n\n")
+            # try: 
+            caldata_obj.unified_calibration(
+                verbose=True,
+                optimization_scheme=optimizer,
+            )
+            print(f"\nCalibration for {optimizer} SUCCEEDS")
+            # except Exception as e:
+            #     print(f"\nCalibration for {optimizer} FAILS\n  {type(e).__name__}: {e}\n\n")
 
 if __name__ == "__main__":
     # unittest.main()]
