@@ -694,13 +694,13 @@ class DevTools:
                 print("\tuv array\t\t\t", uv_array.shape)
                 print("\tcost function realizations\t\t", len(cost_function_realizations))
             output_arrays = {
-                'v runs'    : full_data_realizations[:,0],
-                'm runs'    : full_model_realizations[:,0],
-                'g runs'    : gain_params_realizations[:,0],
-                'u runs'    : model_params_realizations[:,0],
-                'vT runs'   : true_sky_realizations[:,0],
-                'n runs'    : full_noise_realizations[:,0],
-                'e runs'    : full_error_realizations[:,0],
+                'v runs'    : full_data_realizations[...,0],
+                'm runs'    : full_model_realizations[...,0],
+                'g runs'    : gain_params_realizations[...,0],
+                'u runs'    : model_params_realizations[...,0],
+                'vT runs'   : true_sky_realizations[...,0],
+                'n runs'    : full_noise_realizations[...,0],
+                'e runs'    : full_error_realizations[...,0],
                 'uv array'  : uv_array,
                 'cost runs' : np.asarray(cost_function_realizations),
                 'sigma_e'   : run_params['sigma_e'],
