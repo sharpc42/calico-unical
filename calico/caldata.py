@@ -424,9 +424,7 @@ class CalData:
         )
         if simulate_visibilities:
             print("Simulating visibilities (not reading from file)")
-            sim.simulate_visibilities(self)
-            print(f"\n\n***AFTER SIMULATION***\n  data {np.std(np.abs(self.data_visibilities))}"
-                  f"\n  model {np.std(np.abs(self.model_visibilities))}")
+            # sim.simulate_visibilities(self)
         else:
             print("We ain't simulating no visibilities (reading from file)")
         for time_ind, time_val in enumerate(np.unique(data.time_array)):
@@ -463,6 +461,8 @@ class CalData:
                     data_copy.data_array,
                     (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
                 )
+            else:
+                sim.simulate_visibilities(self, seed=time_ind)
 
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(

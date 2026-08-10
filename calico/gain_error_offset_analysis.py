@@ -39,8 +39,8 @@ def main(calibrate            : bool = True,
                 raise ValueError("Need values passed for git and time IDs")
             guess_git_time_suffix = f"g{git_id}_t{time_id}"
         scaling_factors = [0.001, 1]  # skycal and truth
-        sigma_t_scales  = np.arange(0, 1, 0.1, dtype=float)
-        sigma_m_scales  = np.arange(-1, 1, 0.1, dtype=float)
+        sigma_t_scales  = np.arange(0, 1, 0.05, dtype=float)
+        sigma_m_scales  = np.arange(0, 1, 0.05, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -151,11 +151,15 @@ def main(calibrate            : bool = True,
                     print(f"Loading gains guess time - {time.time() - start_load_gains_guess_time:.3f} seconds")
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
-                    sav_data_filename            = 'tutorial_full_onetime_unflagged',
-                    sav_model_filename           = 'tutorial_full_onetime_unflagged',
+                    # sav_data_filename            = 'tutorial_full_onetime_unflagged',
+                    # sav_model_filename           = 'tutorial_full_onetime_unflagged',
+                    sav_data_filename            = 'tutorial_medium',
+                    sav_model_filename           = 'tutorial_medium',
                     run_params_filename          = f'{filename}_settings',
-                    vis_data_writeout_filename   = 'tutorial_full_onetime_unflagged',
-                    model_data_writeout_filename = 'tutorial_full_onetime_unflagged',
+                    # vis_data_writeout_filename   = 'tutorial_full_onetime_unflagged',
+                    # model_data_writeout_filename = 'tutorial_full_onetime_unflagged',
+                    vis_data_writeout_filename   = 'tutorial_medium',
+                    model_data_writeout_filename = 'tutorial_medium',
                     verbose                      = True,
                     simulate_visibilities        = True,
                     calibrate                    = True,

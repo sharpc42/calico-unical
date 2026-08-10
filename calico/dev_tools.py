@@ -558,11 +558,6 @@ class DevTools:
                 this_thermal_noise = thermal_noise_real + 1.0j*thermal_noise_imag
                 data_vis_realizations.append(initial_data_vis + this_thermal_noise)
                 noise_realizations.append(thermal_noise_real)
-                print(f"\n\n***AFTER BUILD***"
-                      f"\n  data   {np.max(np.abs(data_vis_realizations[-1]))}"
-                      f"\n  model  {np.max(np.abs(model_vis_realizations[-1]))}"
-                      f"\n  sigma_e {run_params['sigma_e']}\n  std(e) {np.std(this_model_error)}")
-
             n_times = caldata_obj.Ntimes
             n_bls = caldata_obj.Nbls
             n_ants = caldata_obj.Nants
@@ -595,9 +590,6 @@ class DevTools:
                         if len(gains_real_guess) != caldata_obj.Nants:
                             raise ValueError(f"Gains guess length must be the same as Nants for this run")
                     vwa = variable_weights.VariableWeightsArray()
-                    print(f"\n\n***BEFORE WEIGHTING***"
-                          f"\n  data   {np.max(np.abs(caldata_obj.data_visibilities))}"
-                          f"\n  model  {np.max(np.abs(caldata_obj.model_visibilities))}")
                     vwa.set_algorithm_weights(
                         caldata_obj,
                         weighting_function=run_params['weighting_function'],
@@ -607,9 +599,6 @@ class DevTools:
                         threshold_length=caldata_obj.threshold_length
                         
                     )
-                    print(f"\n\n***AFTER WEIGHTING***"
-                          f"\n  data   {np.max(np.abs(caldata_obj.data_visibilities))}"
-                          f"\n  model  {np.max(np.abs(caldata_obj.model_visibilities))}")
                     if calibration_type == "unical":
                         caldata_obj.unified_calibration(
                             verbose=verbose,
@@ -650,9 +639,6 @@ class DevTools:
                         full_error_realizations,
                         model_err_realizations[k]
                     ))
-                    print(f"\n\n***AFTER CONCATENATION***"
-                          f"\n  data   {np.max(np.abs(full_data_realizations))}"
-                          f"\n  model  {np.max(np.abs(full_model_realizations))}")
                     # full_m_err_long_realizations = np.concatenate((
                     #     full_m_err_long_realizations,
                     #     model_err_long_read_realizations[k]
@@ -665,6 +651,7 @@ class DevTools:
                     # get value of first cost function term g*gv-u
                     gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
                     residual_vector = data - gains_expanded * u_params
+                    residual_vector = np.expand_dims(residual_vector, axis=-1)
                     final_cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
                     cost_function_realizations.append(final_cost)
 
