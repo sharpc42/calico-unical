@@ -524,13 +524,13 @@ class DevTools:
                                                                                       threshold_length=threshold_length,
                                                                                       weighting_function=run_params['weighting_function'],
                                                                                       scaling_factor=run_params['scaling_factor_sim'],
-                                                                                      seed=i+1,)
+                                                                                      seed=i+100,)
                 if model_error_real is None:
                     if verbose: 
                         print("Did not simulate model error")
                     model_error_real = 0
                     model_error_imag = 0
-                this_model_error = model_error_real + 1.0j*model_error_imag 
+                this_model_error = model_error_real + 1.0j*model_error_imag
                 model_err_realizations.append(this_model_error)
                 # vT < m
                 if run_params['sigma_e'] < 0:
@@ -549,7 +549,7 @@ class DevTools:
                                                              n_times=caldata_obj.Ntimes,
                                                              n_bls=caldata_obj.Nbls,
                                                              n_freqs=n_freqs,
-                                                             seed=i+2,)
+                                                             seed=i+200,)
                 if thermal_noise_real is None:
                     if verbose: 
                         print("Did not simulate thermal noise")
@@ -561,13 +561,13 @@ class DevTools:
             n_times = caldata_obj.Ntimes
             n_bls = caldata_obj.Nbls
             n_ants = caldata_obj.Nants
-            full_data_realizations = np.empty((0, n_bls, n_freqs))
-            full_model_realizations = np.empty((0, n_bls, n_freqs))
+            full_data_realizations = np.empty((0, n_times * n_bls, n_freqs))
+            full_model_realizations = np.empty((0, n_times * n_bls, n_freqs))
             gain_params_realizations = np.empty((0, n_freqs))
-            model_params_realizations = np.empty((0, n_bls, n_freqs))
-            true_sky_realizations = np.empty((0, n_bls, n_freqs))
-            full_noise_realizations = np.empty((0, n_bls, n_freqs))
-            full_error_realizations = np.empty((0, n_bls, n_freqs))
+            model_params_realizations = np.empty((0, n_times * n_bls, n_freqs))
+            true_sky_realizations = np.empty((0, n_times * n_bls, n_freqs))
+            full_noise_realizations = np.empty((0, n_times * n_bls, n_freqs))
+            full_error_realizations = np.empty((0, n_times * n_bls, n_freqs))
             cost_function_realizations = []
 
             sum_data_realizations     = np.zeros_like(initial_data_vis)
@@ -649,11 +649,11 @@ class DevTools:
                     # ))
                     uv_array = caldata_obj.uv_array
                     # get value of first cost function term g*gv-u
-                    gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
-                    residual_vector = data - gains_expanded * u_params
-                    residual_vector = np.expand_dims(residual_vector, axis=-1)
-                    final_cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
-                    cost_function_realizations.append(final_cost)
+                    # gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
+                    # residual_vector = data - gains_expanded * u_params
+                    # residual_vector = np.expand_dims(residual_vector, axis=-1)
+                    # final_cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
+                    # cost_function_realizations.append(final_cost)
 
                     sum_data_realizations += data
                     sum_model_realizations += model
@@ -702,9 +702,6 @@ class DevTools:
             # with open(f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl') as file:
                 # print(f"data path {model_path}")
                 # print(f"file\n\t{file}")
-            print(f"\n\n***BEFORE HKL DUMP***"
-                  f"\n  data {np.max(np.abs(full_data_realizations))}"
-                  f"\n  model {np.max(np.abs(full_model_realizations))}")
             hkl.dump(output_arrays, f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl', compression='gzip')
 
             # uvd = copy.deepcopy(example_data)
@@ -745,10 +742,6 @@ class DevTools:
 
             # np.save(f"calico/data/{uvfits_writeout_filename}_g_{suffix}.npy", 
             #         sum_gains_realizations / counter)
-
-            print(f"\n\n***GIVEN SIGMAS***"
-                  f"\n  sigma_n   {run_params["sigma_t"]}"
-                  f"\n  sigma_e   {run_params["sigma_e"]}")
 
             if verbose:
                 print(f"***FINISHED RUN {run}***")
@@ -903,9 +896,6 @@ class DevTools:
             # um_bins = np.arange(-um_boundary, um_boundary, um_step)
             # uvT_bins = np.arange(-uvT_boundary, uvT_boundary, uvT_step)
             # vT_bins = np.arange(-vT_boundary, vT_boundary, uvT_step)
-            print(f"\n\n***V BOUNDARY***\n  {v_boundary}\n\n")
-            print(f"\n\n***Thermal Noise***\n  {np.std(v_arr - vT_arr)}\n\n")
-            print(f"\n\n***Model Error***\n  {np.std(m_arr - vT_arr)}\n\n")
             v_bins = np.arange(-v_boundary, v_boundary, e_step)
             m_bins = np.arange(-m_boundary, m_boundary, e_step)
             n_bins = np.arange(-n_boundary, n_boundary, e_step)

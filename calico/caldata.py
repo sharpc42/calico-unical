@@ -462,7 +462,7 @@ class CalData:
                     (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
                 )
             else:
-                sim.simulate_visibilities(self, seed=time_ind)
+                sim.simulate_visibilities(self, seed=42)
 
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(
@@ -1375,7 +1375,7 @@ class CalData:
                     self.fit_vis_real,
                     self.fit_vis_imag,
                 ),
-                axis=2,
+                axis=-1,
             ).flatten()
             params_flattened = np.hstack(
                 (
@@ -1555,6 +1555,9 @@ class CalData:
                         optimization_scheme     = optimization_scheme
                     )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
+                    print(f"\n\n***fit vis shapes (caldata)***"
+                          f"\n  fit_vis     {self.fit_vis[:,:,[freq_ind],:].shape}"
+                          f"\n  fit_vis_fit {fit_vis_fit[:,:,np.newaxis,:].shape}\n\n")
                     self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
 
                     #self.write_fit_vis()
