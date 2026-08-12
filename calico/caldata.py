@@ -462,7 +462,7 @@ class CalData:
                     (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
                 )
             else:
-                sim.simulate_visibilities(self, seed=42)
+                sim.simulate_visibilities(self, seed=150)
 
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(

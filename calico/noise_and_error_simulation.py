@@ -12,14 +12,14 @@ def simulate_thermal_noise(sigma_t_0,
         thermal_noise_real = np.random.normal(
             0.0,
             sigma_t_0,
-            # size=(n_times, n_bls, n_freqs),
-            size=(1, n_times * n_bls, n_freqs),
+            size=(n_times, n_bls, n_freqs),
+            # size=(1, n_times * n_bls, n_freqs),
         )
         thermal_noise_imag = np.random.normal(
             0.0,
             sigma_t_0,
-            # size=(n_times, n_bls, n_freqs),
-            size=(1, n_times * n_bls, n_freqs),
+            size=(n_times, n_bls, n_freqs),
+            # size=(1, n_times * n_bls, n_freqs),
         )
         return thermal_noise_real, thermal_noise_imag
     except:
@@ -94,14 +94,14 @@ def simulate_model_error(n_times,
         model_error_real = np.random.normal(
             0.0,
             sigma_e_0,
-            # size=(n_times, n_bls, n_freqs),
-            size=(1, n_times * n_bls, n_freqs),
+            size=(n_times, n_bls, n_freqs),
+            # size=(1, n_times * n_bls, n_freqs),
         )
         model_error_imag = np.random.normal(
             0.0,
             sigma_e_0,
-            # size=(n_times, n_bls, n_freqs),
-            size=(1, n_times * n_bls, n_freqs),
+            size=(n_times, n_bls, n_freqs),
+            # size=(1, n_times * n_bls, n_freqs),
         )
         return model_error_real, model_error_imag, None, None
     else:
@@ -136,10 +136,10 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_m,
                 size=(
-                    1,
-                    # caldata_obj.Ntimes,
-                    caldata_obj.Nbls * caldata_obj.Ntimes,
-                    # caldata_obj.Nbls,
+                    # 1,
+                    caldata_obj.Ntimes,
+                    # caldata_obj.Nbls * caldata_obj.Ntimes,
+                    caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
                 ),
@@ -148,10 +148,10 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_m,
                 size=(
-                    1,
-                    # caldata_obj.Ntimes,
-                    # caldata_obj.Nbls,
-                    caldata_obj.Ntimes * caldata_obj.Nbls,
+                    # 1,
+                    caldata_obj.Ntimes,
+                    caldata_obj.Nbls,
+                    # caldata_obj.Ntimes * caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
                 ),

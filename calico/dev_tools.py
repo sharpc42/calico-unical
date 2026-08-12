@@ -561,13 +561,13 @@ class DevTools:
             n_times = caldata_obj.Ntimes
             n_bls = caldata_obj.Nbls
             n_ants = caldata_obj.Nants
-            full_data_realizations = np.empty((0, n_times * n_bls, n_freqs))
-            full_model_realizations = np.empty((0, n_times * n_bls, n_freqs))
+            full_data_realizations = np.empty((0, n_bls, n_freqs))
+            full_model_realizations = np.empty((0, n_bls, n_freqs))
             gain_params_realizations = np.empty((0, n_freqs))
-            model_params_realizations = np.empty((0, n_times * n_bls, n_freqs))
-            true_sky_realizations = np.empty((0, n_times * n_bls, n_freqs))
-            full_noise_realizations = np.empty((0, n_times * n_bls, n_freqs))
-            full_error_realizations = np.empty((0, n_times * n_bls, n_freqs))
+            model_params_realizations = np.empty((0, n_bls, n_freqs))
+            true_sky_realizations = np.empty((0, n_bls, n_freqs))
+            full_noise_realizations = np.empty((0, n_bls, n_freqs))
+            full_error_realizations = np.empty((0, n_bls, n_freqs))
             cost_function_realizations = []
 
             sum_data_realizations     = np.zeros_like(initial_data_vis)
@@ -649,11 +649,11 @@ class DevTools:
                     # ))
                     uv_array = caldata_obj.uv_array
                     # get value of first cost function term g*gv-u
-                    # gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
-                    # residual_vector = data - gains_expanded * u_params
-                    # residual_vector = np.expand_dims(residual_vector, axis=-1)
-                    # final_cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
-                    # cost_function_realizations.append(final_cost)
+                    gains_expanded = (gains[caldata_obj.ant1_inds] * np.conj(gains[caldata_obj.ant2_inds]))[np.newaxis, :]
+                    residual_vector = data - gains_expanded * u_params
+                    residual_vector = np.expand_dims(residual_vector, axis=-1)
+                    final_cost = np.sum(caldata_obj.visibility_weights[:,:,n_freqs-1,vis_pol_ind] * np.abs(residual_vector) ** 2)
+                    cost_function_realizations.append(final_cost)
 
                     sum_data_realizations += data
                     sum_model_realizations += model

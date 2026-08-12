@@ -151,15 +151,15 @@ def main(calibrate            : bool = True,
                     print(f"Loading gains guess time - {time.time() - start_load_gains_guess_time:.3f} seconds")
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
-                    # sav_data_filename            = 'tutorial_full_onetime_unflagged',
-                    # sav_model_filename           = 'tutorial_full_onetime_unflagged',
-                    sav_data_filename            = 'tutorial_medium',
-                    sav_model_filename           = 'tutorial_medium',
+                    sav_data_filename            = 'tutorial_full_onetime_unflagged',
+                    sav_model_filename           = 'tutorial_full_onetime_unflagged',
+                    # sav_data_filename            = 'tutorial_medium',
+                    # sav_model_filename           = 'tutorial_medium',
                     run_params_filename          = f'{filename}_settings',
-                    # vis_data_writeout_filename   = 'tutorial_full_onetime_unflagged',
-                    # model_data_writeout_filename = 'tutorial_full_onetime_unflagged',
-                    vis_data_writeout_filename   = 'tutorial_medium',
-                    model_data_writeout_filename = 'tutorial_medium',
+                    vis_data_writeout_filename   = 'tutorial_full_onetime_unflagged',
+                    model_data_writeout_filename = 'tutorial_full_onetime_unflagged',
+                    # vis_data_writeout_filename   = 'tutorial_medium',
+                    # model_data_writeout_filename = 'tutorial_medium',
                     verbose                      = True,
                     simulate_visibilities        = True,
                     calibrate                    = True,
@@ -597,16 +597,18 @@ def main(calibrate            : bool = True,
         # plot_xlabel_2 = "$\\sigma Re(m)$",
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel = "$\\sigma_t (Re)$",
-        plot_vmax     = min([
-                            np.abs(max(real_g_minus_1_truth_gaussian)),
-                            np.abs(min(real_g_minus_1_truth_gaussian))
-                        ]),
-        plot_vmin     = -min([
-                            np.abs(max(real_g_minus_1_truth_gaussian)),
-                            np.abs(min(real_g_minus_1_truth_gaussian))
-                        ]),
+        # plot_vmax     = min([
+        #                     np.abs(max(real_g_minus_1_truth_gaussian)),
+        #                     np.abs(min(real_g_minus_1_truth_gaussian))
+        #                 ]),
+        # plot_vmin     = -min([
+        #                     np.abs(max(real_g_minus_1_truth_gaussian)),
+        #                     np.abs(min(real_g_minus_1_truth_gaussian))
+        #                 ]),
         # plot_vmin = -0.004,
         # plot_vmax = 0.004,
+        plot_vmin=-0.1,
+        plot_vmax=0.1,
         plot_xlim_h = max(sigma_m_scales),
         plot_xlim_l = min(sigma_m_scales),
         plot_ylim_h = max(sigma_t_scales),
@@ -634,16 +636,18 @@ def main(calibrate            : bool = True,
         # plot_xlabel_2 = "$\\sigma Re(m)$",
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel   = "$\\sigma_t (Re)$",
-        plot_vmax     = min([
-                            np.abs(max(real_g_minus_1_skycal_gaussian)),
-                            np.abs(min(real_g_minus_1_skycal_gaussian))
-                        ]),
-        plot_vmin     = -min([
-                            np.abs(max(real_g_minus_1_skycal_gaussian)),
-                            np.abs(min(real_g_minus_1_skycal_gaussian))
-                        ]),
+        # plot_vmax     = min([
+        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
+        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
+        #                 ]),
+        # plot_vmin     = -min([
+        #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
+        #                     np.abs(min(real_g_minus_1_skycal_gaussian))
+        #                 ]),
         # plot_vmax=0.004,
         # plot_vmin=-0.004,
+        plot_vmax=0.001,
+        plot_vmin=-0.001,
         plot_xlim_h   = max(sigma_m_scales),
         plot_xlim_l   = min(sigma_m_scales),
         plot_ylim_h   = max(sigma_t_scales),
