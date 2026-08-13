@@ -128,6 +128,9 @@ class CalData:
         self.dwcal_memory_save_mode = None
         self.ant1_inds = None
         self.ant2_inds = None
+        self.ant1_inds_flat = None
+        self.ant2_inds_flat = None
+        self.flatten_blts = False
         self.bl_inds = None
         self.gains_multiply_model = None
         self.antenna_names = None
@@ -233,6 +236,7 @@ class CalData:
         sigma_m_0=0.1,
         threshold_length=0,
         simulate_visibilities=False,
+        flatten_blts=False,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -532,6 +536,11 @@ class CalData:
             self.ant2_inds[baseline] = np.where(
                 self.antenna_numbers == metadata_reference.ant_2_array[baseline]
             )[0]
+
+        self.flatten_blts = flatten_blts
+        if flatten_blts:
+            self.ant1_inds_flat = np.tile(self.ant1_inds, self.Ntimes)
+            self.ant2_inds_flat = np.tile(self.ant2_inds, self.Ntimes)
 
         # Get ordered list of antenna names
         # self.antenna_names = np.array(
@@ -1398,22 +1407,25 @@ class CalData:
         vis_pol_ind : int
             Visibility polarization index.
         """
+        reshaped_shape = (
+            (1, self.Ntimes * self.Nbls) if self.flatten_blts else (self.Ntimes, self.Nbls)
+        )
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
-            (self.Ntimes, self.Nbls),
+            reshaped_shape,
         )
         self.model_vis_reshaped = np.reshape(
             self.model_visibilities[:, :, freq_ind, vis_pol_ind],
-            (self.Ntimes, self.Nbls),
+            reshaped_shape,
         )
         self.vis_weights_reshaped = np.reshape(
             self.visibility_weights[:, :, freq_ind, vis_pol_ind],
-            (self.Ntimes, self.Nbls),
+            reshaped_shape,
         )
         if unical:
             self.model_weights_reshaped = np.reshape(
                 self.model_weights[:, :, freq_ind, vis_pol_ind],
-                (self.Ntimes, self.Nbls),
+                reshaped_shape,
             )
     
     def set_ant_inds(self, freq_ind, feed_pol_ind):

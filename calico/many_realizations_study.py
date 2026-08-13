@@ -184,6 +184,7 @@ def init_many_realizations(
     threshold_length=None,
     force_fit_to_true_vis=False,
     gains_real_guess=None,
+    flatten_blts=False,
 ):
     dev = dev_tools.DevTools()
     if prepare_data_files(
@@ -240,6 +241,7 @@ def init_many_realizations(
                 sigma_m_0=1,
                 scaling_factor_cost=1,
                 threshold_length=0,
+                flatten_blts=flatten_blts,
             )
             print(f"\n\n***AFTER LOAD***\n  data {np.std(np.abs(caldata_obj.data_visibilities))}"
             f"\n  model {np.std(np.abs(caldata_obj.model_visibilities))}\n\n")

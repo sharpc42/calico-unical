@@ -26,10 +26,17 @@ def main(calibrate            : bool = True,
          gains_multiply_model : bool = False,
          test_torch           : bool = False,
          give_gains_guess     : bool = False,
+         flatten_blts         : bool = False,
+         data_name            : str  = "tutorial_full_onetime_unflagged",
 ) -> None:
     data_path   = 'calico/data'
     image_path  = 'calico/images'
     file_suffix = ""
+    # Input dataset used only for metadata / visibility-array structure (the
+    # visibilities themselves are Gaussian throws when simulate_visibilities=True).
+    # "tutorial_medium" is the multi-time file; use it with --flatten to collapse
+    # the (Ntimes, Nbls) plane into a single Ntimes*Nbls axis in the optimizer.
+    print(f"Using dataset '{data_name}' (flatten_blts={flatten_blts})")
 
     top_start_time = time.time()
 
@@ -151,15 +158,11 @@ def main(calibrate            : bool = True,
                     print(f"Loading gains guess time - {time.time() - start_load_gains_guess_time:.3f} seconds")
                 __import__('many_realizations_study').init_many_realizations(
                     fhd_prefix                   = '1061316296_',
-                    sav_data_filename            = 'tutorial_full_onetime_unflagged',
-                    sav_model_filename           = 'tutorial_full_onetime_unflagged',
-                    # sav_data_filename            = 'tutorial_medium',
-                    # sav_model_filename           = 'tutorial_medium',
+                    sav_data_filename            = data_name,
+                    sav_model_filename           = data_name,
                     run_params_filename          = f'{filename}_settings',
-                    vis_data_writeout_filename   = 'tutorial_full_onetime_unflagged',
-                    model_data_writeout_filename = 'tutorial_full_onetime_unflagged',
-                    # vis_data_writeout_filename   = 'tutorial_medium',
-                    # model_data_writeout_filename = 'tutorial_medium',
+                    vis_data_writeout_filename   = data_name,
+                    model_data_writeout_filename = data_name,
                     verbose                      = True,
                     simulate_visibilities        = True,
                     calibrate                    = True,
@@ -173,6 +176,7 @@ def main(calibrate            : bool = True,
                     threshold_length             = 0,
                     force_fit_to_true_vis        = test_torch,
                     gains_real_guess             = gains_real_guess,
+                    flatten_blts                  = flatten_blts,
                 )
                 if verbose:
                     print("Finished realizations.")
@@ -1027,11 +1031,19 @@ if __name__ == "__main__":
         "--guess", action="store_true",
         help="give initial guess for the gains"
     )
+    parser.add_argument(
+        "--flatten", action="store_true",
+        help="flatten the (Ntimes, Nbls) plane into a single Ntimes*Nbls axis for the fit visibilities/optimizer"
+    )
+    parser.add_argument(
+        "--data", type=str, default="tutorial_full_onetime_unflagged",
+        help="input dataset name in calico/data (structure/metadata only); e.g. 'tutorial_medium' for multi-time"
+    )
     args = parser.parse_args()
 
     main(
-        calibrate=args.c, 
-        verbose=args.v, 
+        calibrate=args.c,
+        verbose=args.v,
         show_plot=args.s,
         time_id=args.time,
         git_id=args.git,
@@ -1040,4 +1052,6 @@ if __name__ == "__main__":
         gains_multiply_model=args.gmm,
         test_torch=args.test,
         give_gains_guess=args.guess,
+        flatten_blts=args.flatten,
+        data_name=args.data,
     )
