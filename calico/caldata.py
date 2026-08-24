@@ -426,11 +426,6 @@ class CalData:
         flag_array = np.zeros(
             (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=bool
         )
-        if simulate_visibilities:
-            print("Simulating visibilities (not reading from file)")
-            # sim.simulate_visibilities(self)
-        else:
-            print("We ain't simulating no visibilities (reading from file)")
         for time_ind, time_val in enumerate(np.unique(data.time_array)):
             data_copy = data.select(times=time_val, inplace=False)
             model_times = list(set(model.time_array))
@@ -455,18 +450,14 @@ class CalData:
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
 
-            # use visibilities from file if not simulating with Gaussian throw
-            if not simulate_visibilities:
-                self.model_visibilities[time_ind, :, :, :] = np.reshape(
-                    model_copy.data_array,
-                    (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-                )
-                self.data_visibilities[time_ind, :, :, :] = np.reshape(
-                    data_copy.data_array,
-                    (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
-                )
-            else:
-                sim.simulate_visibilities(self, seed=150)
+            self.model_visibilities[time_ind, :, :, :] = np.reshape(
+                model_copy.data_array,
+                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+            )
+            self.data_visibilities[time_ind, :, :, :] = np.reshape(
+                data_copy.data_array,
+                (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
+            )
 
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(

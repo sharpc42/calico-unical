@@ -439,6 +439,7 @@ class DevTools:
         xtol                         : float  = 1e-5,
         maxiter                      : int    = 200,
         force_fit_to_true_vis        : bool   = False,
+        simulate_visibilities        : bool   = False,
         gains_real_guess                      = None,
     ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
@@ -462,7 +463,12 @@ class DevTools:
         if verbose:
             print("settings path", run_params_path)
         run_params_list = hkl.load(f'{run_params_path}.hkl')
-
+        if simulate_visibilities:
+            # for t in range(caldata_obj.Ntimes):
+            sim.simulate_visibilities(
+                caldata_obj=caldata_obj, 
+                seed=84,
+            )
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind])
         original_model_vis = copy.deepcopy(caldata_obj.model_visibilities[:,:,:n_freqs,vis_pol_ind])

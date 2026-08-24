@@ -236,7 +236,7 @@ def init_many_realizations(
                 glim=None,
                 ulim=None,
                 weighting_function="constant_weights",
-                simulate_visibilities=simulate_visibilities,
+                simulate_visibilities=False,
                 sigma_t_0=1,
                 sigma_m_0=1,
                 scaling_factor_cost=1,
@@ -317,6 +317,7 @@ def init_many_realizations(
                 xtol=xtol,
                 maxiter=maxiter,
                 force_fit_to_true_vis=force_fit_to_true_vis,
+                simulate_visibilities=simulate_visibilities,
                 gains_real_guess=gains_real_guess,
             )
         dev.plot_many_realizations(data_filepath=model_path,
