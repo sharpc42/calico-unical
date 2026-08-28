@@ -385,7 +385,7 @@ class DevTools:
                 model_realizations=run_params["model_realizations"],
                 scaling_factor_sim=run_params["scaling_factor_sim"],
                 scaling_factor_cost=run_params["scaling_factor_cost"],
-                simulate_visibilties=simulate_visibilities,
+                simulate_visibilities=simulate_visibilities,
             )
             total_time = (time.perf_counter() - calibration_start_time) / 60
             g_runs.append(g)
@@ -464,10 +464,10 @@ class DevTools:
             print("settings path", run_params_path)
         run_params_list = hkl.load(f'{run_params_path}.hkl')
         if simulate_visibilities:
-            # for t in range(caldata_obj.Ntimes):
             sim.simulate_visibilities(
                 caldata_obj=caldata_obj, 
-                seed=84,
+                seed=42,
+                same_sky_all_times=False,
             )
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind])

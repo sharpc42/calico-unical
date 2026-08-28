@@ -235,7 +235,6 @@ class CalData:
         sigma_t_0=0.1,
         sigma_m_0=0.1,
         threshold_length=0,
-        simulate_visibilities=False,
         flatten_blts=False,
     ):
         """
