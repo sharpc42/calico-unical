@@ -42,10 +42,10 @@ def simulate_model_error(n_times,
         if verbose:
             print("***STEP DOWN WEIGHTS IN SIMULATION***")
         # try:
-        model_error_real_hi = np.zeros(n_times, n_bls)
-        model_error_imag_hi = np.zeros(n_times, n_bls)
-        model_error_real_lo = np.zeros(n_times, n_bls)
-        model_error_imag_lo = np.zeros(n_times, n_bls)
+        model_error_real_hi = np.zeros((n_times, n_bls))
+        model_error_imag_hi = np.zeros((n_times, n_bls))
+        model_error_real_lo = np.zeros((n_times, n_bls))
+        model_error_imag_lo = np.zeros((n_times, n_bls))
 
         threshold_mask = uv_norm_array < threshold_length
 
@@ -130,15 +130,16 @@ def simulate_visibilities(caldata_obj,
                           sigma_m=14,
                           sigma_vT=14,
                           seed=42,
+                          same_sky_all_times=False,
                           true_vis_equals_model=True):
+    print(f"\n\n***same sky all times? {same_sky_all_times}***\n\n")
+    num_times = 1 if same_sky_all_times else caldata_obj.Ntimes
     np.random.seed(seed)
     real_throw = np.random.normal(
                 0,
                 sigma_m,
                 size=(
-                    # 1,
-                    caldata_obj.Ntimes,
-                    # caldata_obj.Nbls * caldata_obj.Ntimes,
+                    num_times,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
@@ -148,15 +149,26 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_m,
                 size=(
-                    # 1,
-                    caldata_obj.Ntimes,
+                    num_times,
                     caldata_obj.Nbls,
-                    # caldata_obj.Ntimes * caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
                 ),
             )
-    caldata_obj.model_visibilities = real_throw + 1.0j*imag_throw
+    model_vis_throw = real_throw + 1.0j*imag_throw
+    if same_sky_all_times:
+        model_vis_throw = np.broadcast_to(
+            model_vis_throw,
+            (
+                caldata_obj.Ntimes,
+                caldata_obj.Nbls,
+                caldata_obj.Nfreqs,
+                caldata_obj.N_vis_pols,
+            ),
+        ).copy()
+    caldata_obj.model_visibilities = model_vis_throw
+    print(f"\n\n***Are they all the same across times?"
+          f"\n  <Std(|v|)_times>_bls {np.mean(np.std(np.abs(caldata_obj.model_visibilities), axis=0))}\n\n")
     if true_vis_equals_model:
         caldata_obj.data_visibilities = caldata_obj.model_visibilities.copy()
     else:
@@ -164,7 +176,7 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_vT,
                 size=(
-                    caldata_obj.Ntimes,
+                    num_times,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
@@ -173,7 +185,7 @@ def simulate_visibilities(caldata_obj,
                 0,
                 sigma_vT,
                 size=(
-                    caldata_obj.Ntimes,
+                    num_times,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                     caldata_obj.N_vis_pols,
