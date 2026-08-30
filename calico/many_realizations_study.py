@@ -236,7 +236,6 @@ def init_many_realizations(
                 glim=None,
                 ulim=None,
                 weighting_function="constant_weights",
-                simulate_visibilities=False,
                 sigma_t_0=1,
                 sigma_m_0=1,
                 scaling_factor_cost=1,
