@@ -727,11 +727,6 @@ def cost_unical_wrapper(
     gains[ant_inds] = gains_reshaped
     if dev_type == "test gains rolled":
         return gains_reshaped
-    # reshape u params. When flatten_blts the time-baseline plane is a single axis
-    # of length Ntimes*Nbls (fit vis viewed as (1, Ntimes*Nbls)); otherwise it is
-    # (Ntimes, Nbls). The underlying float vector is identical either way -- only
-    # the view and the antenna-index maps differ. ant{1,2}_inds_use is chosen to
-    # match the visibility axis so the gains expand correctly.
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
     if caldata_obj.flatten_blts:
         fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
@@ -826,18 +821,17 @@ def jacobian_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*n_ants_unflagged], (n_ants_unflagged, 2))
+    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
-    # reshape u params (flatten_blts -> (1, Ntimes*Nbls), else (Ntimes, Nbls)).
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
     if caldata_obj.flatten_blts:
-        fit_vis_flat = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
-        fit_vis_reshaped = (fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1])[np.newaxis, :]
+        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
+        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[np.newaxis, :]
     else:
-        fit_vis_flat = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
-        fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
+        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
+        fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     jac = cost_function_calculations.jacobian_unical(
         gains,
         fit_vis_reshaped,
@@ -858,10 +852,10 @@ def jacobian_unical_wrapper(
     ).flatten()
     jac_fits = np.stack(
         (
-            # jac[bl_inds].real,
-            # jac[bl_inds].imag,
-            jac[caldata_obj.Ntimes * bl_inds].real,
-            jac[caldata_obj.Ntimes * bl_inds].imag,
+            jac[bl_inds].real,
+            jac[bl_inds].imag,
+            # jac[caldata_obj.Ntimes * bl_inds].real,
+            # jac[caldata_obj.Ntimes * bl_inds].imag,
         ),
         axis=1,
     ).flatten()
@@ -913,18 +907,17 @@ def hessian_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*n_ants_unflagged], (n_ants_unflagged, 2))
+    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
-    # reshape u params (flatten_blts -> (1, Ntimes*Nbls), else (Ntimes, Nbls)).
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
     if caldata_obj.flatten_blts:
-        fit_vis_flat = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
-        fit_vis_reshaped = (fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1])[np.newaxis, :]
+        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
+        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[np.newaxis, :]
     else:
-        fit_vis_flat = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
-        fit_vis_reshaped = fit_vis_flat[:,0] + 1.0j * fit_vis_flat[:,1]
+        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
+        fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     (
         gain_hess_real_real,
         gain_hess_real_imag,
