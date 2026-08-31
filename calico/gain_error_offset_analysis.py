@@ -16,19 +16,24 @@ from datetime import datetime
     in calibration to find gain offset from Re(g)=1
     and sigma(u) - sigma(v_T)
 """
-def main(calibrate            : bool = True, 
-         verbose              : bool = False,
-         show_plot            : bool = False,
-         git_id               : str  = "",
-         time_id              : str  = "",
-         optim_type           : str  = "powell",
-         cal_type             : str  = "unical",
-         gains_multiply_model : bool = False,
-         test_torch           : bool = False,
-         give_gains_guess     : bool = False,
-         flatten_blts         : bool = False,
-         data_name            : str  = "tutorial_full_onetime_unflagged",
+def main(calibrate             : bool = True, 
+         verbose               : bool = False,
+         show_plot             : bool = False,
+         git_id                : str  = "",
+         time_id               : str  = "",
+         optim_type            : str  = "powell",
+         cal_type              : str  = "unical",
+         gains_multiply_model  : bool = False,
+         test_torch            : bool = False,
+         give_gains_guess      : bool = False,
+         flatten_blts          : bool = False,
+         data_name             : str  = "tutorial_full_onetime_unflagged",
+         simulate_visibilities : bool = False,
+         same_sky_all_times    : bool = False, 
 ) -> None:
+    if same_sky_all_times and not simulate_visibilities:
+        raise ValueError(f"simulate_visibilities set to {simulate_visibilities}"
+                         f"- value of true is needed to do same sky at all times")
     data_path   = 'calico/data'
     image_path  = 'calico/images'
     file_suffix = ""
@@ -47,7 +52,7 @@ def main(calibrate            : bool = True,
             guess_git_time_suffix = f"g{git_id}_t{time_id}"
         scaling_factors = [0.001, 1]  # skycal and truth
         sigma_t_scales  = np.arange(0, 10, 0.5, dtype=float)
-        sigma_m_scales  = np.arange(0, 10, 0.5, dtype=float)
+        sigma_m_scales  = np.arange(-10, 10, 0.5, dtype=float)
         model_error_realizations = 1
         thermal_noise_realizations = 1
         scaling_factor_sim = 1
@@ -164,7 +169,8 @@ def main(calibrate            : bool = True,
                     vis_data_writeout_filename   = data_name,
                     model_data_writeout_filename = data_name,
                     verbose                      = True,
-                    simulate_visibilities        = True,
+                    simulate_visibilities        = simulate_visibilities,
+                    same_sky_all_times           = same_sky_all_times,
                     calibrate                    = True,
                     reconstruct_data             = False,
                     reconstruct_model            = False,
@@ -193,7 +199,7 @@ def main(calibrate            : bool = True,
                                    
                 if verbose:
                     print("Cleaning up calculated saved files")
-                os.system(f"rm {data_path}/output_calcs_{suffix}.hkl")
+                os.module(f"rm {data_path}/output_calcs_{suffix}.hkl")
 
         if verbose:
             print("Calibration tests done.")
@@ -1039,6 +1045,14 @@ if __name__ == "__main__":
         "--data", type=str, default="tutorial_full_onetime_unflagged",
         help="input dataset name in calico/data (structure/metadata only); e.g. 'tutorial_medium' for multi-time"
     )
+    parser.add_argument(
+        "--simulate", action="store_true",
+        help="simulate visibilities instead of taking them from a uvfits file"
+    )
+    parser.add_argument(
+        "--samesky", action="store_true",
+        help="simulate the same sky for all time steps (error if simulate not passed)"
+    )
     args = parser.parse_args()
 
     main(
@@ -1054,4 +1068,6 @@ if __name__ == "__main__":
         give_gains_guess=args.guess,
         flatten_blts=args.flatten,
         data_name=args.data,
+        simulate_visibilities=args.simulate,
+        same_sky_all_times=args.samesky,
     )
