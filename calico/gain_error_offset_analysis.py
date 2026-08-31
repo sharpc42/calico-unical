@@ -199,7 +199,7 @@ def main(calibrate             : bool = True,
                                    
                 if verbose:
                     print("Cleaning up calculated saved files")
-                os.module(f"rm {data_path}/output_calcs_{suffix}.hkl")
+                os.system(f"rm {data_path}/output_calcs_{suffix}.hkl")
 
         if verbose:
             print("Calibration tests done.")
