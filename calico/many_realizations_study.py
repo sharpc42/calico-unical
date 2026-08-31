@@ -173,6 +173,7 @@ def init_many_realizations(
     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',   # uvfits filename (using FHD)
     verbose=True,
     simulate_visibilities=False,
+    same_sky_all_times=False,
     calibrate=True,
     reconstruct_data=False,
     reconstruct_model=False,
@@ -317,6 +318,7 @@ def init_many_realizations(
                 maxiter=maxiter,
                 force_fit_to_true_vis=force_fit_to_true_vis,
                 simulate_visibilities=simulate_visibilities,
+                same_sky_all_times=same_sky_all_times,
                 gains_real_guess=gains_real_guess,
             )
         dev.plot_many_realizations(data_filepath=model_path,

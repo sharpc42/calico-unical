@@ -215,7 +215,7 @@ class DevTools:
             ax.set_xlim(xlims[0],xlims[1])
         if ylims is not None:
             ax.set_ylim(ylims[0],ylims[1])
-        fig.savefig('images/' + filename_prefix
+        fig.savefig('calico/images/' + filename_prefix
                  + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
                  + '.png',
                  bbox_inches=0,)
@@ -440,6 +440,7 @@ class DevTools:
         maxiter                      : int    = 200,
         force_fit_to_true_vis        : bool   = False,
         simulate_visibilities        : bool   = False,
+        same_sky_all_times           : bool   = False,
         gains_real_guess                      = None,
     ) -> None:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
@@ -467,7 +468,7 @@ class DevTools:
             sim.simulate_visibilities(
                 caldata_obj=caldata_obj, 
                 seed=42,
-                same_sky_all_times=False,
+                same_sky_all_times=same_sky_all_times,
             )
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind])
