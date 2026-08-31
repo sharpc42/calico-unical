@@ -27,7 +27,8 @@ def simulate_thermal_noise(sigma_t_0,
         if verbose:
             print("Initial thermal noise failed. Was sigma_t set correctly?")
 
-def simulate_model_error(n_times,
+def simulate_model_error(caldata_obj,
+                         n_times,
                          n_bls,
                          sigma_e_0,
                          uv_norm_array, 
@@ -95,15 +96,23 @@ def simulate_model_error(n_times,
             0.0,
             sigma_e_0,
             size=(n_times, n_bls, n_freqs),
-            # size=(1, n_times * n_bls, n_freqs),
         )
         model_error_imag = np.random.normal(
             0.0,
             sigma_e_0,
             size=(n_times, n_bls, n_freqs),
-            # size=(1, n_times * n_bls, n_freqs),
         )
-        return model_error_real, model_error_imag, None, None
+        model_error_throw = model_error_real + 1.0j*model_error_imag
+        if n_times == 1:
+            model_error_throw = np.broadcast_to(
+                model_error_throw,
+                (
+                    caldata_obj.Ntimes,
+                    caldata_obj.Nbls,
+                    caldata_obj.Nfreqs,
+                ),
+            ).copy()
+        return model_error_throw
     else:
         print("Can't do model simulation - sigma_e_0 is not set")
 
