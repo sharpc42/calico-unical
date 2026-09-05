@@ -1,4 +1,6 @@
+import dev_tools as dev
 import numpy as np
+import matplotlib.pyplot as plt
 import sys
 
 def simulate_thermal_noise(sigma_t_0,
@@ -123,9 +125,7 @@ def format_sim_weights_per_baseline(caldata_obj, scaling_factor, threshold_lengt
 
 def plot_weights_per_baseline(caldata_obj, weight_array, scaling_factor, threshold_length=50):
     if scaling_factor != 1:
-        import dev_tools
-        dev = dev_tools.DevTools()
-        dev.plot_weights_per_baseline(
+        dev.DevTools().plot_weights_per_baseline(
             caldata_obj.uv_norm,
             weight_array,
             weighting_function="Step Down",
@@ -141,7 +141,6 @@ def simulate_visibilities(caldata_obj,
                           seed=42,
                           same_sky_all_times=False,
                           true_vis_equals_model=True):
-    print(f"\n\n***same sky all times? {same_sky_all_times}***\n\n")
     num_times = 1 if same_sky_all_times else caldata_obj.Ntimes
     np.random.seed(seed)
     real_throw = np.random.normal(
@@ -176,8 +175,6 @@ def simulate_visibilities(caldata_obj,
             ),
         ).copy()
     caldata_obj.model_visibilities = model_vis_throw
-    print(f"\n\n***Are they all the same across times?"
-          f"\n  <Std(|v|)_times>_bls {np.mean(np.std(np.abs(caldata_obj.model_visibilities), axis=0))}\n\n")
     if true_vis_equals_model:
         caldata_obj.data_visibilities = caldata_obj.model_visibilities.copy()
     else:

@@ -600,6 +600,7 @@ class DevTools:
                     if verbose: print(f"Optimization - Model error realization {k+1}")
                     caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind] = data
                     caldata_obj.model_visibilities[:,:,:n_freqs,vis_pol_ind] = model
+                    # caldata_obj.fit_vis[:,:,:n_freqs,vis_pol_ind] = model
                     # if force_fit_to_true_vis:
                     #     caldata_obj.fit_vis[:,:,num_freqs-1,vis_pol_ind] = original_data_vis
                     if gains_real_guess is not None:
@@ -632,21 +633,12 @@ class DevTools:
                         )
                     else:
                         raise ValueError("Unknown calibration type -- possibilities are 'unical' and 'skycal'")
-
-                    # print(f"\n\n***BEFORE CONCATENATION***"
-                        #   f"\n  data   {np.max(np.abs(full_data_realizations))}"
-                        #   f"\n  model  {np.max(np.abs(full_model_realizations))}"
-                        #   f"\n\n  data concat shape  {full_data_realizations.shape}"
-                        #   f"\n  data array shape  {data.shape}"
-                        #   f"\n  model concat shape  {full_model_realizations.shape}"
-                        #   f"\n  model array shape  {model.shape}")
                     # store data
                     full_data_realizations = np.concatenate((full_data_realizations, data))
                     full_model_realizations = np.concatenate((full_model_realizations, model))
                     gains = copy.deepcopy(caldata_obj.gains[:,:n_freqs,feed_pol_ind])
                     gain_params_realizations = np.concatenate((gain_params_realizations, gains))
                     u_params = copy.deepcopy(caldata_obj.fit_vis[:,:,:n_freqs,vis_pol_ind])
-                    # print(f"***U PARAMS***\n{u_params}\n\n")
                     model_params_realizations = np.concatenate((model_params_realizations, u_params))
                     true_sky_realizations = np.concatenate((true_sky_realizations, initial_data_vis))
                     full_noise_realizations = np.concatenate((
@@ -2290,3 +2282,14 @@ def plot_3d_data_as_2d_hist(
     img_metadata = PngImagePlugin.PngInfo()
     img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
     img.save(filename, pnginfo=img_metadata)
+
+def plot_ntimes_nbls_array(array, this_func, str_upper, str_lower):
+    filepath = "calico/images"
+    import matplotlib.pyplot as plt
+    plt.imshow(array)
+    plt.title(f"{str_upper} vs Ntimes vs Nbls\n{this_func}")
+    plt.xlabel("Ntimes")
+    plt.ylabel("Nbls")
+    plt.colorbar(label="(Jy)")
+    plt.savefig(f"{filepath}/{this_func}_{str_lower}.png")
+    plt.close()
