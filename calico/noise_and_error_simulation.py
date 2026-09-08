@@ -27,7 +27,8 @@ def simulate_thermal_noise(sigma_t_0,
         if verbose:
             print("Initial thermal noise failed. Was sigma_t set correctly?")
 
-def simulate_model_error(n_times,
+def simulate_model_error(caldata_obj,
+                         n_times,
                          n_bls,
                          sigma_e_0,
                          uv_norm_array, 
@@ -36,8 +37,10 @@ def simulate_model_error(n_times,
                          scaling_factor,
                          seed=42,
                          verbose=True,
-                         n_freqs=1,):
+                         n_freqs=1,
+                         same_sky_all_times=False,):
     np.random.seed(seed)
+    n_times = 1 if same_sky_all_times else caldata_obj.Ntimes
     if sigma_e_0 is not None and weighting_function == 'step_down_weights':
         if verbose:
             print("***STEP DOWN WEIGHTS IN SIMULATION***")
@@ -103,7 +106,17 @@ def simulate_model_error(n_times,
             size=(n_times, n_bls, n_freqs),
             # size=(1, n_times * n_bls, n_freqs),
         )
-        return model_error_real, model_error_imag, None, None
+        this_model_error = model_error_real + 1.0j*model_error_imag
+        if same_sky_all_times:
+            this_model_error = np.broadcast_to(
+                this_model_error,
+                (
+                    caldata_obj.Ntimes,
+                    caldata_obj.Nbls,
+                    caldata_obj.Nfreqs,
+                ),
+            ).copy()
+        return this_model_error.real, this_model_error.imag, None, None
     else:
         print("Can't do model simulation - sigma_e_0 is not set")
 
@@ -132,7 +145,6 @@ def simulate_visibilities(caldata_obj,
                           seed=42,
                           same_sky_all_times=False,
                           true_vis_equals_model=True):
-    print(f"\n\n***same sky all times? {same_sky_all_times}***\n\n")
     num_times = 1 if same_sky_all_times else caldata_obj.Ntimes
     np.random.seed(seed)
     real_throw = np.random.normal(
