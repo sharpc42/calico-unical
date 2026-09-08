@@ -522,23 +522,19 @@ class DevTools:
             for i in range(num_model_realizations):
                 if verbose: 
                     print(f"Creating model error realization {i+1}")
-                if same_sky_all_times:
-                    num_times = 1
-                else:
-                    num_times = caldata_obj.Ntimes
-                this_model_error = sim.simulate_model_error(
-                    caldata_obj=caldata_obj,
-                    n_times=num_times,
-                    n_bls=caldata_obj.Nbls,
-                    n_freqs=n_freqs,
-                    sigma_e_0=np.abs(run_params['sigma_e']),
-                    uv_norm_array=caldata_obj.uv_norm,
-                    threshold_length=threshold_length,
-                    weighting_function=run_params['weighting_function'],
-                    scaling_factor=run_params['scaling_factor_sim'],
-                    seed=i+100,
-                )
-                if this_model_error is None:
+                model_error_real, model_error_imag, me_real_long, me_real_short = sim.simulate_model_error(
+                                                                                      caldata_obj=caldata_obj,
+                                                                                      n_times=caldata_obj.Ntimes,
+                                                                                      n_bls=caldata_obj.Nbls,
+                                                                                      n_freqs=n_freqs,
+                                                                                      sigma_e_0=np.abs(run_params['sigma_e']),
+                                                                                      uv_norm_array=caldata_obj.uv_norm,
+                                                                                      threshold_length=threshold_length,
+                                                                                      weighting_function=run_params['weighting_function'],
+                                                                                      scaling_factor=run_params['scaling_factor_sim'],
+                                                                                      seed=i+100,
+                                                                                      same_sky_all_times=same_sky_all_times,)
+                if model_error_real is None:
                     if verbose: 
                         print("Did not simulate model error")
                     this_model_error = np.zeros(
@@ -549,6 +545,8 @@ class DevTools:
                             caldata_obj.N_vis_pols,
                         )
                     )
+                else:
+                    this_model_error = model_error_real + 1.0j*model_error_imag
                 model_err_realizations.append(this_model_error)
                 # vT < m
                 if run_params['sigma_e'] < 0:
@@ -600,7 +598,7 @@ class DevTools:
                     if verbose: print(f"Optimization - Model error realization {k+1}")
                     caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind] = data
                     caldata_obj.model_visibilities[:,:,:n_freqs,vis_pol_ind] = model
-                    # caldata_obj.fit_vis[:,:,:n_freqs,vis_pol_ind] = model
+                    caldata_obj.fit_vis[:,:,:n_freqs,vis_pol_ind] = model
                     # if force_fit_to_true_vis:
                     #     caldata_obj.fit_vis[:,:,num_freqs-1,vis_pol_ind] = original_data_vis
                     if gains_real_guess is not None:
@@ -2206,7 +2204,6 @@ def plot_3d_data_as_2d_hist(
     from matplotlib import colors
     z_grid = np.asarray(z_array).reshape((num_x_vals, num_y_vals))
     np.set_printoptions(precision=4, suppress=True, linewidth=500)
-    print(f"Original z grid\n\n{z_grid}\n\n")
     # rotate grid
     # z_grid_rot = ndimage.rotate(z_grid, angle=angle)
     # print(f"Rotated z grid\n\n{z_grid_rot}\n\n")

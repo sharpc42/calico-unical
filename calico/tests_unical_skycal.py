@@ -764,9 +764,9 @@ class TestStringMethods(unittest.TestCase):
         plt.show()
 
     def test_pack_reshape_multiple_times(self):
-        data = pyuvdata.UVData()
-        data.read_uvfits("./calico/data/tutorial_medium.uvfits")
-        model = data.copy()
+        model = pyuvdata.UVData()
+        model.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        data = model.copy()
         caldata_obj = caldata.CalData()
         caldata_obj.load_data(data, 
                               model, 
@@ -829,10 +829,46 @@ class TestStringMethods(unittest.TestCase):
             # except Exception as e:
             #     print(f"\nCalibration for {optimizer} FAILS\n  {type(e).__name__}: {e}\n\n")
 
+    def test_basic_stability(
+        self,
+        optimizer,
+    ):
+        import dev_tools
+        model = pyuvdata.UVData()
+        model.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        data = model.copy()
+        caldata_obj = caldata.CalData()
+        caldata_obj.load_data(data, 
+                              model, 
+                              gains_multiply_model=True, 
+                              weighting_function="constant_weights",
+                              sigma_t_0=1, 
+                              sigma_m_0=1,
+                              scaling_factor_cost=1, 
+                              threshold_length=0, 
+                              lambda_val=100)
+        caldata_obj.set_ant_inds(0,0) ; caldata_obj.set_bl_inds(0,0)
+        starting_gains = caldata_obj.gains.copy()
+        ending_gains, _ = calibration_optimization.run_unical_optimization(
+            caldata_obj=caldata_obj,
+            xtol=1e-5,
+            maxiter=200,
+            optimization_scheme=optimizer,
+        )
+        dev = dev_tools.DevTools()
+        dev.complex_trajectory_plot(
+            starting_complex_point = starting_gains,
+            complex_step = ending_gains,
+            n_trajectories = caldata_obj.Nants,
+            filename_prefix = f"basic_stability_test_{optimizer}",
+            title = f"Stability Test\nOptimizer = {optimizer}",
+            xlabel = "Real",
+            ylabel = "Imag",
+            xlims = (0.9, 1.1),
+            ylims = (-0.1, 0.1)
+        )
+
+
 if __name__ == "__main__":
-    # unittest.main()]
-    # TestStringMethods.elbow_plot(TestStringMethods)
-    # TestStringMethods.test_multiple_time_steps_unical(TestStringMethods)
-    TestStringMethods.test_calibration_completes_multiple_times(TestStringMethods)
-    # TestStringMethods.plot_skycal_unical_diff_per_scaling_factor()
-    # TestStringMethods.plot_montecarlos()
+    TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
+    TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
