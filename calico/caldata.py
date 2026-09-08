@@ -661,8 +661,8 @@ class CalData:
         # Free memory
         metadata_reference = None
 
-        # Random perturbation of initial gains
-        self.gain_init_stddev = gain_init_stddev
+        # # Random perturbation of initial gains
+        # self.gain_init_stddev = gain_init_stddev
         # if gain_init_stddev != 0.0:
         #     self.gains += np.random.normal(
         #         0.0,

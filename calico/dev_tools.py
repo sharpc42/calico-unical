@@ -522,22 +522,33 @@ class DevTools:
             for i in range(num_model_realizations):
                 if verbose: 
                     print(f"Creating model error realization {i+1}")
-                model_error_real, model_error_imag, me_real_long, me_real_short = sim.simulate_model_error(
-                                                                                      n_times=caldata_obj.Ntimes,
-                                                                                      n_bls=caldata_obj.Nbls,
-                                                                                      n_freqs=n_freqs,
-                                                                                      sigma_e_0=np.abs(run_params['sigma_e']),
-                                                                                      uv_norm_array=caldata_obj.uv_norm,
-                                                                                      threshold_length=threshold_length,
-                                                                                      weighting_function=run_params['weighting_function'],
-                                                                                      scaling_factor=run_params['scaling_factor_sim'],
-                                                                                      seed=i+100,)
-                if model_error_real is None:
+                if same_sky_all_times:
+                    num_times = 1
+                else:
+                    num_times = caldata_obj.Ntimes
+                this_model_error = sim.simulate_model_error(
+                    caldata_obj=caldata_obj,
+                    n_times=num_times,
+                    n_bls=caldata_obj.Nbls,
+                    n_freqs=n_freqs,
+                    sigma_e_0=np.abs(run_params['sigma_e']),
+                    uv_norm_array=caldata_obj.uv_norm,
+                    threshold_length=threshold_length,
+                    weighting_function=run_params['weighting_function'],
+                    scaling_factor=run_params['scaling_factor_sim'],
+                    seed=i+100,
+                )
+                if this_model_error is None:
                     if verbose: 
                         print("Did not simulate model error")
-                    model_error_real = 0
-                    model_error_imag = 0
-                this_model_error = model_error_real + 1.0j*model_error_imag
+                    this_model_error = np.zeros(
+                        (
+                            caldata_obj.Ntimes,
+                            caldata_obj.Nbls,
+                            caldata_obj.Nfreqs,
+                            caldata_obj.N_vis_pols,
+                        )
+                    )
                 model_err_realizations.append(this_model_error)
                 # vT < m
                 if run_params['sigma_e'] < 0:
@@ -546,8 +557,8 @@ class DevTools:
                 elif run_params['sigma_e'] >= 0:
                     model_vis_realizations.append(initial_model_vis)
                     initial_data_vis += this_model_error
-                model_err_realizations_long.append(me_real_long)
-                model_err_realizations_short.append(me_real_short)
+                # model_err_realizations_long.append(me_real_long)
+                # model_err_realizations_short.append(me_real_short)
             for i in range(num_thermal_realizations):
                 if verbose: 
                     print(f"Creating thermal noise realization {i+1}")
@@ -589,6 +600,7 @@ class DevTools:
                     if verbose: print(f"Optimization - Model error realization {k+1}")
                     caldata_obj.data_visibilities[:,:,:n_freqs,vis_pol_ind] = data
                     caldata_obj.model_visibilities[:,:,:n_freqs,vis_pol_ind] = model
+                    # caldata_obj.fit_vis[:,:,:n_freqs,vis_pol_ind] = model
                     # if force_fit_to_true_vis:
                     #     caldata_obj.fit_vis[:,:,num_freqs-1,vis_pol_ind] = original_data_vis
                     if gains_real_guess is not None:
@@ -621,21 +633,12 @@ class DevTools:
                         )
                     else:
                         raise ValueError("Unknown calibration type -- possibilities are 'unical' and 'skycal'")
-
-                    # print(f"\n\n***BEFORE CONCATENATION***"
-                        #   f"\n  data   {np.max(np.abs(full_data_realizations))}"
-                        #   f"\n  model  {np.max(np.abs(full_model_realizations))}"
-                        #   f"\n\n  data concat shape  {full_data_realizations.shape}"
-                        #   f"\n  data array shape  {data.shape}"
-                        #   f"\n  model concat shape  {full_model_realizations.shape}"
-                        #   f"\n  model array shape  {model.shape}")
                     # store data
                     full_data_realizations = np.concatenate((full_data_realizations, data))
                     full_model_realizations = np.concatenate((full_model_realizations, model))
                     gains = copy.deepcopy(caldata_obj.gains[:,:n_freqs,feed_pol_ind])
                     gain_params_realizations = np.concatenate((gain_params_realizations, gains))
                     u_params = copy.deepcopy(caldata_obj.fit_vis[:,:,:n_freqs,vis_pol_ind])
-                    # print(f"***U PARAMS***\n{u_params}\n\n")
                     model_params_realizations = np.concatenate((model_params_realizations, u_params))
                     true_sky_realizations = np.concatenate((true_sky_realizations, initial_data_vis))
                     full_noise_realizations = np.concatenate((
@@ -2279,3 +2282,14 @@ def plot_3d_data_as_2d_hist(
     img_metadata = PngImagePlugin.PngInfo()
     img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
     img.save(filename, pnginfo=img_metadata)
+
+def plot_ntimes_nbls_array(array, this_func, str_upper, str_lower):
+    filepath = "calico/images"
+    import matplotlib.pyplot as plt
+    plt.imshow(array)
+    plt.title(f"{str_upper} vs Ntimes vs Nbls\n{this_func}")
+    plt.xlabel("Ntimes")
+    plt.ylabel("Nbls")
+    plt.colorbar(label="(Jy)")
+    plt.savefig(f"{filepath}/{this_func}_{str_lower}.png")
+    plt.close()

@@ -1,4 +1,6 @@
+import dev_tools as dev
 import numpy as np
+import matplotlib.pyplot as plt
 import sys
 
 def simulate_thermal_noise(sigma_t_0,
@@ -98,25 +100,34 @@ def simulate_model_error(caldata_obj,
             0.0,
             sigma_e_0,
             size=(n_times, n_bls, n_freqs),
-            # size=(1, n_times * n_bls, n_freqs),
         )
         model_error_imag = np.random.normal(
             0.0,
             sigma_e_0,
             size=(n_times, n_bls, n_freqs),
-            # size=(1, n_times * n_bls, n_freqs),
         )
+<<<<<<< HEAD
         this_model_error = model_error_real + 1.0j*model_error_imag
         if same_sky_all_times:
             this_model_error = np.broadcast_to(
                 this_model_error,
+=======
+        model_error_throw = model_error_real + 1.0j*model_error_imag
+        if n_times == 1:
+            model_error_throw = np.broadcast_to(
+                model_error_throw,
+>>>>>>> 6f0da991e775a8457ed12800a4e887154c5d5934
                 (
                     caldata_obj.Ntimes,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                 ),
             ).copy()
+<<<<<<< HEAD
         return this_model_error.real, this_model_error.imag, None, None
+=======
+        return model_error_throw
+>>>>>>> 6f0da991e775a8457ed12800a4e887154c5d5934
     else:
         print("Can't do model simulation - sigma_e_0 is not set")
 
@@ -127,9 +138,7 @@ def format_sim_weights_per_baseline(caldata_obj, scaling_factor, threshold_lengt
 
 def plot_weights_per_baseline(caldata_obj, weight_array, scaling_factor, threshold_length=50):
     if scaling_factor != 1:
-        import dev_tools
-        dev = dev_tools.DevTools()
-        dev.plot_weights_per_baseline(
+        dev.DevTools().plot_weights_per_baseline(
             caldata_obj.uv_norm,
             weight_array,
             weighting_function="Step Down",
@@ -179,8 +188,6 @@ def simulate_visibilities(caldata_obj,
             ),
         ).copy()
     caldata_obj.model_visibilities = model_vis_throw
-    print(f"\n\n***Are they all the same across times?"
-          f"\n  <Std(|v|)_times>_bls {np.mean(np.std(np.abs(caldata_obj.model_visibilities), axis=0))}\n\n")
     if true_vis_equals_model:
         caldata_obj.data_visibilities = caldata_obj.model_visibilities.copy()
     else:

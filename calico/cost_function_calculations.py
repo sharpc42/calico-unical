@@ -1137,7 +1137,7 @@ def cost_unical(
     gains : array of complex
         Shape (Nants,).
     fit_vis : array of complex
-        Shape (Nbls,).
+        Shape (Ntimes, Nbls,).
     model_vis :  array of complex
         Shape (Ntimes, Nbls,).
     data_vis: array of complex
