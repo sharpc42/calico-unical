@@ -1,11 +1,23 @@
+import matplotlib.pyplot as plt
 import numpy as np
+
 import calibration_optimization
 import calibration_wrappers
 import cost_function_calculations
 import calibration_qa
 import caldata
+
+import dev_tools
+import noise_and_error_simulation as sim
+import variable_weights
+
+from datetime import datetime
+
+import copy
 import pyuvdata
 import os
+import subprocess
+import time
 import unittest
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -105,8 +117,6 @@ class TestStringMethods(unittest.TestCase):
         )
 
     def test_cost_function_return_same_for_same_form(self):
-        import time
-        import noise_and_error_simulation as sim
         model = pyuvdata.UVData()
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
@@ -150,14 +160,6 @@ class TestStringMethods(unittest.TestCase):
         np.testing.assert_allclose(cost_one_run_skycal, cost_one_run_unical)
 
     def calibration_grid_search():
-        import time
-        import noise_and_error_simulation as sim
-        import matplotlib.pyplot as plt
-        import dev_tools
-        import subprocess
-        from datetime import datetime
-        import variable_weights
-
         model = pyuvdata.UVData()
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
@@ -331,10 +333,6 @@ class TestStringMethods(unittest.TestCase):
         
 
     def plot_skycal_unical_diff_per_scaling_factor():
-        import time
-        import noise_and_error_simulation as sim
-        import variable_weights
-        import matplotlib.pyplot as plt
         model = pyuvdata.UVData()
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
@@ -406,11 +404,6 @@ class TestStringMethods(unittest.TestCase):
         sigma_t=0.1,
         maxiter=20,
     ):
-        import copy
-        import time
-        import noise_and_error_simulation as sim
-        import variable_weights
-        import matplotlib.pyplot as plt
         model = pyuvdata.UVData()
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
@@ -521,7 +514,6 @@ class TestStringMethods(unittest.TestCase):
         return abs_powell_minus_lbfgs
 
     def elbow_plot(self):
-        import matplotlib.pyplot as plt
         diffs = []
         maxiter_arr = []
         for i in range(0,100,10):
@@ -541,7 +533,6 @@ class TestStringMethods(unittest.TestCase):
         plt.savefig(f"calico/images/powell_lbfgs_diff_elbow_plot.png")
 
     def plot_aggregate_montecarlos():
-        import matplotlib.pyplot as plt
         ne5_arr = [
             1.022,
             1.003,
@@ -602,10 +593,6 @@ class TestStringMethods(unittest.TestCase):
         plt.close()
 
     def montecarlo():
-        import numpy as np
-        import matplotlib.pyplot as plt
-        import time
-
         n_samples = 1e7
         abs_avg_sum_vals = []  # |<|v|^2 + n*e + vn* + v*e>|
         sum_abs_mag_vals = []  # |<|v|^2>| + |<n*e>| + |<vn*>| + |<v*e>|
@@ -833,7 +820,6 @@ class TestStringMethods(unittest.TestCase):
         self,
         optimizer,
     ):
-        import dev_tools
         model = pyuvdata.UVData()
         model.read_uvfits("./calico/data/tutorial_medium.uvfits")
         data = model.copy()
@@ -847,7 +833,6 @@ class TestStringMethods(unittest.TestCase):
                               scaling_factor_cost=1, 
                               threshold_length=0, 
                               lambda_val=100)
-        caldata_obj.set_ant_inds(0,0) ; caldata_obj.set_bl_inds(0,0)
         starting_gains = caldata_obj.gains.copy()
         ending_gains, _ = calibration_optimization.run_unical_optimization(
             caldata_obj=caldata_obj,
@@ -855,8 +840,7 @@ class TestStringMethods(unittest.TestCase):
             maxiter=200,
             optimization_scheme=optimizer,
         )
-        dev = dev_tools.DevTools()
-        dev.complex_trajectory_plot(
+        dev_tools.complex_trajectory_plot(
             starting_complex_point = starting_gains,
             complex_step = ending_gains,
             n_trajectories = caldata_obj.Nants,
@@ -868,7 +852,211 @@ class TestStringMethods(unittest.TestCase):
             ylims = (-0.1, 0.1)
         )
 
+    def examine_gains_fit_time_by_time(self):
+        seed = 100
+        same_sky_all_times = True
+        scaling_factor = 0.001
+        sigma_m = 1
+        sigma_t = 4.5
+        model = pyuvdata.UVData()
+        model.read_uvfits(f"./calico/data/tutorial_medium.uvfits")
+        data = model.copy()
+        caldata_obj = caldata.CalData()
+        caldata_obj.load_data(
+            data, 
+            model, 
+            gains_multiply_model=True, 
+            weighting_function="constant_weights",
+            sigma_t_0=1, 
+            sigma_m_0=1,
+            scaling_factor_cost=1, 
+            threshold_length=0, 
+            lambda_val=100
+        )
+        sim.simulate_visibilities(
+            caldata_obj=caldata_obj, 
+            seed=42,
+            same_sky_all_times=same_sky_all_times,
+        )
+        model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+            caldata_obj=caldata_obj,
+            n_times=caldata_obj.Ntimes,
+            n_bls=caldata_obj.Nbls,
+            n_freqs=1,
+            sigma_e_0=sigma_m,
+            uv_norm_array=caldata_obj.uv_norm,
+            weighting_function="constant_weights",
+            scaling_factor=1/(scaling_factor)**2,
+            seed=seed,
+            same_sky_all_times=same_sky_all_times,
+        )
+        thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
+            sigma_t_0=sigma_t,
+            n_times=caldata_obj.Ntimes,
+            n_bls=caldata_obj.Nbls,
+            n_freqs=1,
+            seed=seed,
+        )
+        caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
+        caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
+        real_gains_arr = []
+        data_copy = caldata_obj.data_visibilities.copy()
+        model_copy = caldata_obj.model_visibilities.copy()
+        fit_vis_copy = caldata_obj.fit_vis.copy()
+        model_weights_copy = caldata_obj.model_weights.copy()
+        vis_weights_copy = caldata_obj.visibility_weights.copy()
+        for time_ind in range(caldata_obj.Ntimes):
+            print(f"\n\n***time {time_ind}***\n\n")
+            caldata_obj.data_visibilities = data_copy[time_ind:time_ind+1, ...]
+            caldata_obj.model_visibilities = model_copy[time_ind:time_ind+1, ...]
+            caldata_obj.model_weights = model_weights_copy[time_ind:time_ind+1, ...]
+            caldata_obj.visibility_weights = vis_weights_copy[time_ind:time_ind+1, ...]
+            caldata_obj.gains = np.ones((caldata_obj.Nants, 1, 1))
+            caldata_obj.fit_vis = model_copy[time_ind:time_ind+1, ...]
+            caldata_obj.unified_calibration(
+                verbose=True,
+                xtol=1e-5,
+                maxiter=200,
+                optimization_scheme="pytorch",
+            )
+            real_gains_arr.append(caldata_obj.gains[...,0,0].real)
+        avg_gains = np.mean(np.asarray(real_gains_arr), axis=0)
+        caldata_obj.data_visibilities = data_copy
+        caldata_obj.model_visibilities = model_copy
+        caldata_obj.fit_vis = fit_vis_copy
+        caldata_obj.model_weights = model_weights_copy
+        caldata_obj.visibility_weights = vis_weights_copy
+        caldata_obj.gains = np.ones((caldata_obj.Nants, 1, 1))
+        caldata_obj.fit_vis = model_copy
+        caldata_obj.unified_calibration(
+            verbose=True,
+            xtol=1e-5,
+            maxiter=200,
+            optimization_scheme="pytorch"
+        )
+        gains = caldata_obj.gains[..., 0, 0]
+        ants = [a for a in range(np.size(gains))]
+        plt.scatter(ants, gains.real, label="full 56 times")
+        plt.scatter(ants, avg_gains, label="avg over times")
+        plt.title("Compare time avg of Re(g) vs fit over all times"
+                  f"\nAnt avg - Individuals: {np.mean(avg_gains):.5f}"
+                  f"\nAll times: {np.mean(gains.real):.5f}")
+        plt.xlabel("Ant #")
+        plt.ylabel("$Re(g)$")
+        plt.legend()
+        plt.savefig("calico/images/gains_avg_over_time_comp.png")
+        plt.close()
+        print(f"\nAny negatives? {(gains < 0).any()}"
+              f"\nHow many?      {gains[gains < 0].size}"
+              f"\nWhat are they? {gains[gains < 0]}\n")
+
+    def gain_offset_with_more_times(self):
+        times = [t for t in range(1,57)]
+        data_files = [f"data_{t}" for t in range(1,56)]
+        data_files.append("tutorial_medium")
+        gain_offsets = []
+        seed = 100
+        same_sky_all_times = True
+        scaling_factor = 0.001
+        sigma_m = 1
+        sigma_t = 4.5
+        for file in data_files:
+            model = pyuvdata.UVData()
+            model.read_uvfits(f"./calico/data/{file}.uvfits")
+            data = model.copy()
+            caldata_obj = caldata.CalData()
+            caldata_obj.load_data(
+                data, 
+                model, 
+                gains_multiply_model=True, 
+                weighting_function="constant_weights",
+                sigma_t_0=1, 
+                sigma_m_0=1,
+                scaling_factor_cost=1, 
+                threshold_length=0, 
+                lambda_val=100
+            )
+            sim.simulate_visibilities(
+                caldata_obj=caldata_obj, 
+                seed=42,
+                same_sky_all_times=same_sky_all_times,
+            )
+            model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+                caldata_obj=caldata_obj,
+                n_times=caldata_obj.Ntimes,
+                n_bls=caldata_obj.Nbls,
+                n_freqs=1,
+                sigma_e_0=sigma_m,
+                uv_norm_array=caldata_obj.uv_norm,
+                weighting_function="constant_weights",
+                scaling_factor=1/(scaling_factor)**2,
+                seed=seed,
+                same_sky_all_times=same_sky_all_times,
+            )
+            thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
+                sigma_t_0=sigma_t,
+                n_times=caldata_obj.Ntimes,
+                n_bls=caldata_obj.Nbls,
+                n_freqs=1,
+                seed=seed,
+            )
+            caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
+            caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
+            caldata_obj.unified_calibration(
+                verbose=True,
+                xtol=1e-5,
+                maxiter=200,
+                optimization_scheme="pytorch",
+            )
+            gain_offsets.append(np.mean(caldata_obj.gains[...,0,0].real, axis=0) - 1)
+        
+        # gain_offsets = [
+        #     -0.022228,
+        #     -0.017228,
+        #     -0.018394,
+        #     -0.017444,
+        #     -0.017299,
+        #     -0.016983,
+        #     -0.016781,
+        #     -0.016088,
+        #     -0.016559,
+        #     -0.016486,
+        #     -0.016721,
+        #     -0.016754,
+        #     -0.016743,
+        #     -0.016875,
+        # ]
+        # gain_offsets = [
+        #     -0.045747,
+        #     -0.018668,
+        #     -0.019208,
+        #     -0.014773,
+        #     -0.016789,
+        #     -0.017168,
+        #     -0.017970,
+        #     -0.018118,
+        #     -0.018057,
+        # ]
+        # gain_offsets = [
+        #     -0.02845296666433413,
+        #     -0.0024628669099968944,
+        #     -0.002849955207445428,
+        #     0.0013188507019580792,
+        #     -0.00042870715899585084,
+        #     -0.0007929212215956019,
+        #     -0.0015147369708328627,
+        #     -0.0017139021592703825,
+        #     -0.001616137995818254,
+        # ]
+        plt.scatter(times, gain_offsets)
+        plt.title("Gain offsets over time")
+        plt.xlabel("Ntimes")
+        plt.ylabel("Gain offset")
+        plt.savefig("calico/images/gain_offset_with_more_times.png")
+        plt.close()
 
 if __name__ == "__main__":
-    TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
-    TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
+    TestStringMethods.gain_offset_with_more_times(TestStringMethods)
+    # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
+    # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
+    # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")

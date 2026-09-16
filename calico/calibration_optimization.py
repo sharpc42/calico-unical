@@ -1306,7 +1306,8 @@ def run_unical_optimization(
         gains_fit[:, :] = np.nan + 1j * np.nan
         return gains_fit
     fit_vis_fit = np.full(
-        (caldata_obj.Ntimes, caldata_obj.Nbls, caldata_obj.N_vis_pols),
+        # (caldata_obj.Ntimes, caldata_obj.Nbls, caldata_obj.N_vis_pols),
+        (np.size(caldata_obj.data_visibilities, axis=0), caldata_obj.Nbls, caldata_obj.N_vis_pols),
         # (1, caldata_obj.Ntimes * caldata_obj.Nbls, caldata_obj.N_vis_pols),
         np.nan + 1j * np.nan,
         dtype=complex,
@@ -1356,7 +1357,10 @@ def run_unical_optimization(
                 )
                 # Fitted-visibility init: (Ntimes, Nbls) by default, or a flat
                 # (1, Ntimes*Nbls) view matching data_vis_reshaped when flatten_blts.
-                _fit_vis_init = caldata_obj.fit_vis[:, caldata_obj.bl_inds, freq_ind, vis_pol_ind]
+                _fit_vis_init = np.reshape(
+                    caldata_obj.fit_vis[:, caldata_obj.bl_inds, freq_ind, vis_pol_ind],
+                    (np.size(caldata_obj.data_visibilities, axis=0), caldata_obj.Nbls),
+                )
                 if caldata_obj.flatten_blts:
                     _fit_vis_init = _fit_vis_init.reshape(1, caldata_obj.Ntimes * caldata_obj.Nbls)
                 fit_vis_fit_tensor = torch.from_numpy(
@@ -1365,13 +1369,6 @@ def run_unical_optimization(
                     device=device,
                     dtype=torch.complex128,
                 )
-                # params_tensor = torch.concatenate(
-                #     (gains_fit_tensor, 
-                #     fit_vis_fit_tensor)
-                # ).to(
-                #     device=device,
-                #     dtype=torch.complex128,
-                # )
                 # additional arrays as tensors
                 data_tensor = torch.from_numpy(
                     caldata_obj.data_vis_reshaped.copy(),

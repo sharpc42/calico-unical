@@ -33,10 +33,10 @@ def simulate_model_error(caldata_obj,
                          n_times,
                          n_bls,
                          sigma_e_0,
-                         uv_norm_array, 
-                         threshold_length, 
+                         uv_norm_array,  
                          weighting_function, 
                          scaling_factor,
+                         threshold_length=100,
                          seed=42,
                          verbose=True,
                          n_freqs=1,
@@ -106,28 +106,17 @@ def simulate_model_error(caldata_obj,
             sigma_e_0,
             size=(n_times, n_bls, n_freqs),
         )
-<<<<<<< HEAD
         this_model_error = model_error_real + 1.0j*model_error_imag
         if same_sky_all_times:
             this_model_error = np.broadcast_to(
                 this_model_error,
-=======
-        model_error_throw = model_error_real + 1.0j*model_error_imag
-        if n_times == 1:
-            model_error_throw = np.broadcast_to(
-                model_error_throw,
->>>>>>> 6f0da991e775a8457ed12800a4e887154c5d5934
                 (
                     caldata_obj.Ntimes,
                     caldata_obj.Nbls,
                     caldata_obj.Nfreqs,
                 ),
             ).copy()
-<<<<<<< HEAD
         return this_model_error.real, this_model_error.imag, None, None
-=======
-        return model_error_throw
->>>>>>> 6f0da991e775a8457ed12800a4e887154c5d5934
     else:
         print("Can't do model simulation - sigma_e_0 is not set")
 

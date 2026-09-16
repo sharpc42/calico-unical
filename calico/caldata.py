@@ -1398,7 +1398,8 @@ class CalData:
             Visibility polarization index.
         """
         reshaped_shape = (
-            (1, self.Ntimes * self.Nbls) if self.flatten_blts else (self.Ntimes, self.Nbls)
+            (1, self.Ntimes * self.Nbls) if self.flatten_blts 
+            else (np.size(self.data_visibilities, axis=0), self.Nbls)
         )
         self.data_vis_reshaped = np.reshape(
             self.data_visibilities[:, :, freq_ind, vis_pol_ind],
