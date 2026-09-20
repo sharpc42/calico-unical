@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize import curve_fit
 
 import calibration_optimization
 import calibration_wrappers
@@ -878,6 +879,15 @@ class TestStringMethods(unittest.TestCase):
             seed=42,
             same_sky_all_times=same_sky_all_times,
         )
+        vwa = variable_weights.VariableWeightsArray()
+        vwa.set_algorithm_weights(
+            caldata_obj,
+            weighting_function="constant_weights",
+            scaling_factor=1/(scaling_factor)**2,
+            sigma_t_0=sigma_t,
+            sigma_m_0=sigma_m,
+            threshold_length=caldata_obj.threshold_length
+        )
         model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
             caldata_obj=caldata_obj,
             n_times=caldata_obj.Ntimes,
@@ -897,7 +907,7 @@ class TestStringMethods(unittest.TestCase):
             n_freqs=1,
             seed=seed,
         )
-        caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
+        # caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
         caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
         real_gains_arr = []
         data_copy = caldata_obj.data_visibilities.copy()
@@ -920,7 +930,13 @@ class TestStringMethods(unittest.TestCase):
                 optimization_scheme="pytorch",
             )
             real_gains_arr.append(caldata_obj.gains[...,0,0].real)
+        real_gains_arr = np.asarray(real_gains_arr)
         avg_gains = np.mean(np.asarray(real_gains_arr), axis=0)
+        ants = np.arange(real_gains_arr.shape[1])
+        x_cloud = np.broadcast_to(
+            ants, real_gains_arr.shape
+        ).ravel()
+        y_cloud = real_gains_arr.ravel()
         caldata_obj.data_visibilities = data_copy
         caldata_obj.model_visibilities = model_copy
         caldata_obj.fit_vis = fit_vis_copy
@@ -935,14 +951,30 @@ class TestStringMethods(unittest.TestCase):
             optimization_scheme="pytorch"
         )
         gains = caldata_obj.gains[..., 0, 0]
-        ants = [a for a in range(np.size(gains))]
-        plt.scatter(ants, gains.real, label="full 56 times")
-        plt.scatter(ants, avg_gains, label="avg over times")
+        plt.scatter(
+            x_cloud, y_cloud,
+            color="orange", alpha=0.15, s=12,
+            edgecolors="none", zorder=1,
+            label="Individual Times",
+        )
+        plt.scatter(
+            ants, gains.real, 
+            color="tab:blue", s=25,
+            zorder=3,
+            label="Full 56 Times",
+        )
+        plt.scatter(
+            ants, avg_gains, 
+            color="darkorange", s=25,
+            zorder=3,
+            label="Avg Over Times",
+        )
         plt.title("Compare time avg of Re(g) vs fit over all times"
                   f"\nAnt avg - Individuals: {np.mean(avg_gains):.5f}"
                   f"\nAll times: {np.mean(gains.real):.5f}")
         plt.xlabel("Ant #")
         plt.ylabel("$Re(g)$")
+        plt.ylim(0.9, 1.1)
         plt.legend()
         plt.savefig("calico/images/gains_avg_over_time_comp.png")
         plt.close()
@@ -957,7 +989,7 @@ class TestStringMethods(unittest.TestCase):
         gain_offsets = []
         seed = 100
         same_sky_all_times = True
-        scaling_factor = 0.001
+        scaling_factor = 0.0001
         sigma_m = 1
         sigma_t = 4.5
         for file in data_files:
@@ -980,6 +1012,15 @@ class TestStringMethods(unittest.TestCase):
                 caldata_obj=caldata_obj, 
                 seed=42,
                 same_sky_all_times=same_sky_all_times,
+            )
+            vwa = variable_weights.VariableWeightsArray()
+            vwa.set_algorithm_weights(
+                caldata_obj,
+                weighting_function="constant_weights",
+                scaling_factor=1/(scaling_factor)**2,
+                sigma_t_0=sigma_t,
+                sigma_m_0=sigma_m,
+                threshold_length=caldata_obj.threshold_length
             )
             model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
                 caldata_obj=caldata_obj,
@@ -1009,45 +1050,6 @@ class TestStringMethods(unittest.TestCase):
                 optimization_scheme="pytorch",
             )
             gain_offsets.append(np.mean(caldata_obj.gains[...,0,0].real, axis=0) - 1)
-        
-        # gain_offsets = [
-        #     -0.022228,
-        #     -0.017228,
-        #     -0.018394,
-        #     -0.017444,
-        #     -0.017299,
-        #     -0.016983,
-        #     -0.016781,
-        #     -0.016088,
-        #     -0.016559,
-        #     -0.016486,
-        #     -0.016721,
-        #     -0.016754,
-        #     -0.016743,
-        #     -0.016875,
-        # ]
-        # gain_offsets = [
-        #     -0.045747,
-        #     -0.018668,
-        #     -0.019208,
-        #     -0.014773,
-        #     -0.016789,
-        #     -0.017168,
-        #     -0.017970,
-        #     -0.018118,
-        #     -0.018057,
-        # ]
-        # gain_offsets = [
-        #     -0.02845296666433413,
-        #     -0.0024628669099968944,
-        #     -0.002849955207445428,
-        #     0.0013188507019580792,
-        #     -0.00042870715899585084,
-        #     -0.0007929212215956019,
-        #     -0.0015147369708328627,
-        #     -0.0017139021592703825,
-        #     -0.001616137995818254,
-        # ]
         plt.scatter(times, gain_offsets)
         plt.title("Gain offsets over time")
         plt.xlabel("Ntimes")
@@ -1056,7 +1058,7 @@ class TestStringMethods(unittest.TestCase):
         plt.close()
 
 if __name__ == "__main__":
+    TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     TestStringMethods.gain_offset_with_more_times(TestStringMethods)
-    # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
     # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
