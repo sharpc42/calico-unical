@@ -1,4 +1,4 @@
-import caldata
+from calico import caldata
 import os, os.path
 import pyuvdata as uv
 import numpy as np
@@ -376,6 +376,16 @@ def init_many_realizations(
 #     simulate_visibilities=True,
 #     calibrate=True,
 # )
+
+prepare_data_files(
+    fhd_prefix = '1061316296_',
+    sav_data_filename = 'fhd_runs/fhd_baseline',                       # sav directory name (using FHD)
+    sav_model_filename = 'fhd_runs/fhd_cutoff_015',                    # sav directory name (using FHD)
+    model_data_writeout_filename = 'fhd_model_one_freq_015',           # uvfits filename (using FHD)
+    vis_data_writeout_filename = 'fhd_data_one_freq_015',              # uvfits filename (using FHD)
+    reconstruct_data=False,
+    reconstruct_model=False,
+)
 
 """
     Below FHD runs had model and data swapped
