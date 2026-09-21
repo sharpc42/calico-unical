@@ -30,6 +30,7 @@ def main(calibrate             : bool = True,
          data_name             : str  = "tutorial_full_onetime_unflagged",
          simulate_visibilities : bool = False,
          same_sky_all_times    : bool = False, 
+         no_notifs             : bool = False,
 ) -> None:
     if same_sky_all_times and not simulate_visibilities:
         raise ValueError(f"simulate_visibilities set to {simulate_visibilities}"
@@ -997,11 +998,12 @@ def main(calibrate             : bool = True,
 
     print(f"\n\tTime taken for many error vals:\n\t{(time.time() - top_start_time)/3600:.4f} hours ({calibrate=})")
 
-    subprocess.run("osascript -e 'tell application \"Messages\""
-                   "to send \"Gain Offset Grid Search (unical - gmm) done\""
-                   "to buddy \"+12068189804\"'", shell=True)
-    subprocess.run("osascript -e 'display notification \"Job finished\""
-                   "with title \"Grid search\"'", shell=True)
+    if not no_notifs:
+        subprocess.run("osascript -e 'tell application \"Messages\""
+                    "to send \"Gain Offset Grid Search (unical - gmm) done\""
+                    "to buddy \"+12068189804\"'", shell=True)
+        subprocess.run("osascript -e 'display notification \"Job finished\""
+                    "with title \"Grid search\"'", shell=True)
     
     return vT_minus_m_gaussian, real_sigma_t_calculated_gaussian, real_g_minus_1_truth_gaussian, real_g_minus_1_skycal_gaussian
 
@@ -1067,6 +1069,10 @@ if __name__ == "__main__":
         "--samesky", action="store_true",
         help="simulate the same sky for all time steps (error if simulate not passed)"
     )
+    parser.add_argument(
+        "--nonotif", action="store_true",
+        help="don't send system and text notifications when grid search is done"
+    )
     args = parser.parse_args()
 
     main(
@@ -1084,4 +1090,5 @@ if __name__ == "__main__":
         data_name=args.data,
         simulate_visibilities=args.simulate,
         same_sky_all_times=args.samesky,
+        no_notifs=args.nonotifs,
     )
