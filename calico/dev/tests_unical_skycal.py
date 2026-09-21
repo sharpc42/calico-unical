@@ -854,61 +854,21 @@ class TestStringMethods(unittest.TestCase):
         )
 
     def examine_gains_fit_time_by_time(self):
-        seed = 100
+        seed = 421
         same_sky_all_times = True
         scaling_factor = 0.001
-        sigma_m = 1
-        sigma_t = 4.5
-        model = pyuvdata.UVData()
-        model.read_uvfits(f"./calico/data/tutorial_medium.uvfits")
-        data = model.copy()
+        sigma_m = 0.1
+        sigma_t = 5.5
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(
-            data, 
-            model, 
-            gains_multiply_model=True, 
-            weighting_function="constant_weights",
-            sigma_t_0=1, 
-            sigma_m_0=1,
-            scaling_factor_cost=1, 
-            threshold_length=0, 
-            lambda_val=100
-        )
-        sim.simulate_visibilities(
-            caldata_obj=caldata_obj, 
-            seed=42,
-            same_sky_all_times=same_sky_all_times,
-        )
-        vwa = variable_weights.VariableWeightsArray()
-        vwa.set_algorithm_weights(
-            caldata_obj,
-            weighting_function="constant_weights",
-            scaling_factor=1/(scaling_factor)**2,
-            sigma_t_0=sigma_t,
-            sigma_m_0=sigma_m,
-            threshold_length=caldata_obj.threshold_length
-        )
-        model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+        dev_tools.prepare_standard_unical_test_run(
+            filename="tutorial_medium",
             caldata_obj=caldata_obj,
-            n_times=caldata_obj.Ntimes,
-            n_bls=caldata_obj.Nbls,
-            n_freqs=1,
-            sigma_e_0=sigma_m,
-            uv_norm_array=caldata_obj.uv_norm,
-            weighting_function="constant_weights",
-            scaling_factor=1/(scaling_factor)**2,
             seed=seed,
+            sigma_m=sigma_m,
+            sigma_t=sigma_t,
+            scaling_factor=scaling_factor,
             same_sky_all_times=same_sky_all_times,
         )
-        thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
-            sigma_t_0=sigma_t,
-            n_times=caldata_obj.Ntimes,
-            n_bls=caldata_obj.Nbls,
-            n_freqs=1,
-            seed=seed+1,
-        )
-        # caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
-        caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
         real_gains_arr = []
         data_copy = caldata_obj.data_visibilities.copy()
         model_copy = caldata_obj.model_visibilities.copy()
@@ -993,56 +953,16 @@ class TestStringMethods(unittest.TestCase):
         sigma_m = 0.1
         sigma_t = 7.5
         for file in data_files:
-            model = pyuvdata.UVData()
-            model.read_uvfits(f"./calico/data/{file}.uvfits")
-            data = model.copy()
             caldata_obj = caldata.CalData()
-            caldata_obj.load_data(
-                data, 
-                model, 
-                gains_multiply_model=True, 
-                weighting_function="constant_weights",
-                sigma_t_0=1, 
-                sigma_m_0=1,
-                scaling_factor_cost=1, 
-                threshold_length=0, 
-                lambda_val=100
-            )
-            sim.simulate_visibilities(
-                caldata_obj=caldata_obj, 
-                seed=42,
-                same_sky_all_times=same_sky_all_times,
-            )
-            vwa = variable_weights.VariableWeightsArray()
-            vwa.set_algorithm_weights(
-                caldata_obj,
-                weighting_function="constant_weights",
-                scaling_factor=1/(scaling_factor)**2,
-                sigma_t_0=sigma_t,
-                sigma_m_0=sigma_m,
-                threshold_length=caldata_obj.threshold_length
-            )
-            model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+            dev_tools.prepare_standard_unical_test_run(
+                filename=file,
                 caldata_obj=caldata_obj,
-                n_times=caldata_obj.Ntimes,
-                n_bls=caldata_obj.Nbls,
-                n_freqs=1,
-                sigma_e_0=sigma_m,
-                uv_norm_array=caldata_obj.uv_norm,
-                weighting_function="constant_weights",
-                scaling_factor=1/(scaling_factor)**2,
                 seed=seed,
+                sigma_m=sigma_m,
+                sigma_t=sigma_t,
+                scaling_factor=scaling_factor,
                 same_sky_all_times=same_sky_all_times,
             )
-            thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
-                sigma_t_0=sigma_t,
-                n_times=caldata_obj.Ntimes,
-                n_bls=caldata_obj.Nbls,
-                n_freqs=1,
-                seed=seed+1,
-            )
-            caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
-            caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
             caldata_obj.unified_calibration(
                 verbose=True,
                 xtol=1e-5,

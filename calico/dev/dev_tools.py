@@ -2291,10 +2291,10 @@ def plot_ntimes_nbls_array(array, this_func, str_upper, str_lower):
     plt.savefig(f"{filepath}/{this_func}_{str_lower}.png")
     plt.close()
 
-def standard_unical_test_run(
-    data_file,
+def prepare_standard_unical_test_run(
+    filename,
     caldata_obj,
-    seed=42,
+    seed=100,
     sigma_t=0.1,
     sigma_m=0.4,
     scaling_factor=1,
@@ -2303,9 +2303,8 @@ def standard_unical_test_run(
 ):
     import pyuvdata
     model = pyuvdata.UVData()
-    model.read_uvfits(f"./calico/data/{data_file}.uvfits")
+    model.read_uvfits(f"./calico/data/{filename}.uvfits")
     data = model.copy()
-    caldata_obj = caldata.CalData()
     caldata_obj.load_data(
         data, 
         model, 
@@ -2331,30 +2330,36 @@ def standard_unical_test_run(
         sigma_m_0=sigma_m,
         threshold_length=caldata_obj.threshold_length
     )
-    model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
-        caldata_obj=caldata_obj,
-        n_times=caldata_obj.Ntimes,
-        n_bls=caldata_obj.Nbls,
-        n_freqs=1,
-        sigma_e_0=sigma_m,
-        uv_norm_array=caldata_obj.uv_norm,
-        weighting_function="constant_weights",
-        scaling_factor=1/(scaling_factor)**2,
-        seed=seed,
-        same_sky_all_times=same_sky_all_times,
-    )
-    thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
-        sigma_t_0=sigma_t,
-        n_times=caldata_obj.Ntimes,
-        n_bls=caldata_obj.Nbls,
-        n_freqs=1,
-        seed=seed+1,
-    )
-    caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
-    caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
-    caldata_obj.unified_calibration(
-        verbose=True,
-        xtol=1e-5,
-        maxiter=200,
-        optimization_scheme="pytorch",
-    )
+    if sigma_m != 0:
+        model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+            caldata_obj=caldata_obj,
+            n_times=caldata_obj.Ntimes,
+            n_bls=caldata_obj.Nbls,
+            n_freqs=1,
+            sigma_e_0=sigma_m,
+            uv_norm_array=caldata_obj.uv_norm,
+            weighting_function="constant_weights",
+            scaling_factor=1/(scaling_factor)**2,
+            seed=seed,
+            same_sky_all_times=same_sky_all_times,
+        )
+        caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
+    else:
+        print("Sigma_m detected to be zero so not simulating model error")
+    if sigma_t != 0:
+        thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
+            sigma_t_0=sigma_t,
+            n_times=caldata_obj.Ntimes,
+            n_bls=caldata_obj.Nbls,
+            n_freqs=1,
+            seed=seed+1,
+        )
+        caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
+    else:
+        print("Sigma_t detected to be zero so not simulating thermal noise")
+    # caldata_obj.unified_calibration(
+    #     verbose=True,
+    #     xtol=1e-5,
+    #     maxiter=200,
+    #     optimization_scheme="pytorch",
+    # )
