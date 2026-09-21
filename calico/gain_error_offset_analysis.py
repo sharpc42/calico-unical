@@ -594,6 +594,8 @@ def main(calibrate             : bool = True,
     )
     if verbose:
         print(f"Plotting truth 2D grid for gain offset")
+    with open("gain_offset_with_time_truth.txt", "w") as file:
+        file.write(f"{real_g_minus_1_truth_gaussian[55]:.6f}\n")
     dev.plot_3d_data_as_2d_hist(
         x_array     = vT_minus_m_gaussian,
         y_array     = real_sigma_t_calculated_gaussian,
@@ -602,7 +604,8 @@ def main(calibrate             : bool = True,
         num_x_vals  = len(sigma_t_scales),
         x_array_2   = sigma_re_m,
         x_array_3   = sigma_re_vT,
-        plot_title  = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth) - Scale Factor: {scaling_factor_truth:.2f}",
+        # plot_title  = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth) - Scale Factor: {scaling_factor_truth:.2f}",
+        plot_title    = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\nGain bias at target: {real_g_minus_1_truth_gaussian[55]:.6f}",
         plot_xlabel = "$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
@@ -615,10 +618,10 @@ def main(calibrate             : bool = True,
         #                     np.abs(max(real_g_minus_1_truth_gaussian)),
         #                     np.abs(min(real_g_minus_1_truth_gaussian))
         #                 ]),
-        # plot_vmin = -0.1,
-        # plot_vmax = 0.1,
-        plot_vmin=-0.001,
-        plot_vmax=0.001,
+        # plot_vmin = -0.001,
+        # plot_vmax = 0.001,
+        plot_vmin=-0.01,
+        plot_vmax=0.01,
         plot_xlim_h = max(sigma_m_scales),
         plot_xlim_l = min(sigma_m_scales),
         plot_ylim_h = max(sigma_t_scales),
@@ -633,6 +636,8 @@ def main(calibrate             : bool = True,
     )
     if verbose:
         print(f"Plotting skycal 2D grid for gain offset")
+    with open("gain_offset_with_time_skycal.txt", "w") as file:
+        file.write(f"{real_g_minus_1_skycal_gaussian[55]:.6f}\n")
     dev.plot_3d_data_as_2d_hist(
         x_array       = vT_minus_m_gaussian,
         y_array       = real_sigma_t_calculated_gaussian,
@@ -641,7 +646,8 @@ def main(calibrate             : bool = True,
         num_x_vals    = len(sigma_t_scales),
         x_array_2     = sigma_re_m,
         x_array_3     = sigma_re_vT,
-        plot_title    = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
+        # plot_title    = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
+        plot_title    = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\nGain bias at target: {real_g_minus_1_skycal_gaussian[55]:.6f}",
         plot_xlabel   = "$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
         plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
@@ -654,10 +660,10 @@ def main(calibrate             : bool = True,
         #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
         #                     np.abs(min(real_g_minus_1_skycal_gaussian))
         #                 ]),
-        # plot_vmaxx=0.1,
-        # plot_vmin=-0.1,
-        plot_vmax=0.001,
-        plot_vmin=-0.001,
+        # plot_vmax=0.001,
+        # plot_vmin=-0.001,
+        plot_vmax=0.01,
+        plot_vmin=-0.01,
         plot_xlim_h   = max(sigma_m_scales),
         plot_xlim_l   = min(sigma_m_scales),
         plot_ylim_h   = max(sigma_t_scales),
@@ -990,6 +996,12 @@ def main(calibrate             : bool = True,
     )
 
     print(f"\n\tTime taken for many error vals:\n\t{(time.time() - top_start_time)/3600:.4f} hours ({calibrate=})")
+
+    subprocess.run("osascript -e 'tell application \"Messages\""
+                   "to send \"Gain Offset Grid Search (unical - gmm) done\""
+                   "to buddy \"+12068189804\"'", shell=True)
+    subprocess.run("osascript -e 'display notification \"Job finished\""
+                   "with title \"Grid search\"'", shell=True)
     
     return vT_minus_m_gaussian, real_sigma_t_calculated_gaussian, real_g_minus_1_truth_gaussian, real_g_minus_1_skycal_gaussian
 
