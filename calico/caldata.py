@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import pyuvdata
 from astropy.units import Quantity
-from calico import calibration_qa, calibration_optimization, dev_tools, variable_weights, noise_and_error_simulation as sim
+from calico import calibration_qa, calibration_optimization
 import multiprocessing
 
 

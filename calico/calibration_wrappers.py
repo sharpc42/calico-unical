@@ -4,7 +4,6 @@ import time
 import pyuvdata
 import multiprocessing
 from calico import caldata
-import dev_tools
 
 def sky_based_calibration_wrapper(
     data,
