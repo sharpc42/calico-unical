@@ -1090,5 +1090,5 @@ if __name__ == "__main__":
         data_name=args.data,
         simulate_visibilities=args.simulate,
         same_sky_all_times=args.samesky,
-        no_notifs=args.nonotifs,
+        no_notifs=args.nonotif,
     )
