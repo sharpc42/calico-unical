@@ -14,8 +14,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from calico import cost_function_calculations, calibration_optimization as cal_opt, calibration_wrappers as calwrap, caldata
 from pyuvdata import UVData, UVCal, Telescope
-import noise_and_error_simulation as sim
-import variable_weights
+from calico.dev import noise_and_error_simulation as sim
+from calico.dev import variable_weights
 
 class DevTools:
 
@@ -2290,3 +2290,71 @@ def plot_ntimes_nbls_array(array, this_func, str_upper, str_lower):
     plt.colorbar(label="(Jy)")
     plt.savefig(f"{filepath}/{this_func}_{str_lower}.png")
     plt.close()
+
+def standard_unical_test_run(
+    data_file,
+    caldata_obj,
+    seed=42,
+    sigma_t=0.1,
+    sigma_m=0.4,
+    scaling_factor=1,
+    optimization_scheme="powell",
+    same_sky_all_times=False,
+):
+    import pyuvdata
+    model = pyuvdata.UVData()
+    model.read_uvfits(f"./calico/data/{data_file}.uvfits")
+    data = model.copy()
+    caldata_obj = caldata.CalData()
+    caldata_obj.load_data(
+        data, 
+        model, 
+        gains_multiply_model=True, 
+        weighting_function="constant_weights",
+        sigma_t_0=1, 
+        sigma_m_0=1,
+        scaling_factor_cost=1, 
+        threshold_length=0, 
+        lambda_val=100
+    )
+    sim.simulate_visibilities(
+        caldata_obj=caldata_obj, 
+        seed=42,
+        same_sky_all_times=same_sky_all_times,
+    )
+    vwa = variable_weights.VariableWeightsArray()
+    vwa.set_algorithm_weights(
+        caldata_obj,
+        weighting_function="constant_weights",
+        scaling_factor=1/(scaling_factor)**2,
+        sigma_t_0=sigma_t,
+        sigma_m_0=sigma_m,
+        threshold_length=caldata_obj.threshold_length
+    )
+    model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+        caldata_obj=caldata_obj,
+        n_times=caldata_obj.Ntimes,
+        n_bls=caldata_obj.Nbls,
+        n_freqs=1,
+        sigma_e_0=sigma_m,
+        uv_norm_array=caldata_obj.uv_norm,
+        weighting_function="constant_weights",
+        scaling_factor=1/(scaling_factor)**2,
+        seed=seed,
+        same_sky_all_times=same_sky_all_times,
+    )
+    thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
+        sigma_t_0=sigma_t,
+        n_times=caldata_obj.Ntimes,
+        n_bls=caldata_obj.Nbls,
+        n_freqs=1,
+        seed=seed+1,
+    )
+    caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
+    caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
+    caldata_obj.unified_calibration(
+        verbose=True,
+        xtol=1e-5,
+        maxiter=200,
+        optimization_scheme="pytorch",
+    )

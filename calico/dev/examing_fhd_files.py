@@ -1,5 +1,5 @@
 from pyuvdata import UVData
-import calibration_wrappers as calwrap
+from calico import calibration_wrappers as calwrap
 import numpy as np
 import matplotlib.pyplot as plt
 

@@ -1,16 +1,17 @@
 from calico import caldata
+
 import os, os.path
 import pyuvdata as uv
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-import dev_tools
+from calico.dev import dev_tools
 import sys
 from pyuvdata import UVData, UVFlag
-import noise_and_error_simulation as sim
+from calico.dev import noise_and_error_simulation as sim
 from pyuvdata import UVFlag
-import make_run_params
+from calico.dev import make_run_params
 
 # def update_calico()
 
@@ -199,7 +200,7 @@ def init_many_realizations(
     ) > 0:
         if threshold_length == None:
             raise ValueError(f"Need threshold length even if zero -- Init Many Realizations")
-        __import__('make_run_params').generate_files()
+        make_run_params.generate_files()
         model_path = os.getcwd() + f'/calico/data/{model_data_writeout_filename}'
         if calibrate:
             if verbose:

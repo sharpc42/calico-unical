@@ -2,15 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
 
-import calibration_optimization
-import calibration_wrappers
-import cost_function_calculations
-import calibration_qa
-import caldata
+from calico import calibration_optimization
+from calico import calibration_wrappers
+from calico import cost_function_calculations
+from calico import calibration_qa
+from calico import caldata
 
-import dev_tools
-import noise_and_error_simulation as sim
-import variable_weights
+from calico.dev import dev_tools
+from calico.dev import noise_and_error_simulation as sim
+from calico.dev import variable_weights
 
 from datetime import datetime
 
@@ -905,7 +905,7 @@ class TestStringMethods(unittest.TestCase):
             n_times=caldata_obj.Ntimes,
             n_bls=caldata_obj.Nbls,
             n_freqs=1,
-            seed=seed,
+            seed=seed+1,
         )
         # caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
         caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag
@@ -990,8 +990,8 @@ class TestStringMethods(unittest.TestCase):
         seed = 100
         same_sky_all_times = True
         scaling_factor = 0.0001
-        sigma_m = 1
-        sigma_t = 4.5
+        sigma_m = 0.1
+        sigma_t = 7.5
         for file in data_files:
             model = pyuvdata.UVData()
             model.read_uvfits(f"./calico/data/{file}.uvfits")
@@ -1039,7 +1039,7 @@ class TestStringMethods(unittest.TestCase):
                 n_times=caldata_obj.Ntimes,
                 n_bls=caldata_obj.Nbls,
                 n_freqs=1,
-                seed=seed,
+                seed=seed+1,
             )
             caldata_obj.data_visibilities[..., 0] += model_error_real + 1.0j*model_error_imag
             caldata_obj.data_visibilities[..., 0] += thermal_noise_real + 1.0j*thermal_noise_imag

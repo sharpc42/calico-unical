@@ -1,7 +1,7 @@
 import numpy as np
 import hickle as hkl
 
-import dev_tools as dev
+from calico.dev import dev_tools as dev
 
 import subprocess
 import pickle
@@ -162,7 +162,7 @@ def main(calibrate             : bool = True,
                     gains_real_guess = np.asarray(candidates[best_idx]["g_arr_real"]) + \
                                        1.0j*np.asarray(candidates[best_idx]["g_arr_imag"])
                     print(f"Loading gains guess time - {time.time() - start_load_gains_guess_time:.3f} seconds")
-                __import__('many_realizations_study').init_many_realizations(
+                __import__('calico.dev.many_realizations_study', fromlist=['init_many_realizations']).init_many_realizations(
                     fhd_prefix                   = '1061316296_',
                     sav_data_filename            = data_name,
                     sav_model_filename           = data_name,

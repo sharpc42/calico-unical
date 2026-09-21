@@ -4,7 +4,7 @@ import pyuvdata
 from astropy.units import Quantity
 from calico import calibration_qa, calibration_optimization
 import multiprocessing
-
+from calico.dev import variable_weights, dev_tools
 
 class CalData:
     """
