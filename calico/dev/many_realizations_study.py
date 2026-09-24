@@ -15,18 +15,24 @@ from calico.dev import make_run_params
 
 # def update_calico()
 
+
 def display_all_images():
 
-    path = os.path.abspath(os.getcwd()) + '/images/'
-    files = [name for name in os.listdir('./images') if not os.path.isdir(os.path.join(path, name))]
+    path = os.path.abspath(os.getcwd()) + "/images/"
+    files = [
+        name
+        for name in os.listdir("./images")
+        if not os.path.isdir(os.path.join(path, name))
+    ]
     # print("Files:",files)
     for file in files:
-        if file[0] != '.':
-            img = plt.imread("./images/"+file)
+        if file[0] != ".":
+            img = plt.imread("./images/" + file)
             _ = plt.imshow(img)
-            plt.axis('off')
+            plt.axis("off")
             plt.tight_layout()
             plt.show()
+
 
 def examine_flags(uvd):
     print("\n***beginning flag waterfall***")
@@ -36,7 +42,7 @@ def examine_flags(uvd):
     print(f"***all flagged?***\n\t{np.all(uvf.flag_array == True)}\n")
     print(f"***any flagged?***\n\t{np.any(uvf.flag_array == True)}\n")
 
-    plt.pcolormesh(np.squeeze(uvf.flag_array[:,:,0]))
+    plt.pcolormesh(np.squeeze(uvf.flag_array[:, :, 0]))
     plt.title("Waterfall of Flag Array (uvf)")
     plt.ylabel("Time")
     plt.xlabel("Frequency")
@@ -45,7 +51,7 @@ def examine_flags(uvd):
     plt.savefig("calico/images/flag_watterfall_uvf.png")
     plt.close()
 
-    plt.pcolormesh(np.squeeze(uvd.flag_array[:,:,0]))
+    plt.pcolormesh(np.squeeze(uvd.flag_array[:, :, 0]))
     plt.title("Waterfall-ish of Flag Array (uvd)")
     plt.ylabel("Blts")
     plt.xlabel("Frequency")
@@ -53,17 +59,18 @@ def examine_flags(uvd):
     plt.colorbar()
     plt.savefig("calico/images/flag_watterfall_uvd.png")
     plt.close()
-    
+
     print("***finished with flag watefall***\n")
 
+
 def prepare_data_files(
-    fhd_prefix = None,
-    sav_data_filename = None,
-    sav_model_filename = None,
-    vis_data_writeout_filename = None,
-    model_data_writeout_filename = None,
-    reconstruct_data = False,
-    reconstruct_model = False,
+    fhd_prefix=None,
+    sav_data_filename=None,
+    sav_model_filename=None,
+    vis_data_writeout_filename=None,
+    model_data_writeout_filename=None,
+    reconstruct_data=False,
+    reconstruct_model=False,
 ):
     if fhd_prefix is None:
         print("ERROR: FHD prefix is missing")
@@ -81,11 +88,11 @@ def prepare_data_files(
         print("ERROR: uvfits model filename is missing")
         return -1
 
-    sav_data_path = os.getcwd() + f'/calico/data/{sav_data_filename}'
-    uv_data_path = os.getcwd() + f'/calico/data/{vis_data_writeout_filename}.uvfits'
+    sav_data_path = os.getcwd() + f"/calico/data/{sav_data_filename}"
+    uv_data_path = os.getcwd() + f"/calico/data/{vis_data_writeout_filename}.uvfits"
     print("uv data path", uv_data_path)
-    if fhd_prefix[-1] != '_':
-        fhd_prefix += '_'
+    if fhd_prefix[-1] != "_":
+        fhd_prefix += "_"
     freq_ind = 379  # null init values
     time_ind = 298
 
@@ -94,11 +101,21 @@ def prepare_data_files(
     else:
         print("Data uvfits file not found - creating")
         # Set up the files we need
-        data_vis_files = os.path.join(sav_data_path, "vis_data", fhd_prefix + "vis_model_XX.sav")
-        data_flags_file = os.path.join(sav_data_path, "vis_data", fhd_prefix + "flags.sav")
-        data_layout_file = os.path.join(sav_data_path, "metadata", fhd_prefix + "layout.sav")
-        data_params_file = os.path.join(sav_data_path, "metadata", fhd_prefix + "params.sav")
-        data_settings_file = os.path.join(sav_data_path, "metadata", fhd_prefix + "settings.txt")
+        data_vis_files = os.path.join(
+            sav_data_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
+        )
+        data_flags_file = os.path.join(
+            sav_data_path, "vis_data", fhd_prefix + "flags.sav"
+        )
+        data_layout_file = os.path.join(
+            sav_data_path, "metadata", fhd_prefix + "layout.sav"
+        )
+        data_params_file = os.path.join(
+            sav_data_path, "metadata", fhd_prefix + "params.sav"
+        )
+        data_settings_file = os.path.join(
+            sav_data_path, "metadata", fhd_prefix + "settings.txt"
+        )
 
         uvd_data = UVData.from_file(
             data_vis_files,
@@ -111,13 +128,17 @@ def prepare_data_files(
         # examine_flags(uvd_data)
 
         # exclude autos (invert select on ant1=ant2)
-        uvd_data.select(ant_str='auto', invert=True)
+        uvd_data.select(ant_str="auto", invert=True)
 
         # select on one frequency (for now)
-        uvd_data.select(frequencies=[uvd_data.freq_array[1]])
+        uvd_data.select(frequencies=[uvd_data.freq_array[freq_ind]])
 
         # keep only one time (for now)
-        uvd_data.select(times=[uvd_data.time_array[uvd_data.Nbls*2]])
+        # uvd_data.select(times=[uvd_data.time_array[uvd_data.Nbls*2]])
+        print(
+            f"\n***how many***\n"
+            f"times {uvd_data.Ntimes}\tbls {uvd_data.Nbls}\tblts {uvd_data.Nblts}"
+        )
 
         print(f"\n***all flagged? before***\n\t{np.all(uvd_data.flag_array == True)}")
         print(f"\n***any flagged? before***\n\t{np.any(uvd_data.flag_array == True)}")
@@ -132,19 +153,29 @@ def prepare_data_files(
         print(f"\n***any flagged? after***\n\t{np.any(uvd_data.flag_array == True)}")
         uvd_data.write_uvfits(uv_data_path)
 
-    sav_model_path = os.getcwd() + f'/calico/data/{sav_model_filename}'
-    uv_model_path = os.getcwd() + f'/calico/data/{model_data_writeout_filename}.uvfits'
+    sav_model_path = os.getcwd() + f"/calico/data/{sav_model_filename}"
+    uv_model_path = os.getcwd() + f"/calico/data/{model_data_writeout_filename}.uvfits"
 
     if os.path.isfile(uv_model_path) and not reconstruct_model:
         print("Model uvfits file exists - skipping")
     else:
         print("Model uvfits file not found - creating")
         # Set up the files we need
-        model_vis_files = os.path.join(sav_model_path, "vis_data", fhd_prefix + "vis_model_XX.sav")
-        model_flags_file = os.path.join(sav_model_path, "vis_data", fhd_prefix + "flags.sav")
-        model_layout_file = os.path.join(sav_model_path, "metadata", fhd_prefix + "layout.sav")
-        model_params_file = os.path.join(sav_model_path, "metadata", fhd_prefix + "params.sav")
-        model_settings_file = os.path.join(sav_model_path, "metadata", fhd_prefix + "settings.txt")
+        model_vis_files = os.path.join(
+            sav_model_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
+        )
+        model_flags_file = os.path.join(
+            sav_model_path, "vis_data", fhd_prefix + "flags.sav"
+        )
+        model_layout_file = os.path.join(
+            sav_model_path, "metadata", fhd_prefix + "layout.sav"
+        )
+        model_params_file = os.path.join(
+            sav_model_path, "metadata", fhd_prefix + "params.sav"
+        )
+        model_settings_file = os.path.join(
+            sav_model_path, "metadata", fhd_prefix + "settings.txt"
+        )
 
         uvd_model = UVData.from_file(
             model_vis_files,
@@ -153,25 +184,29 @@ def prepare_data_files(
             params_file=model_params_file,
             settings_file=model_settings_file,
         )
-        
+
         # probably full repeat selections from before
-        uvd_model.select(ant_str='auto', invert=True)
-        uvd_model.select(frequencies=[uvd_model.freq_array[1]])
-        uvd_model.select(times=[uvd_model.time_array[uvd_model.Nbls*2]])
+        uvd_model.select(ant_str="auto", invert=True)
+        uvd_model.select(frequencies=[uvd_model.freq_array[freq_ind]])
+        # uvd_model.select(times=[uvd_model.time_array[uvd_model.Nbls*2]])
         flagged_bls_model = np.nonzero(np.squeeze(uvd_model.flag_array))[0]
         uvd_model.select(blt_inds=flagged_bls_model, invert=True)
         uvd_model.write_uvfits(uv_model_path)
         print(f"\n***shape after removing flags***\n\t{uvd_model.data_array.shape}\n")
+        print(
+            f"\n***how many***\ntimes {uvd_model.Ntimes}\tbls {uvd_model.Nbls}\tblts {uvd_model.Nblts}"
+        )
 
     return 1
 
+
 def init_many_realizations(
-    fhd_prefix = '1061316296_',
-    sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-    sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-    run_params_filename = 'baseline_dependence_runs_large_noise',
-    vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',     # uvfits filename (gaussian sim) 
-    model_data_writeout_filename = 'tutorial_full_onetime_unflagged',   # uvfits filename (using FHD)
+    fhd_prefix="1061316296_",
+    sav_data_filename="tutorial_full_onetime_unflagged",  # sav directory name (gaussian sim)
+    sav_model_filename="tutorial_full_onetime_unflagged",  # sav directory name (gaussian sim)
+    run_params_filename="baseline_dependence_runs_large_noise",
+    vis_data_writeout_filename="tutorial_full_onetime_unflagged",  # uvfits filename (gaussian sim)
+    model_data_writeout_filename="tutorial_full_onetime_unflagged",  # uvfits filename (using FHD)
     verbose=True,
     simulate_visibilities=False,
     same_sky_all_times=False,
@@ -189,24 +224,33 @@ def init_many_realizations(
     flatten_blts=False,
 ):
     dev = dev_tools.DevTools()
-    if prepare_data_files(
-        fhd_prefix=fhd_prefix,
-        sav_data_filename=sav_data_filename,
-        sav_model_filename=sav_model_filename,
-        vis_data_writeout_filename=vis_data_writeout_filename,
-        model_data_writeout_filename=model_data_writeout_filename,
-        reconstruct_data=reconstruct_data,
-        reconstruct_model=reconstruct_model,
-    ) > 0:
+    if (
+        prepare_data_files(
+            fhd_prefix=fhd_prefix,
+            sav_data_filename=sav_data_filename,
+            sav_model_filename=sav_model_filename,
+            vis_data_writeout_filename=vis_data_writeout_filename,
+            model_data_writeout_filename=model_data_writeout_filename,
+            reconstruct_data=reconstruct_data,
+            reconstruct_model=reconstruct_model,
+        )
+        > 0
+    ):
         if threshold_length == None:
-            raise ValueError(f"Need threshold length even if zero -- Init Many Realizations")
+            raise ValueError(
+                f"Need threshold length even if zero -- Init Many Realizations"
+            )
         make_run_params.generate_files()
-        model_path = os.getcwd() + f'/calico/data/{model_data_writeout_filename}'
+        model_path = os.getcwd() + f"/calico/data/{model_data_writeout_filename}"
         if calibrate:
             if verbose:
                 data_read_start_time = time.time()
-            data_file_path = os.getcwd() + f'/calico/data/{vis_data_writeout_filename}.uvfits'
-            model_file_path = os.getcwd() + f'/calico/data/{model_data_writeout_filename}.uvfits'
+            data_file_path = (
+                os.getcwd() + f"/calico/data/{vis_data_writeout_filename}.uvfits"
+            )
+            model_file_path = (
+                os.getcwd() + f"/calico/data/{model_data_writeout_filename}.uvfits"
+            )
             print_data_read_time = False
             if isinstance(data_file_path, str):  # Read data
                 data = UVData()
@@ -222,7 +266,7 @@ def init_many_realizations(
             if verbose:
                 if print_data_read_time:
                     print(
-                        f"Done. Data read time {(time.time() - data_read_start_time)/60.} minutes."
+                        f"Done. Data read time {(time.time() - data_read_start_time) / 60.0} minutes."
                     )
                 print("Formatting data...")
                 sys.stdout.flush()
@@ -244,13 +288,15 @@ def init_many_realizations(
                 threshold_length=0,
                 flatten_blts=flatten_blts,
             )
-            print(f"\n\n***AFTER LOAD***\n  data {np.std(np.abs(caldata_obj.data_visibilities))}"
-            f"\n  model {np.std(np.abs(caldata_obj.model_visibilities))}\n\n")
+            print(
+                f"\n\n***AFTER LOAD***\n  data {np.std(np.abs(caldata_obj.data_visibilities))}"
+                f"\n  model {np.std(np.abs(caldata_obj.model_visibilities))}\n\n"
+            )
             print(f"\n\n***Nfreqs***\n  {caldata_obj.Nfreqs}\n\n")
             print(f"\n\n***Ntimes***\n  {caldata_obj.Ntimes}\n\n")
             if verbose:
                 print(
-                    f"Done. Data formatting time {(time.time() - data_format_start_time)/60.} minutes."
+                    f"Done. Data formatting time {(time.time() - data_format_start_time) / 60.0} minutes."
                 )
                 print("Running calibration optimization...")
                 sys.stdout.flush()
@@ -298,12 +344,12 @@ def init_many_realizations(
             #             print(f"Optimization time: {caldata_obj.Nfreqs} frequency channels", end="")
             #             print(f"in {(time.time() - optimization_start_time)/60.} minutes.")
             #             sys.stdout.flush()
-                    # caldata_obj.flag_antennas_from_per_ant_cost(
-                    #     flagging_threshold=2.5,
-                    #     parallel=False,
-                    #     pool=None,
-                    #     verbose=verbose,
-                    # )
+            # caldata_obj.flag_antennas_from_per_ant_cost(
+            #     flagging_threshold=2.5,
+            #     parallel=False,
+            #     pool=None,
+            #     verbose=verbose,
+            # )
             dev.calculate_many_realizations(
                 caldata_obj=caldata_obj,
                 example_data=data,
@@ -322,20 +368,23 @@ def init_many_realizations(
                 same_sky_all_times=same_sky_all_times,
                 gains_real_guess=gains_real_guess,
             )
-        dev.plot_many_realizations(data_filepath=model_path,
-                                   run_params_filename=run_params_filename,
-                                   metadata=metadata,
-                                   suffix=suffix,)
+        dev.plot_many_realizations(
+            data_filepath=model_path,
+            run_params_filename=run_params_filename,
+            metadata=metadata,
+            suffix=suffix,
+        )
 
     else:
         print("Problem with data files - exiting")
+
 
 # init_many_realizations(
 #     fhd_prefix = '1061316296_',
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'baseline_dependence_runs_large_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',      # uvfits filename (using FHD)
 #     verbose=False,
 #     simulate_visibilities=False,
@@ -347,7 +396,7 @@ def init_many_realizations(
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'baseline_dependence_runs_large_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
 #     verbose=False,
 #     simulate_visibilities=True,
@@ -359,7 +408,7 @@ def init_many_realizations(
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'baseline_dependence_runs_small_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
 #     verbose=False,
 #     simulate_visibilities=False,
@@ -371,7 +420,7 @@ def init_many_realizations(
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'baseline_dependence_runs_small_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',     # uvfits filename (using FHD)
 #     verbose=False,
 #     simulate_visibilities=True,
@@ -379,11 +428,11 @@ def init_many_realizations(
 # )
 
 prepare_data_files(
-    fhd_prefix = '1061316296_',
-    sav_data_filename = 'fhd_runs/fhd_baseline',                       # sav directory name (using FHD)
-    sav_model_filename = 'fhd_runs/fhd_cutoff_015',                    # sav directory name (using FHD)
-    model_data_writeout_filename = 'fhd_model_one_freq_015',           # uvfits filename (using FHD)
-    vis_data_writeout_filename = 'fhd_data_one_freq_015',              # uvfits filename (using FHD)
+    fhd_prefix="1061316296_",
+    sav_data_filename="fhd_runs/fhd_baseline",  # sav directory name (using FHD)
+    sav_model_filename="fhd_runs/fhd_cutoff_015",  # sav directory name (using FHD)
+    model_data_writeout_filename="fhd_model_one_freq_015",  # uvfits filename (using FHD)
+    vis_data_writeout_filename="fhd_data_one_freq_015",  # uvfits filename (using FHD)
     reconstruct_data=False,
     reconstruct_model=False,
 )
@@ -565,7 +614,7 @@ prepare_data_files(
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'add_gaussian_error_large_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
 #     verbose=True,
 #     simulate_visibilities=True,
@@ -579,13 +628,13 @@ prepare_data_files(
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'add_gaussian_error_medium_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
 #     verbose=True,
 #     simulate_visibilities=True,
 #     calibrate=True,
 #     reconstruct_data=False,
-#     reconstruct_model=False, 
+#     reconstruct_model=False,
 # )
 
 # init_many_realizations(
@@ -593,7 +642,7 @@ prepare_data_files(
 #     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
 #     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
 #     run_params_filename = 'add_gaussian_error_small_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim) 
+#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
 #     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
 #     verbose=True,
 #     simulate_visibilities=True,

@@ -13,10 +13,13 @@ from calico import cost_function_calculations
     plane is a single axis of length Ntimes*Nbls, so the per-baseline antenna
     maps are tiled across times; otherwise the plain (Nbls,) maps are used.
 """
+
+
 def _unical_ant_inds(caldata_obj):
     if getattr(caldata_obj, "flatten_blts", False):
         return caldata_obj.ant1_inds_flat, caldata_obj.ant2_inds_flat
     return caldata_obj.ant1_inds, caldata_obj.ant2_inds
+
 
 """
     Reshape the optimizer's fitted u-parameter block back to (Ntimes, Nbls)
@@ -24,6 +27,8 @@ def _unical_ant_inds(caldata_obj):
     The flattened (Ntimes*Nbls) layout and the (Ntimes, Nbls) layout share the
     same underlying float ordering, so this is a pure reshape either way.
 """
+
+
 def _unpack_unical_fit_vis(u_part_flat, caldata_obj):
     if getattr(caldata_obj, "flatten_blts", False):
         u = np.reshape(u_part_flat, (caldata_obj.Ntimes * caldata_obj.Nbls, 2))
@@ -41,11 +46,13 @@ def _unpack_unical_fit_vis(u_part_flat, caldata_obj):
     that will constitute additional expected elements in that dimension of
     the array, handled similarly. This algorithm might update in the future.
 """
+
+
 def flatten_hessian(
     hess_arrays,
     Nants_unflagged,
-    Ntimes = None,
-    Nbls = None,
+    Ntimes=None,
+    Nbls=None,
 ):
     unical = len(hess_arrays[:]) > 3  # see if additional arrays for unical are passed
     if not unical:
@@ -54,7 +61,9 @@ def flatten_hessian(
         )
     else:
         hess_flattened = np.full(
-            (2 * Nants_unflagged + 2 * Nbls, 2 * Nants_unflagged + 2 * Nbls), np.nan, dtype=float
+            (2 * Nants_unflagged + 2 * Nbls, 2 * Nants_unflagged + 2 * Nbls),
+            np.nan,
+            dtype=float,
         )
     for ant_ind_1 in range(Nants_unflagged):
         for ant_ind_2 in range(Nants_unflagged):
@@ -78,26 +87,30 @@ def flatten_hessian(
                 if hess_row_ind >= Nants_unflagged and hess_col_ind >= Nants_unflagged:
                     # real-real
                     hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = hess_arrays[3][
-                        hess_row_ind - Nants_unflagged, 
+                        hess_row_ind - Nants_unflagged,
                         hess_col_ind - Nants_unflagged,
                     ]
                     # imag-real
-                    hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = hess_arrays[4][
-                        hess_row_ind - Nants_unflagged, 
-                        hess_col_ind - Nants_unflagged,
-                    ]
+                    hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = (
+                        hess_arrays[4][
+                            hess_row_ind - Nants_unflagged,
+                            hess_col_ind - Nants_unflagged,
+                        ]
+                    )
                     # real-imag
                     hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = np.conj(
                         hess_arrays[4][
-                            hess_col_ind - Nants_unflagged, 
+                            hess_col_ind - Nants_unflagged,
                             hess_row_ind - Nants_unflagged,
                         ]
                     )
                     # imag-imag
-                    hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = hess_arrays[5][
-                        hess_row_ind - Nants_unflagged, 
-                        hess_col_ind - Nants_unflagged,
-                    ]
+                    hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = (
+                        hess_arrays[5][
+                            hess_row_ind - Nants_unflagged,
+                            hess_col_ind - Nants_unflagged,
+                        ]
+                    )
                 # In the u-gains mix blocks
                 # Index Ordering:
                 #   6: Re(u) Re(g)
@@ -106,42 +119,59 @@ def flatten_hessian(
                 #   9: Im(u) Im(g)
                 else:
                     if hess_row_ind >= Nants_unflagged:
-                        hess_flattened[2*hess_row_ind, 2*hess_col_ind] = hess_arrays[6][
-                            hess_row_ind - Nants_unflagged,
-                            hess_col_ind,
-                        ]
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind] = hess_arrays[7][
-                            hess_row_ind - Nants_unflagged,
-                            hess_col_ind,
-                        ]
-                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = hess_arrays[8][
-                            hess_row_ind - Nants_unflagged,
-                            hess_col_ind,
-                        ]
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[9][
-                            hess_row_ind - Nants_unflagged,
-                            hess_col_ind,
-                        ]
+                        hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = (
+                            hess_arrays[6][
+                                hess_row_ind - Nants_unflagged,
+                                hess_col_ind,
+                            ]
+                        )
+                        hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = (
+                            hess_arrays[7][
+                                hess_row_ind - Nants_unflagged,
+                                hess_col_ind,
+                            ]
+                        )
+                        hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = (
+                            hess_arrays[8][
+                                hess_row_ind - Nants_unflagged,
+                                hess_col_ind,
+                            ]
+                        )
+                        hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = (
+                            hess_arrays[9][
+                                hess_row_ind - Nants_unflagged,
+                                hess_col_ind,
+                            ]
+                        )
                     # transpose (and complex conjugate?) of above block
                     elif hess_col_ind >= Nants_unflagged:
-                        hess_flattened[2*hess_row_ind, 2*hess_col_ind] = hess_arrays[6][
-                            hess_col_ind - Nants_unflagged,
-                            hess_row_ind,
-                        ]
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind] = hess_arrays[8][
-                            hess_col_ind - Nants_unflagged,
-                            hess_row_ind,
-                        ]
-                        hess_flattened[2*hess_row_ind, 2*hess_col_ind + 1] = hess_arrays[7][
-                            hess_col_ind - Nants_unflagged,
-                            hess_row_ind,
-                        ]
-                        hess_flattened[2*hess_row_ind + 1, 2*hess_col_ind + 1] = hess_arrays[9][
-                            hess_col_ind - Nants_unflagged,
-                            hess_row_ind,
-                        ]
+                        hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = (
+                            hess_arrays[6][
+                                hess_col_ind - Nants_unflagged,
+                                hess_row_ind,
+                            ]
+                        )
+                        hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = (
+                            hess_arrays[8][
+                                hess_col_ind - Nants_unflagged,
+                                hess_row_ind,
+                            ]
+                        )
+                        hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = (
+                            hess_arrays[7][
+                                hess_col_ind - Nants_unflagged,
+                                hess_row_ind,
+                            ]
+                        )
+                        hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = (
+                            hess_arrays[9][
+                                hess_col_ind - Nants_unflagged,
+                                hess_row_ind,
+                            ]
+                        )
 
     return hess_flattened
+
 
 def cost_skycal_wrapper(
     gains_flattened,
@@ -681,6 +711,7 @@ def hessian_dw_abscal_wrapper(
     )
     return hess
 
+
 def cost_unical_wrapper(
     params_flattened,
     caldata_obj,
@@ -699,8 +730,8 @@ def cost_unical_wrapper(
     Parameters
     ----------
     params_flattened : array of float
-        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params 
-        and u params. Even indices correspond to the real components of the and odd 
+        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params
+        and u params. Even indices correspond to the real components of the and odd
         indices correspond to the imaginary components.
     caldata_obj : CalData
     ant_inds : array of int
@@ -721,7 +752,9 @@ def cost_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
+    gains_reshaped = np.reshape(
+        params_flattened[: 2 * len(ant_inds)], (len(ant_inds), 2)
+    )
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
@@ -729,10 +762,16 @@ def cost_unical_wrapper(
         return gains_reshaped
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
     if caldata_obj.flatten_blts:
-        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
-        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[np.newaxis, :]
+        fit_vis_reshaped = np.reshape(
+            params_flattened[2 * n_ants_unflagged :], (n_times * len(bl_inds), 2)
+        )
+        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[
+            np.newaxis, :
+        ]
     else:
-        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
+        fit_vis_reshaped = np.reshape(
+            params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
+        )
         fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     if dev_type == "test fit vis rolled":
         return fit_vis_reshaped
@@ -796,8 +835,8 @@ def jacobian_unical_wrapper(
     Parameters
     ----------
     params_flattened : array of float
-        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params 
-        and u params. Even indices correspond to the real components of the and odd 
+        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params
+        and u params. Even indices correspond to the real components of the and odd
         indices correspond to the imaginary components.
     caldata_obj : CalData
     ant_inds : array of int
@@ -821,16 +860,24 @@ def jacobian_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
+    gains_reshaped = np.reshape(
+        params_flattened[: 2 * len(ant_inds)], (len(ant_inds), 2)
+    )
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
     if caldata_obj.flatten_blts:
-        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
-        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[np.newaxis, :]
+        fit_vis_reshaped = np.reshape(
+            params_flattened[2 * n_ants_unflagged :], (n_times * len(bl_inds), 2)
+        )
+        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[
+            np.newaxis, :
+        ]
     else:
-        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
+        fit_vis_reshaped = np.reshape(
+            params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
+        )
         fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     jac = cost_function_calculations.jacobian_unical(
         gains,
@@ -885,8 +932,8 @@ def hessian_unical_wrapper(
     Parameters
     ----------
     params_flattened : array of float
-        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params 
-        and u params. Even indices correspond to the real components of the and odd 
+        Shape (2*Nants_unflagged + 2*Nbls,). Array of values for gain params
+        and u params. Even indices correspond to the real components of the and odd
         indices correspond to the imaginary components.
     caldata_obj : CalData
     ant_inds : array of int
@@ -907,16 +954,24 @@ def hessian_unical_wrapper(
     """
 
     # reshape gain params
-    gains_reshaped = np.reshape(params_flattened[:2*len(ant_inds)], (len(ant_inds), 2))
+    gains_reshaped = np.reshape(
+        params_flattened[: 2 * len(ant_inds)], (len(ant_inds), 2)
+    )
     gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
     if caldata_obj.flatten_blts:
-        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times * len(bl_inds), 2))
-        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[np.newaxis, :]
+        fit_vis_reshaped = np.reshape(
+            params_flattened[2 * n_ants_unflagged :], (n_times * len(bl_inds), 2)
+        )
+        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[
+            np.newaxis, :
+        ]
     else:
-        fit_vis_reshaped = np.reshape(params_flattened[2*n_ants_unflagged:], (n_times, len(bl_inds), 2))
+        fit_vis_reshaped = np.reshape(
+            params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
+        )
         fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     (
         gain_hess_real_real,
@@ -944,7 +999,7 @@ def hessian_unical_wrapper(
         caldata_obj.bl_inds,
         caldata_obj.lambda_val,
     )
-    #if caldata_obj.gains_multiply_model:
+    # if caldata_obj.gains_multiply_model:
 
     hess_unical = flatten_hessian(
         [
@@ -963,6 +1018,7 @@ def hessian_unical_wrapper(
         Nbls=len(caldata_obj.bl_inds),
     )
     return hess_unical
+
 
 def run_skycal_optimization_per_pol_single_freq(
     caldata_obj,
@@ -1033,7 +1089,10 @@ def run_skycal_optimization_per_pol_single_freq(
             caldata_obj.reshape_data(freq_ind, vis_pol_ind)
             if dev_type == "test gains flattened":
                 return gains_init_flattened
-            if dev_type == "test gains rolled" or dev_type == "test gains one run skycal":
+            if (
+                dev_type == "test gains rolled"
+                or dev_type == "test gains one run skycal"
+            ):
                 return cost_skycal_wrapper(
                     gains_init_flattened,
                     caldata_obj,
@@ -1056,7 +1115,7 @@ def run_skycal_optimization_per_pol_single_freq(
             if verbose:
                 print(result.message)
                 print(
-                    f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
+                    f"Optimization time: {(end_optimize - start_optimize) / 60.0} minutes"
                 )
             sys.stdout.flush()
             gains_fit_single_pol = np.reshape(result.x, (len(caldata_obj.ant_inds), 2))
@@ -1171,7 +1230,9 @@ def run_abscal_optimization_single_freq(
         end_optimize = time.time()
         if verbose:
             print(result.message)
-            print(f"Optimization time: {(end_optimize - start_optimize)/60.} minutes")
+            print(
+                f"Optimization time: {(end_optimize - start_optimize) / 60.0} minutes"
+            )
         sys.stdout.flush()
 
     return abscal_params
@@ -1231,10 +1292,11 @@ def run_dw_abscal_optimization(
         )
         if verbose:
             print(result.message)
-            print(f"Optimization time: {(time.time() - start_optimize)/60.} minutes")
+            print(f"Optimization time: {(time.time() - start_optimize) / 60.0} minutes")
         sys.stdout.flush()
 
     return abscal_params
+
 
 def run_unical_optimization(
     caldata_obj,
@@ -1283,19 +1345,24 @@ def run_unical_optimization(
     """
 
     optimization_methods = {
-        "scipy",     "pytorch",
-        "powell",    "scipy powell",
-        "bfgs",      "scipy bfgs",
-        "newton-cg", "scipy newton-cg"
-        "lbfgs",     "pytorch lbfgs",
-        "adam",      "pytorch adam",
+        "scipy",
+        "pytorch",
+        "powell",
+        "scipy powell",
+        "bfgs",
+        "scipy bfgs",
+        "newton-cg",
+        "scipy newton-cglbfgs",
+        "pytorch lbfgs",
+        "adam",
+        "pytorch adam",
     }
 
     if optimization_scheme not in optimization_methods:
         print(f"Optimization scheme not known, defaulting to SciPy Powell")
         print(f"Available options:\n{optimization_methods=}")
-        optimization_scheme="powell"
-    
+        optimization_scheme = "powell"
+
     gains_fit = np.full(
         (caldata_obj.Nants, caldata_obj.N_feed_pols),
         np.nan + 1j * np.nan,
@@ -1307,7 +1374,11 @@ def run_unical_optimization(
         return gains_fit
     fit_vis_fit = np.full(
         # (caldata_obj.Ntimes, caldata_obj.Nbls, caldata_obj.N_vis_pols),
-        (np.size(caldata_obj.data_visibilities, axis=0), caldata_obj.Nbls, caldata_obj.N_vis_pols),
+        (
+            np.size(caldata_obj.data_visibilities, axis=0),
+            caldata_obj.Nbls,
+            caldata_obj.N_vis_pols,
+        ),
         # (1, caldata_obj.Ntimes * caldata_obj.Nbls, caldata_obj.N_vis_pols),
         np.nan + 1j * np.nan,
         dtype=complex,
@@ -1319,9 +1390,7 @@ def run_unical_optimization(
             np.max(caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
         ):  # All flagged
             gains_fit[:, feed_pol_ind] = np.nan + 1j * np.nan
-        elif (
-            np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) == -1.0
-        ):
+        elif np.max(caldata_obj.model_weights[:, :, freq_ind, vis_pol_ind]) == -1.0:
             fit_vis_fit[:, :, vis_pol_ind] = np.nan + 1j * np.nan
         else:
             start_prep = time.time()
@@ -1329,9 +1398,11 @@ def run_unical_optimization(
             caldata_obj.set_bl_inds(freq_ind, vis_pol_ind)
             n_ants_unflagged = len(caldata_obj.ant_inds)
             caldata_obj.reshape_data(freq_ind, vis_pol_ind, unical=True)
-            if (optimization_scheme == "lbfgs" or
-                optimization_scheme == "pytorch lbfgs" or
-                optimization_scheme == "pytorch"):
+            if (
+                optimization_scheme == "lbfgs"
+                or optimization_scheme == "pytorch lbfgs"
+                or optimization_scheme == "pytorch"
+            ):
                 """
                     Do PyTorch L-BFGS optimization
                     (use complex variables directly)
@@ -1341,16 +1412,14 @@ def run_unical_optimization(
                 # else:
                 device = torch.device("cpu")
                 if verbose:
-                    print ("MPS device not found.")
+                    print("MPS device not found.")
                 sys.stdout.flush()
                 start_optimize = time.time()
                 # main params arrays as tensors
                 gains_fit_tensor = torch.from_numpy(
                     caldata_obj.gains[
-                        caldata_obj.ant_inds, 
-                        freq_ind, 
-                        feed_pol_ind
-                    ].copy(), 
+                        caldata_obj.ant_inds, freq_ind, feed_pol_ind
+                    ].copy(),
                 ).to(
                     device=device,
                     dtype=torch.complex128,
@@ -1362,7 +1431,9 @@ def run_unical_optimization(
                     (np.size(caldata_obj.data_visibilities, axis=0), caldata_obj.Nbls),
                 )
                 if caldata_obj.flatten_blts:
-                    _fit_vis_init = _fit_vis_init.reshape(1, caldata_obj.Ntimes * caldata_obj.Nbls)
+                    _fit_vis_init = _fit_vis_init.reshape(
+                        1, caldata_obj.Ntimes * caldata_obj.Nbls
+                    )
                 fit_vis_fit_tensor = torch.from_numpy(
                     _fit_vis_init.copy(),
                 ).to(
@@ -1418,47 +1489,56 @@ def run_unical_optimization(
                 gains_fit_tensor.requires_grad_(True)
                 fit_vis_fit_tensor.requires_grad_(True)
                 params = [gains_fit_tensor, fit_vis_fit_tensor]
-                tolerance_grad   = 1e-9
+                tolerance_grad = 1e-9
                 tolerance_change = 1e-9
                 optimizer = torch.optim.LBFGS(
-                    params, 
-                    lr               = 1.0, 
-                    max_iter         = 100,
-                    history_size     = 10,
-                    tolerance_grad   = tolerance_grad,
-                    tolerance_change = tolerance_change,
-                    line_search_fn   = "strong_wolfe",
+                    params,
+                    lr=1.0,
+                    max_iter=100,
+                    history_size=10,
+                    tolerance_grad=tolerance_grad,
+                    tolerance_change=tolerance_change,
+                    line_search_fn="strong_wolfe",
                 )
+
                 # helper functions for two tensor grads
                 def _all_finite(tensors):
                     return all(
-                        torch.isfinite(torch.view_as_real(tensor)).all() for tensor in tensors
+                        torch.isfinite(torch.view_as_real(tensor)).all()
+                        for tensor in tensors
                     )
+
                 def _grads_finite(tensors):
                     return all(
-                        tensor.grad is not None and
-                        torch.isfinite(torch.view_as_real(tensor.grad)).all() for tensor in tensors
+                        tensor.grad is not None
+                        and torch.isfinite(torch.view_as_real(tensor.grad)).all()
+                        for tensor in tensors
                     )
+
                 # Euclidean norm across two tensor grads
                 def _joint_grad_norm(tensors):
                     return torch.sqrt(
-                        sum(torch.view_as_real(tensor.grad).pow(2).sum()
-                          for tensor in tensors if tensor.grad is not None)
+                        sum(
+                            torch.view_as_real(tensor.grad).pow(2).sum()
+                            for tensor in tensors
+                            if tensor.grad is not None
+                        )
                     )
+
                 def closure():
                     optimizer.zero_grad()
                     loss = cost_function_calculations.cost_unical_torch(
-                        gains         = gains_fit_tensor,
-                        fit_vis       = fit_vis_fit_tensor,
-                        data_vis      = data_tensor,
-                        model_vis     = model_tensor,
-                        vis_weights   = vis_weights_tensor,
-                        model_weights = model_weights_tensor,
-                        ant_inds      = ant_inds_tensor,
-                        ant1_inds     = ant1_inds_tensor,
-                        ant2_inds     = ant2_inds_tensor,
-                        num_ants      = caldata_obj.Nants,
-                        lambda_val    = caldata_obj.lambda_val,
+                        gains=gains_fit_tensor,
+                        fit_vis=fit_vis_fit_tensor,
+                        data_vis=data_tensor,
+                        model_vis=model_tensor,
+                        vis_weights=vis_weights_tensor,
+                        model_weights=model_weights_tensor,
+                        ant_inds=ant_inds_tensor,
+                        ant1_inds=ant1_inds_tensor,
+                        ant2_inds=ant2_inds_tensor,
+                        num_ants=caldata_obj.Nants,
+                        lambda_val=caldata_obj.lambda_val,
                     )
                     loss.backward()
                     max_norm = 1e3
@@ -1473,6 +1553,7 @@ def run_unical_optimization(
                                 if p.grad is not None:
                                     p.grad.mul_(max_norm / grad_norm)
                     return loss
+
                 best_loss = np.inf
                 best_params = [p.detach().clone() for p in params]
                 previous_loss = None
@@ -1481,58 +1562,79 @@ def run_unical_optimization(
                     loss_val = loss.item()
                     if not np.isfinite(loss_val) or not _all_finite(params):
                         if verbose:
-                            print(f"Non-finite at iteration {i}; "
-                                  "keeping best finite solution (loss={best_loss:.3e}).")
+                            print(
+                                f"Non-finite at iteration {i}; "
+                                "keeping best finite solution (loss={best_loss:.3e})."
+                            )
                         break
                     if loss_val < best_loss:
                         best_loss = loss_val
                         best_params = [p.detach().clone() for p in params]
-                    if (previous_loss is not None 
-                        and abs(previous_loss - loss.item()) < tolerance_change):
+                    if (
+                        previous_loss is not None
+                        and abs(previous_loss - loss.item()) < tolerance_change
+                    ):
                         print(f"Converged at iteration {i}")
                         break
                     previous_loss = loss_val
                 gains_best, fit_vis_best = best_params
-                gains_final   = gains_best.detach().cpu().numpy().astype(gains_fit.dtype)      # (Nants_unflagged,)
-                fit_vis_final = fit_vis_best.detach().cpu().numpy().astype(fit_vis_fit.dtype)  # (Ntimes, Nbls) or (1, Ntimes*Nbls)
+                gains_final = (
+                    gains_best.detach().cpu().numpy().astype(gains_fit.dtype)
+                )  # (Nants_unflagged,)
+                fit_vis_final = (
+                    fit_vis_best.detach().cpu().numpy().astype(fit_vis_fit.dtype)
+                )  # (Ntimes, Nbls) or (1, Ntimes*Nbls)
                 if caldata_obj.flatten_blts:
                     # collapse the flat (1, Ntimes*Nbls) view back to (Ntimes, Nbls) for storage
-                    fit_vis_final = fit_vis_final.reshape(caldata_obj.Ntimes, caldata_obj.Nbls)
+                    fit_vis_final = fit_vis_final.reshape(
+                        caldata_obj.Ntimes, caldata_obj.Nbls
+                    )
                 if verbose:
-                    # recreate scipy 
-                    print(f"***PyTorch Result***") 
+                    # recreate scipy
+                    print(f"***PyTorch Result***")
                     state = optimizer.state[gains_fit_tensor]
                     print(f"\tIterations:         {state.get('n_iter', 'N/A')}")
                     print(f"\tFunction evals:     {state.get('func_evals', 'N/A')}")
                     if _grads_finite(params):
-                        grad_norm = _joint_grad_norm(params).item() 
+                        grad_norm = _joint_grad_norm(params).item()
                         print(f"Max gradient norm:  {grad_norm:.3e}")
                         if grad_norm < tolerance_grad:
                             print("Message: Gradient tolerance reached (converged)")
                         elif abs(previous_loss - loss.item()) < tolerance_change:
                             print("Message: Loss change tolerance reached (converged)")
                         else:
-                            print("Message: Max iterations reached (may not have converged)")
-                    print(f"\tOptimization time:  {(time.time()
-                                                  - start_optimize) / 60} minutes")
+                            print(
+                                "Message: Max iterations reached (may not have converged)"
+                            )
+                    print(
+                        f"\tOptimization time:  {
+                            (time.time() - start_optimize) / 60
+                        } minutes"
+                    )
                 sys.stdout.flush()
-                gains_fit[caldata_obj.ant_inds, feed_pol_ind]    = gains_final
+                gains_fit[caldata_obj.ant_inds, feed_pol_ind] = gains_final
                 fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = fit_vis_final
                 # fit_vis_fit[0, caldata_obj.Ntimes * caldata_obj.bl_inds, vis_pol_ind] = fit_vis_final
 
-            if (optimization_scheme == "powell" or
-                optimization_scheme == "scipy powell" or
-                optimization_scheme == "scipy"):
+            if (
+                optimization_scheme == "powell"
+                or optimization_scheme == "scipy powell"
+                or optimization_scheme == "scipy"
+            ):
                 """
                 Do SciPy Powell optimization (break up complex variables
                 into real and imaginary parts for minimizer function)
                 """
                 caldata_obj.set_ant_inds(freq_ind, feed_pol_ind)
-                params_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind, unical=True)
+                params_init_flattened = caldata_obj.pack(
+                    freq_ind, feed_pol_ind, unical=True
+                )
                 caldata_obj.reshape_data(freq_ind, vis_pol_ind, unical=True)
-                print(f"Preparing params time - {(time.time()-start_prep)/60} minutes")
+                print(
+                    f"Preparing params time - {(time.time() - start_prep) / 60} minutes"
+                )
                 if dev_type == "test gains flattened":
-                    return params_init_flattened[:2*len(caldata_obj.ant_inds)]
+                    return params_init_flattened[: 2 * len(caldata_obj.ant_inds)]
                 elif len(dev_type) > 0:
                     return cost_unical_wrapper(
                         params_init_flattened,
@@ -1542,121 +1644,154 @@ def run_unical_optimization(
                         caldata_obj.bl_inds + n_ants_unflagged,
                         freq_ind,
                         vis_pol_ind,
-                        dev_type=dev_type
+                        dev_type=dev_type,
                     )
                 # Minimize the cost function
                 start_optimize = time.time()
                 result = scipy.optimize.minimize(
                     cost_unical_wrapper,
                     params_init_flattened,
-                    args=(caldata_obj, 
-                        caldata_obj.ant_inds, 
+                    args=(
+                        caldata_obj,
+                        caldata_obj.ant_inds,
                         n_ants_unflagged,
                         caldata_obj.Ntimes,
                         caldata_obj.bl_inds + n_ants_unflagged,
                         freq_ind,
-                        vis_pol_ind),
+                        vis_pol_ind,
+                    ),
                     method="Powell",
                     options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
                 )
-                print(f"Optimization time: {(time.time()-start_optimize)/60} minutes")
+                print(
+                    f"Optimization time: {(time.time() - start_optimize) / 60} minutes"
+                )
                 end_optimize = time.time()
                 if verbose:
                     print(result.message)
                     print(
-                        f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
+                        f"Optimization time: {(end_optimize - start_optimize) / 60.0} minutes"
                     )
                 sys.stdout.flush()
-                gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)],
-                                                (len(caldata_obj.ant_inds), 2))
+                gains_fit_single_pol = np.reshape(
+                    result.x[: 2 * len(caldata_obj.ant_inds)],
+                    (len(caldata_obj.ant_inds), 2),
+                )
                 gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
                     gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
                 )
                 # Reshape the fitted u-block back to (Ntimes, Nbls) for storage,
                 # inverting the flat or (Ntimes, Nbls) layout used during the solve.
-                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = _unpack_unical_fit_vis(
-                    result.x[2*len(caldata_obj.ant_inds):], caldata_obj
+                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = (
+                    _unpack_unical_fit_vis(
+                        result.x[2 * len(caldata_obj.ant_inds) :], caldata_obj
+                    )
                 )
 
-            if (optimization_scheme == "bfgs" or
-                optimization_scheme == "scipy bfgs"):
+            if optimization_scheme == "bfgs" or optimization_scheme == "scipy bfgs":
                 """
                 Do SciPy BFGS optimization (break up complex variables
                 into real and imaginary parts for minimizer function)
                 """
-                params_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind, unical=True)
-                print(f"Preparing params time - {(time.time()-start_prep)/60} minutes")
+                params_init_flattened = caldata_obj.pack(
+                    freq_ind, feed_pol_ind, unical=True
+                )
+                print(
+                    f"Preparing params time - {(time.time() - start_prep) / 60} minutes"
+                )
                 start_optimize = time.time()
                 result = scipy.optimize.minimize(
                     cost_unical_wrapper,
                     params_init_flattened,
-                    args=(caldata_obj, 
-                        caldata_obj.ant_inds, 
+                    args=(
+                        caldata_obj,
+                        caldata_obj.ant_inds,
                         n_ants_unflagged,
                         caldata_obj.Ntimes,
                         caldata_obj.bl_inds + n_ants_unflagged,
                         freq_ind,
-                        vis_pol_ind),
+                        vis_pol_ind,
+                    ),
                     method="BFGS",
                     jac=jacobian_unical_wrapper,
                     options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
                 )
-                print(f"Optimization time: {(time.time()-start_optimize)/60} minutes")
+                print(
+                    f"Optimization time: {(time.time() - start_optimize) / 60} minutes"
+                )
                 end_optimize = time.time()
                 if verbose:
                     print(result.message)
                     print(
-                        f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
+                        f"Optimization time: {(end_optimize - start_optimize) / 60.0} minutes"
                     )
                 sys.stdout.flush()
-                gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)],
-                                                (len(caldata_obj.ant_inds), 2))
+                gains_fit_single_pol = np.reshape(
+                    result.x[: 2 * len(caldata_obj.ant_inds)],
+                    (len(caldata_obj.ant_inds), 2),
+                )
                 gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
                     gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
                 )
-                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = _unpack_unical_fit_vis(
-                    result.x[2*len(caldata_obj.ant_inds):], caldata_obj
+                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = (
+                    _unpack_unical_fit_vis(
+                        result.x[2 * len(caldata_obj.ant_inds) :], caldata_obj
+                    )
                 )
-                
-            if (optimization_scheme == "newton-cg" or
-                optimization_scheme == "scipy newton-cg"):
+
+            if (
+                optimization_scheme == "newton-cg"
+                or optimization_scheme == "scipy newton-cg"
+            ):
                 """
                 Do SciPy Newton-CGS optimization (break up complex variables
                 into real and imaginary parts for minimizer function)
                 """
-                params_init_flattened = caldata_obj.pack(freq_ind, feed_pol_ind, unical=True)
-                print(f"Preparing params time - {(time.time()-start_prep)/60} minutes")
+                params_init_flattened = caldata_obj.pack(
+                    freq_ind, feed_pol_ind, unical=True
+                )
+                print(
+                    f"Preparing params time - {(time.time() - start_prep) / 60} minutes"
+                )
                 start_optimize = time.time()
                 result = scipy.optimize.minimize(
                     cost_unical_wrapper,
                     params_init_flattened,
-                    args=(caldata_obj, 
-                        caldata_obj.ant_inds, 
+                    args=(
+                        caldata_obj,
+                        caldata_obj.ant_inds,
                         n_ants_unflagged,
                         caldata_obj.Ntimes,
                         caldata_obj.bl_inds + n_ants_unflagged,
                         freq_ind,
-                        vis_pol_ind),
+                        vis_pol_ind,
+                    ),
                     method="Newton-CG",
                     jac=jacobian_unical_wrapper,
                     hess=hessian_unical_wrapper,
                     options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
                 )
-                print(f"Optimization time: {(time.time()-start_optimize)/60} minutes")
+                print(
+                    f"Optimization time: {(time.time() - start_optimize) / 60} minutes"
+                )
                 end_optimize = time.time()
                 if verbose:
                     print(result.message)
                     print(
-                        f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
+                        f"Optimization time: {(end_optimize - start_optimize) / 60.0} minutes"
                     )
                 sys.stdout.flush()
-                gains_fit_single_pol = np.reshape(result.x[:2*len(caldata_obj.ant_inds)],
-                                                (len(caldata_obj.ant_inds), 2))
+                gains_fit_single_pol = np.reshape(
+                    result.x[: 2 * len(caldata_obj.ant_inds)],
+                    (len(caldata_obj.ant_inds), 2),
+                )
                 gains_fit[caldata_obj.ant_inds, feed_pol_ind] = (
                     gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
                 )
-                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = _unpack_unical_fit_vis(
-                    result.x[2*len(caldata_obj.ant_inds):], caldata_obj
+                fit_vis_fit[:, caldata_obj.bl_inds, vis_pol_ind] = (
+                    _unpack_unical_fit_vis(
+                        result.x[2 * len(caldata_obj.ant_inds) :], caldata_obj
+                    )
                 )
 
             # Ensure that the phase of the gains is mean-zero

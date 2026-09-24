@@ -6,6 +6,7 @@ from calico import calibration_qa, calibration_optimization
 import multiprocessing
 from calico.dev import variable_weights, dev_tools
 
+
 class CalData:
     """
     Object containing all data and parameters needed for calibration.
@@ -166,10 +167,10 @@ class CalData:
         self.sigma_m_0 = None
         self.antpos_enu = None
         self.threshold_length = 0
-        self.threshold_mask = None,
-        self.thermal_noise_real = None,
-        self.model_error_real_long = None,
-        self.model_error_real_short = None,
+        self.threshold_mask = (None,)
+        self.thermal_noise_real = (None,)
+        self.model_error_real_long = (None,)
+        self.model_error_real_short = (None,)
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -228,8 +229,8 @@ class CalData:
         min_cal_baseline_lambda=None,
         max_cal_baseline_lambda=None,
         lambda_val=100,
-        glim=(-1,1),
-        ulim=(-10,10),
+        glim=(-1, 1),
+        ulim=(-10, 10),
         weighting_function="constant_weights",
         scaling_factor_cost=1,
         sigma_t_0=0.1,
@@ -433,9 +434,7 @@ class CalData:
                     np.where(
                         np.abs(model_times - time_val)
                         == np.min(np.abs(model_times - time_val))
-                    )[0][
-                        0
-                    ]  # Account for times that are close but not exactly equal
+                    )[0][0]  # Account for times that are close but not exactly equal
                 ],
                 inplace=False,
             )
@@ -489,6 +488,7 @@ class CalData:
         self.lst = np.mean(metadata_reference.lst_array)
         # self.telescope_location = metadata_reference.telescope_location
         from astropy.coordinates import EarthLocation
+
         location = EarthLocation.from_geodetic(0, 0, 0)
 
         if (min_cal_baseline_lambda is not None) or (
@@ -699,7 +699,7 @@ class CalData:
             scaling_factor=scaling_factor_cost,
             sigma_t_0=sigma_t_0,
             sigma_m_0=sigma_m_0,
-            threshold_length=self.threshold_length
+            threshold_length=self.threshold_length,
         )
         # # NOTE: Incorporate this into VWA
         # print(f"\n\n***MAX FLAG ARRAY***\n  {np.max(flag_array)=}\n\n")
@@ -711,7 +711,7 @@ class CalData:
         self.lambda_val = lambda_val
 
         # # DEV: make copies of original data vis, fit vis, and gains
-        # self.data_vis_orig = self.data_visibilities.copy() 
+        # self.data_vis_orig = self.data_visibilities.copy()
         # self.fit_vis_orig = self.fit_vis.copy()
         # self.gains_orig = self.gains.copy()
 
@@ -1359,12 +1359,12 @@ class CalData:
 
         # interweave real and imaginary parts of gains
         gains_flattened = np.stack(
-                (
-                    self.gains_real,
-                    self.gains_imag,
-                ),
-                axis=1,
-            ).flatten()
+            (
+                self.gains_real,
+                self.gains_imag,
+            ),
+            axis=1,
+        ).flatten()
         if not unical:
             return gains_flattened
         else:
@@ -1398,7 +1398,8 @@ class CalData:
             Visibility polarization index.
         """
         reshaped_shape = (
-            (1, self.Ntimes * self.Nbls) if self.flatten_blts 
+            (1, self.Ntimes * self.Nbls)
+            if self.flatten_blts
             else (np.size(self.data_visibilities, axis=0), self.Nbls)
         )
         self.data_vis_reshaped = np.reshape(
@@ -1418,7 +1419,7 @@ class CalData:
                 self.model_weights[:, :, freq_ind, vis_pol_ind],
                 reshaped_shape,
             )
-    
+
     def set_ant_inds(self, freq_ind, feed_pol_ind):
         """
         This function sets indices of unflagged antennas
@@ -1450,15 +1451,19 @@ class CalData:
 
     def set_bl_inds(self, freq_ind, vis_pol_ind):
         weights_summed = np.sum(
-            (self.model_weights[:, :, freq_ind, vis_pol_ind]
-                + self.visibility_weights[:, :, freq_ind, vis_pol_ind]),
+            (
+                self.model_weights[:, :, freq_ind, vis_pol_ind]
+                + self.visibility_weights[:, :, freq_ind, vis_pol_ind]
+            ),
             axis=0,
         )
         self.bl_inds = np.where(weights_summed > 0.0)[0]
 
     def write_fit_vis(self):
         if not np.any(self.ant_inds):
-            print("WARNING: All data was flagged. No u_cal file could be written.")  # update this later to a proper warning
+            print(
+                "WARNING: All data was flagged. No u_cal file could be written."
+            )  # update this later to a proper warning
             return
         # fit_vis_uvdata = pyuvdata.UVData()
         # fit_vis_uvdata.data_array = self.fit_vis
@@ -1479,7 +1484,7 @@ class CalData:
     ):
         """
         Run calibration per polarization. Updates the gains attribute and u parameters with
-        calibrated values. Here the XX and YY visibilities are calibrated individually and 
+        calibrated values. Here the XX and YY visibilities are calibrated individually and
         the cross-polarization phase is applied from the XY and YX visibilities after the fact
         to the gains (models later?). Option to parallelize calibration across frequency.
 
@@ -1509,7 +1514,7 @@ class CalData:
         verbose : bool
             Set to True to print optimization outputs. Default False.
         """
-        
+
         if np.max(self.visibility_weights) == 0.0:
             print("ERROR: All data flagged.")
             sys.stdout.flush()
@@ -1547,20 +1552,26 @@ class CalData:
             else:
                 for freq_ind in range(self.Nfreqs):
                     dev = dev_tools.DevTools()
-                    gains_fit, fit_vis_fit = calibration_optimization.run_unical_optimization(
-                        self,
-                        xtol,
-                        maxiter,
-                        freq_ind                = freq_ind,
-                        verbose                 = verbose,
-                        get_crosspol_phase      = get_crosspol_phase,
-                        crosspol_phase_strategy = crosspol_phase_strategy,
-                        optimization_scheme     = optimization_scheme
+                    gains_fit, fit_vis_fit = (
+                        calibration_optimization.run_unical_optimization(
+                            self,
+                            xtol,
+                            maxiter,
+                            freq_ind=freq_ind,
+                            verbose=verbose,
+                            get_crosspol_phase=get_crosspol_phase,
+                            crosspol_phase_strategy=crosspol_phase_strategy,
+                            optimization_scheme=optimization_scheme,
+                        )
                     )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
-                    print(f"\n\n***fit vis shapes (caldata)***"
-                          f"\n  fit_vis     {self.fit_vis[:,:,[freq_ind],:].shape}"
-                          f"\n  fit_vis_fit {fit_vis_fit[:,:,np.newaxis,:].shape}\n\n")
-                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
+                    print(
+                        f"\n\n***fit vis shapes (caldata)***"
+                        f"\n  fit_vis     {self.fit_vis[:, :, [freq_ind], :].shape}"
+                        f"\n  fit_vis_fit {fit_vis_fit[:, :, np.newaxis, :].shape}\n\n"
+                    )
+                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[
+                        :, :, np.newaxis, :
+                    ].copy()
 
-                    #self.write_fit_vis()
+                    # self.write_fit_vis()

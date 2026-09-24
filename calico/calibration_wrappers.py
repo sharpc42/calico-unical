@@ -5,6 +5,7 @@ import pyuvdata
 import multiprocessing
 from calico import caldata
 
+
 def sky_based_calibration_wrapper(
     data,
     model,
@@ -200,7 +201,7 @@ def sky_based_calibration_wrapper(
     if verbose:
         if print_data_read_time:
             print(
-                f"Done. Data read time {(time.time() - data_read_start_time)/60.} minutes."
+                f"Done. Data read time {(time.time() - data_read_start_time) / 60.0} minutes."
             )
         print("Formatting data...")
         sys.stdout.flush()
@@ -231,7 +232,7 @@ def sky_based_calibration_wrapper(
 
     if verbose:
         print(
-            f"Done. Data formatting time {(time.time() - data_format_start_time)/60.} minutes."
+            f"Done. Data formatting time {(time.time() - data_format_start_time) / 60.0} minutes."
         )
         print("Running calibration optimization...")
         sys.stdout.flush()
@@ -248,10 +249,10 @@ def sky_based_calibration_wrapper(
         )
         if verbose:
             print(
-                f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
+                f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter + 1} of {antenna_flagging_iterations}."
             )
             print(
-                f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
+                f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time) / 60.0} minutes."
             )
             sys.stdout.flush()
         caldata_obj.flag_antennas_from_per_ant_cost(
@@ -272,7 +273,7 @@ def sky_based_calibration_wrapper(
     )
     if verbose:
         print(
-            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes"
+            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time) / 60.0} minutes"
         )
         sys.stdout.flush()
 
@@ -283,7 +284,7 @@ def sky_based_calibration_wrapper(
     uvcal = caldata_obj.convert_to_uvcal()
 
     if verbose:
-        print(f"Total processing time {(time.time() - start_time)/60.} minutes.")
+        print(f"Total processing time {(time.time() - start_time) / 60.0} minutes.")
         sys.stdout.flush()
 
     if log_file_path is not None:
@@ -405,7 +406,7 @@ def abscal_wrapper(
 
     if verbose and print_data_read_time:
         print(
-            f"Done. Data read time {(time.time() - data_read_start_time)/60.} minutes."
+            f"Done. Data read time {(time.time() - data_read_start_time) / 60.0} minutes."
         )
         sys.stdout.flush()
     if verbose:
@@ -428,7 +429,7 @@ def abscal_wrapper(
 
     if verbose:
         print(
-            f"Done. Data formatting time {(time.time() - data_format_start_time)/60.} minutes."
+            f"Done. Data formatting time {(time.time() - data_format_start_time) / 60.0} minutes."
         )
         print("Running calibration optimization...")
         sys.stdout.flush()
@@ -439,9 +440,9 @@ def abscal_wrapper(
 
     if verbose:
         print(
-            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes"
+            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time) / 60.0} minutes"
         )
-        print(f"Total processing time {(time.time() - start_time)/60.} minutes.")
+        print(f"Total processing time {(time.time() - start_time) / 60.0} minutes.")
         sys.stdout.flush()
 
     if log_file_path is not None:
@@ -578,7 +579,7 @@ def dw_absolute_calibration(
 
     if verbose and print_data_read_time:
         print(
-            f"Done. Data read time {(time.time() - data_read_start_time)/60.} minutes."
+            f"Done. Data read time {(time.time() - data_read_start_time) / 60.0} minutes."
         )
         sys.stdout.flush()
     if verbose:
@@ -604,7 +605,7 @@ def dw_absolute_calibration(
 
     if verbose:
         print(
-            f"Done. Data formatting time {(time.time() - data_format_start_time)/60.} minutes."
+            f"Done. Data formatting time {(time.time() - data_format_start_time) / 60.0} minutes."
         )
         print("Calculating delay weighting matrix...")
         sys.stdout.flush()
@@ -617,7 +618,7 @@ def dw_absolute_calibration(
 
     if verbose:
         print(
-            f"Done. Time calculating delay weighting matrix {(time.time() - data_format_start_time)/60.} minutes."
+            f"Done. Time calculating delay weighting matrix {(time.time() - data_format_start_time) / 60.0} minutes."
         )
         print("Running calibration optimization...")
         sys.stdout.flush()
@@ -627,9 +628,9 @@ def dw_absolute_calibration(
 
     if verbose:
         print(
-            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes"
+            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time) / 60.0} minutes"
         )
-        print(f"Total processing time {(time.time() - start_time)/60.} minutes.")
+        print(f"Total processing time {(time.time() - start_time) / 60.0} minutes.")
         sys.stdout.flush()
 
     if log_file_path is not None:
@@ -752,6 +753,7 @@ def apply_abscal(
     if not inplace:
         return uvdata_new
 
+
 def unified_calibration_wrapper(
     data,
     model,
@@ -782,8 +784,8 @@ def unified_calibration_wrapper(
     verbose=False,
     log_file_path=None,
     # dev
-    glim=(-1,1),
-    ulim=(-10,10),
+    glim=(-1, 1),
+    ulim=(-10, 10),
     antenna_gain_weights=None,
     model_baseline_weights=None,
     threshold_length=None,
@@ -799,11 +801,11 @@ def unified_calibration_wrapper(
     calibration_type="unical",
 ):
     """
-    Top-level wrapper for running unified calibration per polarization. Function 
+    Top-level wrapper for running unified calibration per polarization. Function
     creates a CalData object, updates the gains attribute and u parameters, and
-    returns a pyuvdata UVCal object containing the calibration solutions. Here the 
-    XX and YY visibilities are calibrated individually and the cross-polarization 
-    phase is applied from the XY and YX visibilities after the fact. Option to 
+    returns a pyuvdata UVCal object containing the calibration solutions. Here the
+    XX and YY visibilities are calibrated individually and the cross-polarization
+    phase is applied from the XY and YX visibilities after the fact. Option to
     parallelize calibration across frequency.
 
     Parameters
@@ -923,10 +925,11 @@ def unified_calibration_wrapper(
         data_read_start_time = time.time()
 
     import os
+
     data_file = data
     model_file = model
-    data_file_path = os.getcwd() + f'/calico/data/{data}.uvfits'
-    model_file_path = os.getcwd() + f'/calico/data/{model}.uvfits'
+    data_file_path = os.getcwd() + f"/calico/data/{data}.uvfits"
+    model_file_path = os.getcwd() + f"/calico/data/{model}.uvfits"
 
     # NOTE: SEEMS REDUNDANT OR INCONSISTENT WITH ABOVE
     print_data_read_time = False
@@ -974,7 +977,7 @@ def unified_calibration_wrapper(
     if verbose:
         if print_data_read_time:
             print(
-                f"Done. Data read time {(time.time() - data_read_start_time)/60.} minutes."
+                f"Done. Data read time {(time.time() - data_read_start_time) / 60.0} minutes."
             )
         print("Formatting data...")
         sys.stdout.flush()
@@ -1012,35 +1015,35 @@ def unified_calibration_wrapper(
 
     if verbose:
         print(
-            f"Done. Data formatting time {(time.time() - data_format_start_time)/60.} minutes."
+            f"Done. Data formatting time {(time.time() - data_format_start_time) / 60.0} minutes."
         )
         print("Running calibration optimization...")
         sys.stdout.flush()
         optimization_start_time = time.time()
 
     # for ant_flag_iter in range(antenna_flagging_iterations):
-        # caldata_obj.unified_calibration(
-        #     xtol=xtol / 10,  # Lower tolerance for antenna flagging
-        #     maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
-        #     get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
-        #     parallel=parallel,
-        #     verbose=verbose,
-        #     pool=pool,
-        # )
-        # if verbose:
-        #     print(
-        #         f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
-        #     )
-        #     print(
-        #         f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
-        #     )
-        #     sys.stdout.flush()
-        # caldata_obj.flag_antennas_from_per_ant_cost(
-        #     flagging_threshold=antenna_flagging_threshold,
-        #     parallel=parallel,
-        #     pool=pool,
-        #     verbose=verbose,
-        # )
+    # caldata_obj.unified_calibration(
+    #     xtol=xtol / 10,  # Lower tolerance for antenna flagging
+    #     maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
+    #     get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
+    #     parallel=parallel,
+    #     verbose=verbose,
+    #     pool=pool,
+    # )
+    # if verbose:
+    #     print(
+    #         f"Initial calibration optimization done. Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}."
+    #     )
+    #     print(
+    #         f"Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes."
+    #     )
+    #     sys.stdout.flush()
+    # caldata_obj.flag_antennas_from_per_ant_cost(
+    #     flagging_threshold=antenna_flagging_threshold,
+    #     parallel=parallel,
+    #     pool=pool,
+    #     verbose=verbose,
+    # )
 
     caldata_obj.unified_calibration(
         xtol=xtol,
@@ -1054,7 +1057,7 @@ def unified_calibration_wrapper(
     )
     if verbose:
         print(
-            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time)/60.} minutes"
+            f"Done. Optimization time: {caldata_obj.Nfreqs} frequency channels in {(time.time() - optimization_start_time) / 60.0} minutes"
         )
         sys.stdout.flush()
 
@@ -1062,11 +1065,11 @@ def unified_calibration_wrapper(
         pool.terminate()
 
     # Convert to UVCal object
-    #uvcal = caldata_obj.convert_to_uvcal()
+    # uvcal = caldata_obj.convert_to_uvcal()
     uvcal = None
 
     if verbose:
-        print(f"Total processing time {(time.time() - start_time)/60.} minutes.")
+        print(f"Total processing time {(time.time() - start_time) / 60.0} minutes.")
         sys.stdout.flush()
 
     if log_file_path is not None:
@@ -1074,4 +1077,8 @@ def unified_calibration_wrapper(
         sys.stderr = stderr_orig
         log_file_new.close()
 
-    return uvcal, caldata_obj.data_visibilities[0,:,0,0], caldata_obj.model_visibilities[0,:,0,0]
+    return (
+        uvcal,
+        caldata_obj.data_visibilities[0, :, 0, 0],
+        caldata_obj.model_visibilities[0, :, 0, 0],
+    )

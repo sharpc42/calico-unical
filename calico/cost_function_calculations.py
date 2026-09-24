@@ -4,6 +4,7 @@ import sys
 from calico import utils
 import time
 
+
 def cost_skycal(
     gains,
     model_visibilities,
@@ -82,7 +83,7 @@ def jacobian_skycal(
         Jacobian of the chi-squared cost function, shape (Nants,). The real part
         corresponds to derivatives with respect to the real part of the gains;
         the imaginary part corresponds to derivatives with respect to the
-        imaginary part of the gains.    
+        imaginary part of the gains.
     """
 
     start_jac = time.time()
@@ -124,7 +125,7 @@ def jacobian_skycal(
         jac += 2 * regularization_term
 
     end_jac = time.time()
-    print("***JACOBIAN TIME***", (end_jac - start_jac)/60.)
+    print("***JACOBIAN TIME***", (end_jac - start_jac) / 60.0)
 
     return jac
 
@@ -171,9 +172,7 @@ def reformat_baselines_to_antenna_matrix(
         antenna_matrix[
             ant1_inds[bl_ind],
             ant2_inds[bl_ind],
-        ] = bl_array[
-            bl_ind,
-        ]
+        ] = bl_array[bl_ind,]
     return antenna_matrix
 
 
@@ -314,7 +313,7 @@ def hessian_skycal(
         )
 
     end_hess = time.time()
-    print("***HESSIAN TIME***", (end_hess - start_hess)/60.)
+    print("***HESSIAN TIME***", (end_hess - start_hess) / 60.0)
 
     return hess_real_real, hess_real_imag, hess_imag_imag
 
@@ -423,14 +422,10 @@ def set_crosspol_phase_pseudoV(
     crosspol_data_visibilities_calibrated = crosspol_data_visibilities
     crosspol_data_visibilities_calibrated[:, :, 0] *= gains_expanded_1[
         :, :, 0
-    ] * np.conj(
-        gains_expanded_2[:, :, 1]
-    )  # Apply gains to PQ visibilities
+    ] * np.conj(gains_expanded_2[:, :, 1])  # Apply gains to PQ visibilities
     crosspol_data_visibilities_calibrated[:, :, 1] *= gains_expanded_1[
         :, :, 1
-    ] * np.conj(
-        gains_expanded_2[:, :, 0]
-    )  # Apply gains to QP visibilities
+    ] * np.conj(gains_expanded_2[:, :, 0])  # Apply gains to QP visibilities
     visibility_weights = np.nanmean(
         crosspol_visibility_weights, axis=2
     )  # Doesn't support different weights for PQ and QP
@@ -1110,23 +1105,22 @@ def reformat_to_matrix(
         rect_matrix[
             ant1_inds[bl_ind],
             ant2_inds[bl_ind],
-        ] = input_array[
-            bl_ind,
-        ]
+        ] = input_array[bl_ind,]
     return rect_matrix
 
+
 def cost_unical(
-    gains         : np.ndarray[complex],
-    fit_vis       : np.ndarray[complex],
-    data_vis      : np.ndarray[complex],
-    model_vis     : np.ndarray[complex],
-    vis_weights   : np.ndarray[float],
-    model_weights : np.ndarray[float],
-    ant1_inds     : np.ndarray[int],
-    ant2_inds     : np.ndarray[int],
-    lambda_val    : float,
-    force_skycal  : bool = False,
-    gmm           : bool = True,
+    gains: np.ndarray[complex],
+    fit_vis: np.ndarray[complex],
+    data_vis: np.ndarray[complex],
+    model_vis: np.ndarray[complex],
+    vis_weights: np.ndarray[float],
+    model_weights: np.ndarray[float],
+    ant1_inds: np.ndarray[int],
+    ant2_inds: np.ndarray[int],
+    lambda_val: float,
+    force_skycal: bool = False,
+    gmm: bool = True,
 ) -> float:
     """
     Calculate the cost function (chi-squared) value.
@@ -1165,7 +1159,9 @@ def cost_unical(
         else:
             res_vec_1 = fit_vis - gains_expanded * data_vis
         res_vec_2 = fit_vis - model_vis
-        cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(model_weights * np.abs(res_vec_2)**2)
+        cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2) + np.sum(
+            model_weights * np.abs(res_vec_2) ** 2
+        )
     else:
         res_vec_1 = data_vis - gains_expanded * model_vis
         cost = np.sum(vis_weights * np.abs(res_vec_1) ** 2)
@@ -1175,18 +1171,19 @@ def cost_unical(
 
     return cost
 
+
 def cost_unical_torch(
-    gains         : torch.Tensor,
-    fit_vis       : torch.Tensor,
-    data_vis      : torch.Tensor,
-    model_vis     : torch.Tensor,
-    vis_weights   : torch.Tensor,
-    model_weights : torch.Tensor,
-    ant_inds      : torch.Tensor,
-    ant1_inds     : torch.Tensor,
-    ant2_inds     : torch.Tensor,
-    num_ants      : int,
-    lambda_val    : float,
+    gains: torch.Tensor,
+    fit_vis: torch.Tensor,
+    data_vis: torch.Tensor,
+    model_vis: torch.Tensor,
+    vis_weights: torch.Tensor,
+    model_weights: torch.Tensor,
+    ant_inds: torch.Tensor,
+    ant1_inds: torch.Tensor,
+    ant2_inds: torch.Tensor,
+    num_ants: int,
+    lambda_val: float,
 ) -> float:
     """
     Calculate the cost function (chi-squared) value.
@@ -1226,8 +1223,8 @@ def cost_unical_torch(
     gains_expanded = (gains[ant1_inds] * torch.conj((gains[ant2_inds])))[None, :]
     res_vec_1 = data_vis - gains_expanded * fit_vis
     res_vec_2 = fit_vis - model_vis
-    cost_1 = vis_weights * (res_vec_1.real ** 2 + res_vec_1.imag ** 2)
-    cost_2 = model_weights * (res_vec_2.real ** 2 + res_vec_2.imag ** 2)
+    cost_1 = vis_weights * (res_vec_1.real**2 + res_vec_1.imag**2)
+    cost_2 = model_weights * (res_vec_2.real**2 + res_vec_2.imag**2)
     cost = torch.sum(cost_1) + torch.sum(cost_2)
 
     if lambda_val > 0:
@@ -1236,16 +1233,17 @@ def cost_unical_torch(
 
     return cost
 
+
 def jacobian_unical(
-    gains         : np.ndarray[complex],
-    fit_vis       : np.ndarray[complex],
-    data_vis      : np.ndarray[complex],
-    model_vis     : np.ndarray[complex],
-    vis_weights   : np.ndarray[float],
-    model_weights : np.ndarray[float],
-    ant1_inds     : np.ndarray[int],
-    ant2_inds     : np.ndarray[int],
-    lambda_val    : float,
+    gains: np.ndarray[complex],
+    fit_vis: np.ndarray[complex],
+    data_vis: np.ndarray[complex],
+    model_vis: np.ndarray[complex],
+    vis_weights: np.ndarray[float],
+    model_weights: np.ndarray[float],
+    ant1_inds: np.ndarray[int],
+    ant2_inds: np.ndarray[int],
+    lambda_val: float,
 ) -> np.ndarray[complex]:
     """
     Calculate the Jacobian of the cost function.
@@ -1286,71 +1284,81 @@ def jacobian_unical(
 
     # Convert gains to row vector with unit
     # dimension extended along the time axis
-    gains_exp_1 = gains[np.newaxis, ant1_inds]                   # shape (1,Nbls)
-    gains_exp_2 = gains[np.newaxis, ant2_inds]                   # shape (1,Nbls)
+    gains_exp_1 = gains[np.newaxis, ant1_inds]  # shape (1,Nbls)
+    gains_exp_2 = gains[np.newaxis, ant2_inds]  # shape (1,Nbls)
 
     # calculate real terms in baseline space
-    gains_term1_bls = np.mean(                                   # shape (Nbls)
-        2 * vis_weights * (gains_exp_1 * np.abs(gains_exp_2)**2.0 * np.abs(fit_vis)**2.0 - (
-            data_vis * gains_exp_2 * np.conj(fit_vis))
+    gains_term1_bls = np.mean(  # shape (Nbls)
+        2
+        * vis_weights
+        * (
+            gains_exp_1 * np.abs(gains_exp_2) ** 2.0 * np.abs(fit_vis) ** 2.0
+            - (data_vis * gains_exp_2 * np.conj(fit_vis))
         ),
         axis=0,
     )
     # convert to antenna space
-    gains_term1_ants = utils.bincount_multidim(                  # shape (Nants)
+    gains_term1_ants = utils.bincount_multidim(  # shape (Nants)
         ant1_inds,
         weights=gains_term1_bls,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
     # must add antenna permutations
-    gains_term2_bls = np.mean(                                   # shape (Nbls)
-        2 * vis_weights * (gains_exp_2 * np.abs(gains_exp_1)**2.0 * np.abs(fit_vis)**2.0 - (
-            np.conj(data_vis) * gains_exp_1 * fit_vis)
+    gains_term2_bls = np.mean(  # shape (Nbls)
+        2
+        * vis_weights
+        * (
+            gains_exp_2 * np.abs(gains_exp_1) ** 2.0 * np.abs(fit_vis) ** 2.0
+            - (np.conj(data_vis) * gains_exp_1 * fit_vis)
         ),
         axis=0,
     )
     # convert to antenna space
-    gains_term2_ants = utils.bincount_multidim(                  # shape (Nants)
+    gains_term2_ants = utils.bincount_multidim(  # shape (Nants)
         ant2_inds,
         weights=gains_term2_bls,
         minlength=np.max([np.max(ant1_inds), np.max(ant2_inds)]) + 1,
     )
-    jac_gains = gains_term1_ants + gains_term2_ants;             # shape (Nants)
+    jac_gains = gains_term1_ants + gains_term2_ants  # shape (Nants)
 
     # model vis params terms
-    vis_term = np.mean(                                    # shape (Nbls)
-        2 * vis_weights * (np.abs(gains_exp_1)**2.0 * np.abs(gains_exp_2)**2.0 * fit_vis
-                           - gains_exp_1 * np.conj(gains_exp_2) * data_vis),
+    vis_term = np.mean(  # shape (Nbls)
+        2
+        * vis_weights
+        * (
+            np.abs(gains_exp_1) ** 2.0 * np.abs(gains_exp_2) ** 2.0 * fit_vis
+            - gains_exp_1 * np.conj(gains_exp_2) * data_vis
+        ),
         axis=0,
     )
-    model_term = np.mean(                                    # shape (Nbls)
+    model_term = np.mean(  # shape (Nbls)
         2 * model_weights * (fit_vis - model_vis),
         axis=0,
     )
 
-    jac_vis = vis_term + model_term    # shape (Nbls)
+    jac_vis = vis_term + model_term  # shape (Nbls)
 
     jac = np.hstack((jac_gains, jac_vis))
 
-    print(f"Jacobian time - {(time.time()-start_jac)/60} minutes")
+    print(f"Jacobian time - {(time.time() - start_jac) / 60} minutes")
 
     return jac
 
 
 def hessian_unical(
-    gains         : np.ndarray[complex],
-    fit_vis       : np.ndarray[complex],
-    Nants         : int,
-    Nbls          : int,
-    Ntimes        : int,
-    data_vis      : np.ndarray[complex],
-    model_vis     : np.ndarray[complex],
-    vis_weights   : np.ndarray[float],
-    model_weights : np.ndarray[float],
-    ant1_inds     : np.ndarray[int],
-    ant2_inds     : np.ndarray[int],
-    bl_inds       : np.ndarray[int],
-    lambda_val    : float,
+    gains: np.ndarray[complex],
+    fit_vis: np.ndarray[complex],
+    Nants: int,
+    Nbls: int,
+    Ntimes: int,
+    data_vis: np.ndarray[complex],
+    model_vis: np.ndarray[complex],
+    vis_weights: np.ndarray[float],
+    model_weights: np.ndarray[float],
+    ant1_inds: np.ndarray[int],
+    ant2_inds: np.ndarray[int],
+    bl_inds: np.ndarray[int],
+    lambda_val: float,
 ) -> tuple[np.ndarray[float], ...]:
     """
     Calculate the Hessian of the cost function.
@@ -1394,12 +1402,12 @@ def hessian_unical(
 
     start_hess = time.time()
 
-    gains_exp_1 = gains[ant1_inds]                                      # shape (Nbls)
-    gains_exp_2 = gains[ant2_inds]                                      # shape (Nbls)
+    gains_exp_1 = gains[ant1_inds]  # shape (Nbls)
+    gains_exp_2 = gains[ant2_inds]  # shape (Nbls)
     fit_squared = np.mean(
-        vis_weights * np.abs(fit_vis) ** 2.0,   
+        vis_weights * np.abs(fit_vis) ** 2.0,
         axis=0,
-    )                                                      
+    )
     data_times_u = np.mean(
         vis_weights * np.conj(data_vis) * fit_vis,
         axis=0,
@@ -1407,26 +1415,22 @@ def hessian_unical(
 
     """Gains params only"""
     # Calculate the antenna off-diagonal components
-    gain_hess_components = np.zeros((Nbls, 4), dtype=float)             # shape (Nbls, 4)
+    gain_hess_components = np.zeros((Nbls, 4), dtype=float)  # shape (Nbls, 4)
     # Real-real Hessian component for gains:
     gain_hess_components[:, 0] = (
-        4 * gains_exp_1.real * gains_exp_2.real * fit_squared
-        - 2 * data_times_u.real
+        4 * gains_exp_1.real * gains_exp_2.real * fit_squared - 2 * data_times_u.real
     ).real
     # Real-imaginary Hessian component for gains, term 1:
     gain_hess_components[:, 1] = (
-        4 * gains_exp_1.real * gains_exp_2.imag * fit_squared
-        + 2 * data_times_u.imag
+        4 * gains_exp_1.real * gains_exp_2.imag * fit_squared + 2 * data_times_u.imag
     ).real
     # Real-imaginary Hessian component for gains, term 2:
     gain_hess_components[:, 2] = (
-        4 * gains_exp_1.imag * gains_exp_2.real * fit_squared
-        - 2 * data_times_u.imag
+        4 * gains_exp_1.imag * gains_exp_2.real * fit_squared - 2 * data_times_u.imag
     ).real
     # Imaginary-imaginary Hessian component for gains:
     gain_hess_components[:, 3] = (
-        4 * gains_exp_1.imag * gains_exp_2.imag * fit_squared
-        - 2 * data_times_u.real
+        4 * gains_exp_1.imag * gains_exp_2.imag * fit_squared - 2 * data_times_u.real
     ).real
 
     gain_hess_components = reformat_baselines_to_antenna_matrix(
@@ -1436,20 +1440,26 @@ def hessian_unical(
         Nants,
         Nbls,
     )
-    gain_hess_real_real = gain_hess_components[:, :, 0] + gain_hess_components[:, :, 0].T
-    gain_hess_real_imag = gain_hess_components[:, :, 1] + gain_hess_components[:, :, 2].T
-    gain_hess_imag_imag = gain_hess_components[:, :, 3] + gain_hess_components[:, :, 3].T
+    gain_hess_real_real = (
+        gain_hess_components[:, :, 0] + gain_hess_components[:, :, 0].T
+    )
+    gain_hess_real_imag = (
+        gain_hess_components[:, :, 1] + gain_hess_components[:, :, 2].T
+    )
+    gain_hess_imag_imag = (
+        gain_hess_components[:, :, 3] + gain_hess_components[:, :, 3].T
+    )
 
     # Calculate the antenna diagonals
     gain_hess_diag = 2 * (
         utils.bincount_multidim(
             ant1_inds,
-            weights = 2 * np.abs(gains_exp_2) ** 2.0 * fit_squared,
+            weights=2 * np.abs(gains_exp_2) ** 2.0 * fit_squared,
             minlength=Nants,
         )
         + utils.bincount_multidim(
             ant2_inds,
-            weights= 2 * np.abs(gains_exp_1) ** 2.0 * fit_squared,
+            weights=2 * np.abs(gains_exp_1) ** 2.0 * fit_squared,
             minlength=Nants,
         )
     )
@@ -1478,7 +1488,7 @@ def hessian_unical(
             2
             * lambda_val
             * arg_sum
-            * (gains_weighted.real ** 2.0 - gains_weighted.imag ** 2.0)
+            * (gains_weighted.real**2.0 - gains_weighted.imag**2.0)
         )
         gain_hess_imag_imag -= np.diag(
             4 * lambda_val * arg_sum * gains_weighted.imag * gains_weighted.real
@@ -1493,39 +1503,61 @@ def hessian_unical(
 
     # Calculate the fitted visibilities diagonals
     fit_hess_diag = (
-        2 * vis_weights * np.abs(gains_exp_1) ** 2.0 * np.abs(gains_exp_2)**2.0
-         + model_weights
+        2 * vis_weights * np.abs(gains_exp_1) ** 2.0 * np.abs(gains_exp_2) ** 2.0
+        + model_weights
     )
     np.fill_diagonal(fit_hess_real_real, fit_hess_diag)
     np.fill_diagonal(fit_hess_imag_imag, fit_hess_diag)
 
     """Fit vis/gains mix"""
-    # Calculate the antenna off-diagonal components 
+    # Calculate the antenna off-diagonal components
     # for both antennas in baseline
-    fit_gain_hess_vectors = np.zeros((Nbls, 4), dtype=float)               # shape: (Nbls, 4)
-    fit_gain_hess_components = np.zeros((Nbls, Nants, 4), dtype=float)     # shape: (Nbls, Nants, 4)
+    fit_gain_hess_vectors = np.zeros((Nbls, 4), dtype=float)  # shape: (Nbls, 4)
+    fit_gain_hess_components = np.zeros(
+        (Nbls, Nants, 4), dtype=float
+    )  # shape: (Nbls, Nants, 4)
 
     """Fit vis/antenna 1 gains Hessian components"""
     # Real-real
     fit_gain_hess_vectors[:, 0] = (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.real * gains_exp_1.real * np.abs(gains_exp_2)**2.0
-        - 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).real
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.real
+        * gains_exp_1.real
+        * np.abs(gains_exp_2) ** 2.0
+        - 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).real
+    )
     # Real gain, imaginary fit vis:
     fit_gain_hess_vectors[:, 1] = (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.imag * gains_exp_1.real * np.abs(gains_exp_2)**2.0
-        + 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).imag
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.imag
+        * gains_exp_1.real
+        * np.abs(gains_exp_2) ** 2.0
+        + 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).imag
+    )
     # Imaginary gain, real fit vis:
     fit_gain_hess_vectors[:, 2] = (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.real * gains_exp_1.imag * np.abs(gains_exp_2)**2.0
-        + 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).imag
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.real
+        * gains_exp_1.imag
+        * np.abs(gains_exp_2) ** 2.0
+        + 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).imag
+    )
     # Imaginary-imaginary
     fit_gain_hess_vectors[:, 3] = (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.imag * gains_exp_1.imag * np.abs(gains_exp_2)**2.0
-        + 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).real
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.imag
+        * gains_exp_1.imag
+        * np.abs(gains_exp_2) ** 2.0
+        + 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_2)).real
+    )
 
     # # Update hessian block with second derivatives w.r.t. antenna 1 gains
     # for bl_ind in range(Nbls):
@@ -1537,39 +1569,68 @@ def hessian_unical(
     """U params/antenna 2 gains Hessian components"""
     # Real-real
     fit_gain_hess_vectors[:, 0] += (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.real * gains_exp_2.real * np.abs(gains_exp_1)**2.0
-        - 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).real
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.real
+        * gains_exp_2.real
+        * np.abs(gains_exp_1) ** 2.0
+        - 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).real
+    )
     # Real gain, imaginary fit vis:
     fit_gain_hess_vectors[:, 1] += (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.imag * gains_exp_2.real * np.abs(gains_exp_1)**2.0
-        + 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).imag
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.imag
+        * gains_exp_2.real
+        * np.abs(gains_exp_1) ** 2.0
+        + 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).imag
+    )
     # Imaginary gain, real fit vis:
     fit_gain_hess_vectors[:, 2] += (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.real * gains_exp_2.imag * np.abs(gains_exp_1)**2.0
-        + 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).imag
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.real
+        * gains_exp_2.imag
+        * np.abs(gains_exp_1) ** 2.0
+        + 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).imag
+    )
     # Imaginary-imaginary
     fit_gain_hess_vectors[:, 3] += (
-        4 * np.mean(vis_weights, axis=0) * fit_vis.imag * gains_exp_2.imag * np.abs(gains_exp_1)**2.0
-        + 2 * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).real
-        )
+        4
+        * np.mean(vis_weights, axis=0)
+        * fit_vis.imag
+        * gains_exp_2.imag
+        * np.abs(gains_exp_1) ** 2.0
+        + 2
+        * (np.mean(vis_weights * np.conj(data_vis), axis=0) * np.conj(gains_exp_1)).real
+    )
 
     # Update hessian block with second derivatives w.r.t. antenna 1 and 2 gains
     for bl_ind in range(Nbls):
         fit_gain_hess_components[
             bl_ind,
             ant2_inds[bl_ind],
-        ] = fit_gain_hess_vectors[bl_ind,:]
+        ] = fit_gain_hess_vectors[bl_ind, :]
 
     fit_gain_hess_realu_realg = fit_gain_hess_components[:, :, 0]
     fit_gain_hess_imagu_realg = fit_gain_hess_components[:, :, 1]
     fit_gain_hess_realu_imagg = fit_gain_hess_components[:, :, 2]
     fit_gain_hess_imagu_imagg = fit_gain_hess_components[:, :, 3]
 
-    print(f"Hessian time - {(time.time()-start_hess)/60} minutes")
+    print(f"Hessian time - {(time.time() - start_hess) / 60} minutes")
 
-    return gain_hess_real_real, gain_hess_real_imag, gain_hess_imag_imag, \
-        fit_hess_real_real, fit_hess_real_imag, fit_hess_imag_imag, \
-        fit_gain_hess_realu_realg, fit_gain_hess_imagu_realg, fit_gain_hess_realu_imagg, fit_gain_hess_imagu_imagg
+    return (
+        gain_hess_real_real,
+        gain_hess_real_imag,
+        gain_hess_imag_imag,
+        fit_hess_real_real,
+        fit_hess_real_imag,
+        fit_hess_imag_imag,
+        fit_gain_hess_realu_realg,
+        fit_gain_hess_imagu_realg,
+        fit_gain_hess_realu_imagg,
+        fit_gain_hess_imagu_imagg,
+    )
