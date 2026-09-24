@@ -1,5 +1,6 @@
-import numpy as np
 import sys
+
+import numpy as np
 
 
 class VariableWeightsArray:
@@ -141,7 +142,7 @@ class VariableWeightsArray:
             parameters are added as class attributes.
         """
         if threshold_length == None:
-            raise ValueError(f"Need threshold length even if zero -- Variable Weights")
+            raise ValueError("Need threshold length even if zero -- Variable Weights")
 
         caldata_obj.sigma_t_0 = sigma_t_0
         caldata_obj.sigma_m_0 = sigma_m_0
@@ -153,32 +154,8 @@ class VariableWeightsArray:
         # set the weight arrays to user arrays if passed
         if self.thermal_noise_weight_array:
             print("***thermal noise weight array***", self.thermal_noise_weight_array)
-            try:
-                caldata_obj.visibility_weights = self.thermal_noise_weight_array
-            except:
-                print(sys.exc_info())
-                print(
-                    "Thermal noise weights can't be used.\nDefaulting to constant weights"
-                )
-                caldata_obj.visibility_weights = np.ones(
-                    caldata_obj.Ntimes,
-                    caldata_obj.Nbls,
-                    caldata_obj.Nfreqs,
-                    caldata_obj.N_vis_pols,
-                )
-            try:
-                caldata_obj.model_weights = self.model_error_weight_array
-            except:
-                print(sys.exc_info())
-                print(
-                    "Model error weights can't be used. Defaulting to constant weights"
-                )
-                caldata_obj.model_weights = np.ones(
-                    caldata_obj.Ntimes,
-                    caldata_obj.Nbls,
-                    caldata_obj.Nfreqs,
-                    caldata_obj.N_vis_pols,
-                )
+            caldata_obj.visibility_weights = self.thermal_noise_weight_array
+            caldata_obj.model_weights = self.model_error_weight_array
         else:
             self.thermal_noise_weight_array = np.zeros(
                 (
@@ -205,13 +182,7 @@ class VariableWeightsArray:
 
             caldata_obj.threshold_mask = self.uv_norm_array < threshold_length
 
-            # try:
             getattr(self, self.weighting_function)(caldata_obj, freq_ind, pol_ind)
-            # except:
-            #     print(sys.exc_info())
-            #     print("Maybe you passed in a bad weighting function?")
-            #     print("Defaulting to constant weights.")
-            #     self.hard_cutoff_weights(caldata_obj)
 
             caldata_obj.visibility_weights = self.thermal_noise_weight_array
             caldata_obj.model_weights = self.model_error_weight_array
@@ -252,10 +223,10 @@ class VariableWeightsArray:
         )
         try:
             self.power = int(self.power)
-        except:
+        except TypeError as e:
             print(sys.exc_info())
             print(
-                "Maybe you passed a bad value for power for a power law cutoff?",
+                f"Error: {e}",
                 end=" ",
             )
             print("Defaulting to power=2")
