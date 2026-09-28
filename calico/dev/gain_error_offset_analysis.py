@@ -2,7 +2,7 @@ import argparse
 import os
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import hickle as hkl
 import numpy as np
@@ -74,7 +74,7 @@ def main(
         if optim_type is None:
             optim_type = "powell"
 
-        start_time_dt = datetime.fromtimestamp(start_time)
+        start_time_dt = datetime.fromtimestamp(start_time, tz=timezone.utc)
         metadata = {
             "Date": f"{start_time_dt:%B %d, %Y}",
             "Time": f"{start_time_dt:%H:%M:%S}",
@@ -216,9 +216,9 @@ def main(
                 #     f'{data_path}/output_calcs_{suffix}.hkl',
                 #     mode='r',
                 # ) as file:
-                output_calcs = hkl.load(f"{data_path}/output_calcs_{suffix}.hkl")
-                for output_calc_dict in output_calcs:
-                    output_calcs_list.append(output_calc_dict)
+                output_calcs_list = hkl.load(f"{data_path}/output_calcs_{suffix}.hkl")
+                # for output_calc_dict in output_calcs:
+                #     output_calcs_list.append(output_calc_dict)
 
                 if verbose:
                     print("Cleaning up calculated saved files")
@@ -274,7 +274,7 @@ def main(
     std_gain_phase = []
     sigma_re_m = []
     sigma_re_vT = []
-    scaling_factor_truth = None
+    # scaling_factor_truth = None
     e_n_corr_coeff = []
     n_m_corr_coeff = []
     e_m_corr_coeff = []
@@ -301,7 +301,7 @@ def main(
             avg_mag_vTm *= -1
         # print(f"{avg_mag_vTm=}")
         if read_scaling_factor - 1 < 1e-5:
-            scaling_factor_truth = read_scaling_factor
+            # scaling_factor_truth = read_scaling_factor
             # print(f"\n\n***TRUTH SCALING FACTOR***\n\t{scaling_factor_truth}\n\n")
             real_sigma_uvT_truth_gaussian.append(real_sigma_uvT)
             real_g_minus_1_truth_gaussian.append(calc["avg_re_g_offset"])
