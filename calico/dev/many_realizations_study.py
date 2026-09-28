@@ -1,17 +1,14 @@
-from calico import caldata
-
-import os, os.path
-import pyuvdata as uv
-import numpy as np
-import matplotlib.pyplot as plt
+import os
+import os.path
+import sys
 import time
 
-from calico.dev import dev_tools
-import sys
+import matplotlib.pyplot as plt
+import numpy as np
 from pyuvdata import UVData, UVFlag
-from calico.dev import noise_and_error_simulation as sim
-from pyuvdata import UVFlag
-from calico.dev import make_run_params
+
+from calico import caldata
+from calico.dev import dev_tools, make_run_params
 
 # def update_calico()
 
@@ -93,8 +90,9 @@ def prepare_data_files(
     print("uv data path", uv_data_path)
     if fhd_prefix[-1] != "_":
         fhd_prefix += "_"
-    freq_ind = 379  # null init values
-    time_ind = 298
+    # null init values
+    freq_ind = 379
+    # time_ind = 298
 
     if os.path.isfile(uv_data_path) and not reconstruct_data:
         print("Data uvits file exists - skipping")
@@ -102,10 +100,10 @@ def prepare_data_files(
         print("Data uvfits file not found - creating")
         # Set up the files we need
         data_vis_files = os.path.join(
-            sav_data_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
+            sav_data_path, "cal_prerun", "vis_data", fhd_prefix + "vis_model_XX.sav"
         )
         data_flags_file = os.path.join(
-            sav_data_path, "vis_data", fhd_prefix + "flags.sav"
+            sav_data_path, "cal_prerun", "vis_data", fhd_prefix + "flags.sav"
         )
         data_layout_file = os.path.join(
             sav_data_path, "metadata", fhd_prefix + "layout.sav"
@@ -162,10 +160,10 @@ def prepare_data_files(
         print("Model uvfits file not found - creating")
         # Set up the files we need
         model_vis_files = os.path.join(
-            sav_model_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
+            sav_model_path, "cal_prerun", "vis_data", fhd_prefix + "vis_model_XX.sav"
         )
         model_flags_file = os.path.join(
-            sav_model_path, "vis_data", fhd_prefix + "flags.sav"
+            sav_model_path, "cal_prerun", "vis_data", fhd_prefix + "flags.sav"
         )
         model_layout_file = os.path.join(
             sav_model_path, "metadata", fhd_prefix + "layout.sav"
@@ -238,7 +236,7 @@ def init_many_realizations(
     ):
         if threshold_length == None:
             raise ValueError(
-                f"Need threshold length even if zero -- Init Many Realizations"
+                "Need threshold length even if zero -- Init Many Realizations"
             )
         make_run_params.generate_files()
         model_path = os.getcwd() + f"/calico/data/{model_data_writeout_filename}"
@@ -300,7 +298,7 @@ def init_many_realizations(
                 )
                 print("Running calibration optimization...")
                 sys.stdout.flush()
-                optimization_start_time = time.time()
+                # optimization_start_time = time.time()
             # calwrap.unified_calibration_wrapper(
             #     data=vis_data_writeout_filename,
             #     model=model_data_writeout_filename,
@@ -327,7 +325,7 @@ def init_many_realizations(
             dev = dev_tools.DevTools()
             xtol = 1e-5
             maxiter = 200
-            antenna_flagging_iterations = 1
+            # antenna_flagging_iterations = 1
             # if calibration_type == "skycal":
             #     for ant_flag_iter in range(antenna_flagging_iterations):
             #         caldata_obj.sky_based_calibration(
@@ -430,7 +428,7 @@ def init_many_realizations(
 prepare_data_files(
     fhd_prefix="1061316296_",
     sav_data_filename="fhd_runs/fhd_baseline",  # sav directory name (using FHD)
-    sav_model_filename="fhd_runs/fhd_cutoff_015",  # sav directory name (using FHD)
+    sav_model_filename="fhd_runs/fhd_cutoff015",  # sav directory name (using FHD)
     model_data_writeout_filename="fhd_model_one_freq_015",  # uvfits filename (using FHD)
     vis_data_writeout_filename="fhd_data_one_freq_015",  # uvfits filename (using FHD)
     reconstruct_data=False,
