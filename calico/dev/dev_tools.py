@@ -213,8 +213,8 @@ class DevTools:
         complex_step: list[complex] | np.ndarray[complex],
         n_trajectories: int,
         filename_prefix: str,
-        xlims: tuple[int | float] = None,
-        ylims: tuple[int | float] = None,
+        xlims: tuple[int | float] | None = None,
+        ylims: tuple[int | float] | None = None,
         title: str = "",
         xlabel: str = "",
         ylabel: str = "",
@@ -521,8 +521,8 @@ class DevTools:
         vis_pol_ind: int = 0,
         feed_pol_ind: int = 0,
         suffix: str = "",
-        metadata: dict = None,
-        example_data: UVData = None,
+        metadata: dict | None = None,
+        example_data: UVData | None = None,
         optimization_scheme: str = "powell",
         calibration_type: str = "unical",
         xtol: float = 1e-5,
@@ -909,7 +909,7 @@ class DevTools:
         simulation_type: str = "gaussian",
         verbose: bool = False,
         suffix: str = "",
-        metadata: dict = None,
+        metadata: dict | None = None,
         save_plot: bool = True,
     ) -> None:
 
@@ -2018,8 +2018,8 @@ class DevTools:
         filename: str,
         scaling_factor: int = 1,
         threshold_length: int = 50,
-        upper_limit: int = None,
-        lower_limit: int = None,
+        upper_limit: int | None = None,
+        lower_limit: int | None = None,
     ) -> None:
         colors = error_array / np.max(np.abs(error_array))
         plt.scatter(spatial_array[:, 0], spatial_array[:, 1], c=colors, cmap="viridis")
@@ -2099,7 +2099,7 @@ class DevTools:
         threshold_length: int = 50,
         weighting_function: str = "constant_weights",
         sigma_m_0: int = 1,
-        sigma_e_0: int = None,
+        sigma_e_0: int | None = None,
         datafile: str = "data/tutorial_medium_onetime.uvfits",
     ) -> None:
 
@@ -2241,7 +2241,7 @@ class DevTools:
         scaling_factor=1,
         threshold_length=50,
         sigma: str = "sigma_m",
-        ylim: float = None,
+        ylim: float | None = None,
     ) -> None:
         plt.scatter(uv_norm_array, weight_array, marker="_")
         plt.title(
@@ -2281,12 +2281,12 @@ class DevTools:
         ylabel: str,
         filename: str,
         params: str,
-        extra_array: np.ndarray[float] = None,
+        extra_array: np.ndarray[float] | None = None,
         extra_label="",
         main_label="",
         main_num_bins=50,
         extra_num_bins=50,
-        xlim_hi: int = None,
+        xlim_hi: int | None = None,
         xlim_lo: int = -1,
     ) -> None:
         if not xlim_hi:
@@ -2368,15 +2368,15 @@ class DevTools:
         params: str,
         main_label: str = "",
         main_num_bins: int = 50,
-        xlim_hi: float = None,
-        xlim_lo: float = None,
-        ylim_lo: float = None,
-        ylim_hi: float = None,
+        xlim_hi: float | None = None,
+        xlim_lo: float | None = None,
+        ylim_lo: float | None = None,
+        ylim_hi: float | None = None,
         variation: str = "stddev",
-        radius: float = None,
-        xlim: float = None,
-        ylim: float = None,
-        ax: plt.axes = None,
+        radius: float | None = None,
+        xlim: float | None = None,
+        ylim: float | None = None,
+        ax: plt.axes | None = None,
     ) -> None:
 
         if variation == "stddev":
@@ -2507,7 +2507,7 @@ def build_3d_scatter_plot(
     x_array: np.ndarray,
     y_array: np.ndarray,
     z_array: np.ndarray,
-    z_array_2: np.ndarray = None,
+    z_array_2: np.ndarray | None = None,
     second_plot: bool = False,
     show_plot: bool = False,
     plot_title: str = "",
@@ -2524,7 +2524,7 @@ def build_3d_scatter_plot(
     second_plot_label: str = "",
     filename: str = "",
     suffix: str = "",
-    metadata: dict = None,
+    metadata: dict | None = None,
 ) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
@@ -2565,19 +2565,19 @@ def plot_3d_data_as_2d_hist(
     num_x_vals: int,
     num_y_vals: int,
     # top arrays
-    x_array_2: np.ndarray = None,
-    x_array_3: np.ndarray = None,
+    x_array_2: np.ndarray | None = None,
+    x_array_3: np.ndarray | None = None,
     # left side array
-    z_array_2: np.ndarray = None,
+    z_array_2: np.ndarray | None = None,
     plot_title: str = "",
     plot_xlabel: str = "",
     plot_xlabel_2: str = "",
     plot_xlabel_3: str = "",
     plot_ylabel: str = "",
-    plot_xlim_h: float = None,
-    plot_xlim_l: float = None,
-    plot_ylim_h: float = None,
-    plot_ylim_l: float = None,
+    plot_xlim_h: float | None = None,
+    plot_xlim_l: float | None = None,
+    plot_ylim_h: float | None = None,
+    plot_ylim_l: float | None = None,
     plot_vmax: float = 1,
     plot_vmin: float = 0,
     filename: str = "",
@@ -2585,7 +2585,7 @@ def plot_3d_data_as_2d_hist(
     log_cmap: bool = False,
     cmap_label: str = "",
     suffix: str = "",
-    metadata: dict = None,
+    metadata: dict | None = None,
     angle: float = 0,
     box_text: str = "",
 ) -> None:
@@ -2596,7 +2596,7 @@ def plot_3d_data_as_2d_hist(
     # rotate grid
     # z_grid_rot = ndimage.rotate(z_grid, angle=angle)
     # print(f"Rotated z grid\n\n{z_grid_rot}\n\n")
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     if z_array_2 is None:
         # NOTE: Move above code here?
         ...
