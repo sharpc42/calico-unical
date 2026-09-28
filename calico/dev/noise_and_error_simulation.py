@@ -1,7 +1,8 @@
-from calico.dev import dev_tools as dev
-import numpy as np
-import matplotlib.pyplot as plt
 import sys
+
+import numpy as np
+
+from calico.dev import dev_tools as dev
 
 
 def simulate_thermal_noise(
@@ -27,10 +28,10 @@ def simulate_thermal_noise(
             # size=(1, n_times * n_bls, n_freqs),
         )
         return thermal_noise_real, thermal_noise_imag
-    except:
+    except ValueError as e:
         print(sys.exc_info())
         if verbose:
-            print("Initial thermal noise failed. Was sigma_t set correctly?")
+            print(f"Initial thermal noise failed. Was sigma_t_0 set correctly?\nGot:\n{e}")
 
 
 def simulate_model_error(
@@ -116,7 +117,7 @@ def simulate_model_error(
         #     print("Initial model error failed. Was sigma_e set correctly?")
     elif sigma_e_0 is not None and weighting_function == "constant_weights":
         if verbose:
-            print(f"Constant weighting function in simulation")
+            print("Constant weighting function in simulation")
         model_error_real = np.random.normal(
             0.0,
             sigma_e_0,
