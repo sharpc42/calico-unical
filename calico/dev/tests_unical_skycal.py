@@ -1,25 +1,20 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.optimize import curve_fit
-
-from calico import calibration_optimization
-from calico import calibration_wrappers
-from calico import cost_function_calculations
-from calico import calibration_qa
-from calico import caldata
-
-from calico.dev import dev_tools
-from calico.dev import noise_and_error_simulation as sim
-from calico.dev import variable_weights
-
-from datetime import datetime
-
 import copy
-import pyuvdata
 import os
 import subprocess
 import time
 import unittest
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pyuvdata
+
+from calico import (
+    caldata,
+    calibration_optimization,
+)
+from calico.dev import dev_tools, variable_weights
+from calico.dev import noise_and_error_simulation as sim
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -497,7 +492,7 @@ class TestStringMethods(unittest.TestCase):
         ]  # make sure these track the correct optimizer order...
         plot_time = int(time.time())
         abs_powell_minus_lbfgs = np.abs(powell_gains) - np.abs(lbfgs_gains)
-        print(f"Plotting abs diff plot")
+        print("Plotting abs diff plot")
         x_arr = [x for x in range(abs_powell_minus_lbfgs.size)]
         plt.plot(x_arr, abs_powell_minus_lbfgs)
         plt.title("$|g_P| - |g_L|$ per antenna")
@@ -508,7 +503,7 @@ class TestStringMethods(unittest.TestCase):
         )
         plt.close()
         real_powell_minus_lbfgs = powell_gains.real - lbfgs_gains.real
-        print(f"Plotting real diff plot")
+        print("Plotting real diff plot")
         x_arr = [x for x in range(real_powell_minus_lbfgs.size)]
         plt.plot(x_arr, real_powell_minus_lbfgs)
         plt.title("$Re(g_P) - Re(g_L)$ per antenna")
@@ -517,7 +512,7 @@ class TestStringMethods(unittest.TestCase):
         plt.savefig(f"calico/images/powell_lbfgs_diff_real_{plot_time}.png")
         plt.close()
         imag_powell_minus_lbfgs = powell_gains.imag - lbfgs_gains.imag
-        print(f"Plotting imag diff plot")
+        print("Plotting imag diff plot")
         x_arr = [x for x in range(imag_powell_minus_lbfgs.size)]
         plt.plot(x_arr, imag_powell_minus_lbfgs)
         plt.title("$Im(g_P) - Im(g_L)$ per antenna")
@@ -525,7 +520,7 @@ class TestStringMethods(unittest.TestCase):
         plt.xlabel("Antennas")
         plt.savefig(f"calico/images/powell_lbfgs_diff_imag_{plot_time}.png")
         plt.close()
-        print(f"Plotting scatter plot in nsew-plane (abs diff)")
+        print("Plotting scatter plot in nsew-plane (abs diff)")
         en_plane = caldata_obj.antenna_positions[:, :-1]
         print(f"en-plane shape - {en_plane.shape}")
         max_diff = np.max(
@@ -561,10 +556,10 @@ class TestStringMethods(unittest.TestCase):
             )
             maxiter_arr.append(i)
         plt.plot(maxiter_arr, diffs)
-        plt.title(f"$|g_P| - |g_L|$ as function of max iterations")
-        plt.ylabel(f"$|g_P| - |g_L|$")
-        plt.xlabel(f"Maxiter")
-        plt.savefig(f"calico/images/powell_lbfgs_diff_elbow_plot.png")
+        plt.title("$|g_P| - |g_L|$ as function of max iterations")
+        plt.ylabel("$|g_P| - |g_L|$")
+        plt.xlabel("Maxiter")
+        plt.savefig("calico/images/powell_lbfgs_diff_elbow_plot.png")
 
     def plot_aggregate_montecarlos():
         ne5_arr = [
@@ -728,7 +723,7 @@ class TestStringMethods(unittest.TestCase):
         avg_model_error_squared = np.mean(np.abs(new_model_error) ** 2)
         org_model_visibilities = org_true_data_visibilities.copy()
 
-        print(f"\n***MODEL VISIBILITIES - CASE m = vT + e***")
+        print("\n***MODEL VISIBILITIES - CASE m = vT + e***")
         new_model_visibilities = org_true_data_visibilities + new_model_error
         avg_abs_m_squared = np.mean(np.abs(new_model_visibilities) ** 2)
         avg_abs_vT_squared = np.mean(np.abs(org_true_data_visibilities) ** 2)
@@ -746,7 +741,7 @@ class TestStringMethods(unittest.TestCase):
             f"$<|v_T|^2> - <|m|^2> - <|e|^2>$ {avg_abs_vT_squared - avg_abs_m_squared - avg_model_error_squared:.3f}"
         )
 
-        print(f"\n***MODEL VISIBILITIES - CASE vT = m + e***")
+        print("\n***MODEL VISIBILITIES - CASE vT = m + e***")
         new_true_data_visibilities = org_model_visibilities + new_model_error
         avg_abs_m_squared = np.mean(np.abs(org_model_visibilities) ** 2)
         avg_abs_vT_squared = np.mean(np.abs(new_true_data_visibilities) ** 2)
@@ -895,18 +890,21 @@ class TestStringMethods(unittest.TestCase):
             ylims=(-0.1, 0.1),
         )
 
-    def compare_unical_skycal_ant_by_ant(self):
+    def compare_unical_skycal_gains_and_us(self):
         seed = 421
         same_sky_all_times = True
         scaling_factor_skycal = 0.001
         scaling_factor_unical = 1
-        sigma_m = 0.1
-        sigma_t = 5
+        sigma_m = 10
+        sigma_t = 0.1
         filename = "tutorial_medium"
         # filename = "fhd_data_one_freq_015"
         gaussian_simulation = True
         caldata_obj = caldata.CalData()
-        dev_tools.prepare_standard_unical_test_run(
+        (
+            skycal_model_error,
+            skycal_thermal_noise,
+        ) = dev_tools.prepare_standard_unical_test_run(
             filename=filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
@@ -915,6 +913,8 @@ class TestStringMethods(unittest.TestCase):
             sigma_t=sigma_t,
             scaling_factor=scaling_factor_skycal,
             same_sky_all_times=same_sky_all_times,
+            return_model_error=True,
+            return_thermal_noise=True,
         )
         orig_data = caldata_obj.data_visibilities.copy()
         orig_model = caldata_obj.model_visibilities.copy()
@@ -922,7 +922,16 @@ class TestStringMethods(unittest.TestCase):
             verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
         )
         skycal_gains = caldata_obj.gains[..., 0, 0]
-        dev_tools.prepare_standard_unical_test_run(
+        # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
+        skycal_u = np.ravel(caldata_obj.fit_vis[..., 0, 0])
+        skycal_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
+        skycal_e = np.ravel(skycal_model_error[..., 0])
+        skycal_n = np.ravel(skycal_thermal_noise[..., 0])
+
+        (
+            unical_model_error,
+            unical_thermal_noise,
+        ) = dev_tools.prepare_standard_unical_test_run(
             filename=filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
@@ -931,6 +940,8 @@ class TestStringMethods(unittest.TestCase):
             sigma_t=sigma_t,
             scaling_factor=scaling_factor_unical,
             same_sky_all_times=same_sky_all_times,
+            return_model_error=True,
+            return_thermal_noise=True,
         )
         caldata_obj.data_visibilities = orig_data
         caldata_obj.model_visibilities = orig_model
@@ -938,7 +949,22 @@ class TestStringMethods(unittest.TestCase):
             verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
         )
         unical_gains = caldata_obj.gains[..., 0, 0]
+        # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
+        unical_u = np.ravel(caldata_obj.fit_vis[..., 0, 0])
+        unical_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
+        unical_e = np.ravel(unical_model_error[..., 0])
+        unical_n = np.ravel(unical_thermal_noise[..., 0])
+
+        # plotting quantities
         ants = np.arange(unical_gains.size)
+        skycal_vT_u_diff = np.abs(skycal_m + skycal_e - skycal_u)
+        unical_vT_u_diff = np.abs(unical_m + unical_e - unical_u)
+        skycal_e = np.abs(skycal_e)
+        unical_e = np.abs(unical_e)
+        skycal_n = np.abs(skycal_n)
+        unical_n = np.abs(unical_e)
+
+        # plotting gains over ants
         plt.scatter(
             ants,
             skycal_gains.real,
@@ -963,9 +989,68 @@ class TestStringMethods(unittest.TestCase):
         )
         plt.xlabel("Ant #")
         plt.ylabel("$Re(g)$")
-        plt.ylim(0.7, 1.7)
+        # plt.ylim(0.7, 1.7)
         plt.legend()
         plt.savefig("calico/images/gains_avg_unical_vs_skycal.png")
+        plt.close()
+        # plotting u's hist for skycal
+        plt.hist(
+            skycal_vT_u_diff,
+            bins=50,
+            color="red",
+            label="$|vT-u|$",
+        )
+        plt.hist(
+            skycal_e,
+            bins=50,
+            color="blue",
+            alpha=0.5,
+            label="$|e|$",
+        )
+        # plt.hist(
+        #     skycal_n,
+        #     bins=50,
+        #     color="pink",
+        #     label="$|n|$",
+        # )
+        plt.xlabel("Jy")
+        plt.title(
+            "Fit model parameter $u$s convergence (skycal)"
+            f"\n$\\sigma_m=${sigma_m:.2f} $\\sigma_t=${sigma_t:.2f}"
+        )
+        plt.xlim(0, 0.35)
+        plt.legend()
+        plt.savefig("calico/images/fit_us_convergence_skycal.png")
+        plt.close()
+
+        # plotting u's hist for unical
+        plt.hist(
+            unical_vT_u_diff,
+            bins=50,
+            color="red",
+            label="$|vT-u|$",
+        )
+        plt.hist(
+            unical_e,
+            bins=50,
+            color="blue",
+            alpha=0.5,
+            label="$|e|$",
+        )
+        # plt.hist(
+        #     unical_n,
+        #     bins=50,
+        #     color="pink",
+        #     label="$|n|$",
+        # )
+        plt.xlabel("Jy")
+        plt.title(
+            "Fit model parameter $u$s convergence (unical)"
+            f"\n$\\sigma_m=${sigma_m:.2f} $\\sigma_t=${sigma_t:.2f}"
+        )
+        plt.xlim(0, 0.35)
+        plt.legend()
+        plt.savefig("calico/images/fit_us_convergence_unical.png")
         plt.close()
 
     def examine_gains_fit_time_by_time(self):
@@ -1111,6 +1196,6 @@ class TestStringMethods(unittest.TestCase):
 if __name__ == "__main__":
     # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.gain_offset_with_more_times(TestStringMethods)
-    TestStringMethods.compare_unical_skycal_ant_by_ant(TestStringMethods)
+    TestStringMethods.compare_unical_skycal_gains_and_us(TestStringMethods)
     # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
     # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")

@@ -2684,6 +2684,8 @@ def prepare_standard_unical_test_run(
     scaling_factor=1,
     optimization_scheme="powell",
     same_sky_all_times=False,
+    return_model_error=False,
+    return_thermal_noise=False,
 ):
     import pyuvdata
 
@@ -2729,9 +2731,8 @@ def prepare_standard_unical_test_run(
             seed=seed,
             same_sky_all_times=same_sky_all_times,
         )
-        caldata_obj.data_visibilities[..., 0] += (
-            model_error_real + 1.0j * model_error_imag
-        )
+        model_error = model_error_real + 1.0j * model_error_imag
+        caldata_obj.data_visibilities[..., 0] += model_error
     else:
         print("Sigma_m detected to be zero so not simulating model error")
     if sigma_t != 0:
@@ -2742,10 +2743,15 @@ def prepare_standard_unical_test_run(
             n_freqs=1,
             seed=seed + 1,
         )
-        caldata_obj.data_visibilities[..., 0] += (
-            thermal_noise_real + 1.0j * thermal_noise_imag
-        )
+        thermal_noise = thermal_noise_real + 1.0j * thermal_noise_imag
+        caldata_obj.data_visibilities[..., 0] += thermal_noise
     else:
         print("Sigma_t detected to be zero so not simulating thermal noise")
     caldata_obj.fit_vis = caldata_obj.model_visibilities.copy()
     # caldata_obj.gains = np.ones(shape=caldata_obj.gains.shape, dtype=np.complex128)
+    if return_model_error and return_thermal_noise:
+        return model_error, thermal_noise
+    elif return_thermal_noise:
+        return thermal_noise
+    elif return_model_error:
+        return model_error
