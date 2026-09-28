@@ -1,6 +1,6 @@
-import numpy as np
+
 import matplotlib.pyplot as plt
-import time
+import numpy as np
 
 n_samples = 1e7
 abs_avg_sum_vals = []  # |<|v|^2 + n*e + vn* + v*e>|
@@ -100,7 +100,7 @@ new_model_error = np.random.normal(
 avg_model_error_squared = np.mean(np.abs(new_model_error) ** 2)
 org_model_visibilities = org_true_data_visibilities.copy()
 
-print(f"\n***MODEL VISIBILITIES - CASE m = vT + e***")
+print("\n***MODEL VISIBILITIES - CASE m = vT + e***")
 new_model_visibilities = org_true_data_visibilities + new_model_error
 avg_abs_m_squared = np.mean(np.abs(new_model_visibilities) ** 2)
 avg_abs_vT_squared = np.mean(np.abs(org_true_data_visibilities) ** 2)
@@ -114,7 +114,7 @@ print(
     f"$<|v_T|^2> - <|m|^2> - <|e|^2>$ {avg_abs_vT_squared - avg_abs_m_squared - avg_model_error_squared:.3f}"
 )
 
-print(f"\n***MODEL VISIBILITIES - CASE vT = m + e***")
+print("\n***MODEL VISIBILITIES - CASE vT = m + e***")
 new_true_data_visibilities = org_model_visibilities + new_model_error
 avg_abs_m_squared = np.mean(np.abs(org_model_visibilities) ** 2)
 avg_abs_vT_squared = np.mean(np.abs(new_true_data_visibilities) ** 2)
@@ -132,7 +132,7 @@ fig, ax = plt.subplots()
 plt.hist(abs_avg_sum_vals, bins=50)
 plt.title("$\\frac{|< |v_T|^2 + v_T^* e + n^* v_T + n^* e >|}{<|v_T|^2>}$")
 plt.xlabel("Realizations")
-props = dict(boxstyle="round", color="wheat", alpha=0.7)
+props = {"boxstyle": "round", "color": "wheat", "alpha": 0.7,}
 plt.text(
     x=0.85,
     y=0.95,
