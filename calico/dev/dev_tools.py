@@ -1,24 +1,22 @@
+import copy
+import os
+import pickle
 import subprocess
 import time
-import pickle
-import json
-import os
-import copy
 
-from scipy.differentiate import jacobian
 import hickle as hkl
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, PngImagePlugin
-from matplotlib.backends.backend_pdf import PdfPages
+from pyuvdata import UVData
+from scipy.differentiate import jacobian
 
 from calico import (
-    cost_function_calculations,
     calibration_optimization as cal_opt,
-    calibration_wrappers as calwrap,
-    caldata,
 )
-from pyuvdata import UVData, UVCal, Telescope
+from calico import (
+    calibration_wrappers as calwrap,
+)
 from calico.dev import noise_and_error_simulation as sim
 from calico.dev import variable_weights
 
@@ -233,7 +231,7 @@ class DevTools:
                     complex_step[val].real,
                     complex_step[val].imag,
                 ),
-                arrowprops=dict(arrowstyle="->"),
+                arrowprops={"arrowstyle": "->"},
             )
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -430,7 +428,7 @@ class DevTools:
         max_realizations: int = 100,
         verbose: bool = False,
         simulate_visibilities: bool = False,
-    ) -> tuple[np.ndarray[complex] | np.ndarray[complex] | np.ndarray[complex]]:
+    ) -> tuple[np.ndarray[complex]]:
 
         with open(f"calico/data/{run_params_filename}.pkl", "rb") as file:
             run_params_list = pickle.load(file)
@@ -719,7 +717,7 @@ class DevTools:
                         )
                         if len(gains_real_guess) != caldata_obj.Nants:
                             raise ValueError(
-                                f"Gains guess length must be the same as Nants for this run"
+                                "Gains guess length must be the same as Nants for this run"
                             )
                     vwa = variable_weights.VariableWeightsArray()
                     vwa.set_algorithm_weights(
@@ -848,7 +846,7 @@ class DevTools:
                 output_arrays["e runs short"] = model_err_realizations_short[0]
             except:
                 if verbose:
-                    print(f"No baseline dependent model error realizations to write")
+                    print("No baseline dependent model error realizations to write")
             # with open(f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl') as file:
             # print(f"data path {model_path}")
             # print(f"file\n\t{file}")
@@ -1223,7 +1221,7 @@ class DevTools:
             ax[run, 2].set_ylim(-glim, glim)
             if run == 0:
                 ax[run, 2].set_title(
-                    f"2D Gains Error\n(Complex Plane)",
+                    "2D Gains Error\n(Complex Plane)",
                     fontsize="22",
                 )
             ax[run, 2].tick_params(labelbottom=True, labelleft=True)
@@ -1678,11 +1676,11 @@ class DevTools:
     def plot_gains_one_ant_same_noise_and_error(
         self,
         num_realizations: int = 20,
-        sigma: int | float = 1.0,
+        sigma: float = 1.0,
         variation: str = "stddev",
         plot_type: str = "variation",
         data_path: str = "data/tutorial_medium_onetime.uvfits",
-        weights_threshold: int | float = 50,
+        weights_threshold: float = 50,
         cutoff_function: str = "constant_weights",
     ) -> float:
 
@@ -2046,7 +2044,12 @@ class DevTools:
             f"1/$\\sigma_e^2$ Scaling Factor {scaling_factor}\n"
             f"Threshold Length {threshold_length}\n"
         )
-        bbox = dict(boxstyle="round", fc="blanchedalmond", ec="orange", alpha=0.85)
+        bbox = {
+            "boxstyle": "round", 
+            "fc": "blanchedalmond", 
+            "ec": "orange", 
+            "alpha": 0.85,
+        }
         plt.text(150, 100, params, fontsize=9, bbox=bbox, horizontalalignment="right")
         plt.savefig("images/" + filename + ".png")
         plt.close()
@@ -2253,7 +2256,12 @@ class DevTools:
             f"1/$\\{sigma}^2$ Scaling Factor {scaling_factor}\n"
             f"Threshold Length {threshold_length}\n"
         )
-        bbox = dict(boxstyle="round", fc="blanchedalmond", ec="orange", alpha=0.7)
+        bbox = {
+            "boxstyle": "round", 
+            "fc": "blanchedalmond", 
+            "ec": "orange", 
+            "alpha": 0.7,
+        }
         plt.text(
             np.max(uv_norm_array),
             0.1,
@@ -2338,7 +2346,12 @@ class DevTools:
         else:
             text_x = np.max(main_array)
             text_y = max(main_hist) / 2
-        bbox = dict(boxstyle="round", fc="blanchedalmond", ec="orange", alpha=0.7)
+        bbox = {
+            "boxstyle": "round", 
+            "fc": "blanchedalmond", 
+            "ec": "orange", 
+            "alpha": 0.7,
+        }
         plt.text(
             text_x, text_y, params, fontsize=9, bbox=bbox, horizontalalignment="right"
         )
@@ -2355,14 +2368,14 @@ class DevTools:
         params: str,
         main_label: str = "",
         main_num_bins: int = 50,
-        xlim_hi: int | float = None,
-        xlim_lo: int | float = None,
-        ylim_lo: int | float = None,
-        ylim_hi: int | float = None,
+        xlim_hi: float = None,
+        xlim_lo: float = None,
+        ylim_lo: float = None,
+        ylim_hi: float = None,
         variation: str = "stddev",
         radius: float = None,
-        xlim: int | float = None,
-        ylim: int | float = None,
+        xlim: float = None,
+        ylim: float = None,
         ax: plt.axes = None,
     ) -> None:
 
@@ -2423,7 +2436,12 @@ class DevTools:
             ax.set_ylim(ylim_lo, ylim_hi)
         ax.set_title(title, fontsize="15")
         ax.tick_params(labelbottom=True, labelleft=True)
-        bbox = dict(boxstyle="round", fc="blanchedalmond", ec="orange", alpha=0.7)
+        bbox = {
+            "boxstyle": "round", 
+            "fc": "blanchedalmond", 
+            "ec": "orange", 
+            "alpha": 0.7,
+        }
         text_x = np.max(main_real)
         text_y = np.max(main_imag) / 2
         plt.text(
@@ -2496,12 +2514,12 @@ def build_3d_scatter_plot(
     plot_xlabel: str = "",
     plot_ylabel: str = "",
     plot_zlabel: str = "",
-    xlim_hi: int | float = 1,
-    xlim_lo: int | float = 0,
-    ylim_hi: int | float = 1,
-    ylim_lo: int | float = 0,
-    zlim_hi: int | float = 1,
-    zlim_lo: int | float = 0,
+    xlim_hi: float = 1,
+    xlim_lo: float = 0,
+    ylim_hi: float = 1,
+    ylim_lo: float = 0,
+    zlim_hi: float = 1,
+    zlim_lo: float = 0,
     first_plot_label: str = "",
     second_plot_label: str = "",
     filename: str = "",
@@ -2556,23 +2574,21 @@ def plot_3d_data_as_2d_hist(
     plot_xlabel_2: str = "",
     plot_xlabel_3: str = "",
     plot_ylabel: str = "",
-    plot_xlim_h: int | float = None,
-    plot_xlim_l: int | float = None,
-    plot_ylim_h: int | float = None,
-    plot_ylim_l: int | float = None,
-    plot_vmax: int | float = 1,
-    plot_vmin: int | float = 0,
+    plot_xlim_h: float = None,
+    plot_xlim_l: float = None,
+    plot_ylim_h: float = None,
+    plot_ylim_l: float = None,
+    plot_vmax: float = 1,
+    plot_vmin: float = 0,
     filename: str = "",
     plot_cmap: str = "viridis",
     log_cmap: bool = False,
     cmap_label: str = "",
     suffix: str = "",
     metadata: dict = None,
-    angle: int | float = 0,
+    angle: float = 0,
     box_text: str = "",
 ) -> None:
-    from scipy.interpolate import griddata
-    from scipy import ndimage
     from matplotlib import colors
 
     z_grid = np.asarray(z_array).reshape((num_x_vals, num_y_vals))
@@ -2621,21 +2637,25 @@ def plot_3d_data_as_2d_hist(
         ax2 = ax.twiny()
         ax2.set_xlim(ax.get_xlim())
         ax2.set_xticks(x_array)
-        x2_labels = [f"{str(int(val))}" for val in x_array_2]
+        x2_labels = [f"{int(val)!s}" for val in x_array_2]
         ax2.set_xticklabels(x2_labels)
         ax2.set_xlabel(plot_xlabel_2)
         if x_array_3 is not None:
             ax3 = ax.twiny()
             ax3.set_xlim(ax.get_xlim())
             ax3.set_xticks(x_array)
-            x3_labels = [f"{str(int(val))}" for val in x_array_3]
+            x3_labels = [f"{int(val)!s}" for val in x_array_3]
             ax3.set_xticklabels(x3_labels)
             ax2.set_xlabel(plot_xlabel_3)  # should have been ax3 but this works now
             ax3.spines["top"].set_position(("axes", 1.15))
     ax.set_ylabel(plot_ylabel)
     plt.xlim(plot_xlim_l, plot_xlim_h)
     plt.ylim(plot_ylim_l, plot_ylim_h)
-    props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
+    props = {
+        "boxstyle": "round", 
+        "facecolor": "wheat", 
+        "alpha": 0.5,
+    }
     ax.text(
         0.95,
         0.95,
