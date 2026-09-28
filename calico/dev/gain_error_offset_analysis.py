@@ -1067,11 +1067,13 @@ def main(
             'to send "Gain Offset Grid Search (unical - gmm) done"'
             'to buddy "+12068189804"\'',
             shell=True,
+            check=True,
         )
         subprocess.run(
             'osascript -e \'display notification "Job finished"'
             'with title "Grid search"\'',
             shell=True,
+            check=True,
         )
 
     return (
