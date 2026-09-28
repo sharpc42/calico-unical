@@ -1,15 +1,13 @@
-import numpy as np
-import hickle as hkl
-
-from calico.dev import dev_tools as dev
-
-import subprocess
-import pickle
-import json
-import os
 import argparse
+import os
+import subprocess
 import time
 from datetime import datetime
+
+import hickle as hkl
+import numpy as np
+
+from calico.dev import dev_tools as dev
 
 """
     Test grid of model error and thermal noise values
@@ -165,7 +163,7 @@ def main(
                 gains_real_guess = None
                 if give_gains_guess:
                     start_load_gains_guess_time = time.time()
-                    print(f"Loading gains guess")
+                    print("Loading gains guess")
                     guess_list = hkl.load(f"{cwd}/calico/data/{guess_filename}.hkl")
                     target_sf = 1000000.0  # 1.0 for unical, 1000000.0 for skycal
                     candidates = [
@@ -230,7 +228,7 @@ def main(
             print("Calibration tests done.")
 
         if verbose:
-            print(f"Writing out collection of output calcs...")
+            print("Writing out collection of output calcs...")
         hkl.dump(
             output_calcs_list,
             f"{data_path}/output_calcs_list_{file_suffix}.hkl",
@@ -238,7 +236,7 @@ def main(
         )
 
         if verbose:
-            print(f"Writing out initial metadata...")
+            print("Writing out initial metadata...")
         # with open(f'{data_path}/metadata_{file_suffix}.hkl') as file:
         hkl.dump(
             metadata, f"{data_path}/metadata_{file_suffix}.hkl", compression="gzip"
@@ -250,7 +248,7 @@ def main(
     else:
         file_suffix = f"g{git_id}_t{time_id}"
         if verbose:
-            print(f"Reading in initial metadata...")
+            print("Reading in initial metadata...")
         # with open(
         #     f'{data_path}/metadata_{file_suffix}.hkl',
         #     mode='r',
@@ -258,7 +256,7 @@ def main(
         metadata = hkl.load(f"{data_path}/metadata_{file_suffix}.hkl")
 
     if verbose:
-        print(f"Reading in output calcs...")
+        print("Reading in output calcs...")
     # with open(
     #     f'{data_path}/output_calcs_list_{file_suffix}.hkl',
     #     mode='r',
@@ -594,7 +592,7 @@ def main(
     #     box_text      = f"Optimizer: {optim_type}",
     # )
     if verbose:
-        print(f"Plotting skycal 2D grid for final cost function value")
+        print("Plotting skycal 2D grid for final cost function value")
     dev.plot_3d_data_as_2d_hist(
         x_array=vT_minus_m_gaussian,
         y_array=real_sigma_t_calculated_gaussian,
@@ -632,7 +630,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting truth 2D grid for gain offset")
+        print("Plotting truth 2D grid for gain offset")
     with open("gain_offset_with_time_truth.txt", "w") as file:
         file.write(f"{real_g_minus_1_truth_gaussian[55]:.6f}\n")
     dev.plot_3d_data_as_2d_hist(
@@ -674,7 +672,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting skycal 2D grid for gain offset")
+        print("Plotting skycal 2D grid for gain offset")
     with open("gain_offset_with_time_skycal.txt", "w") as file:
         file.write(f"{real_g_minus_1_skycal_gaussian[55]:.6f}\n")
     dev.plot_3d_data_as_2d_hist(
@@ -716,7 +714,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting truth-skycal diff 2D grid for gain offset")
+        print("Plotting truth-skycal diff 2D grid for gain offset")
     real_g_minus_1_diff_of_abs = np.abs(
         np.asarray(real_g_minus_1_truth_gaussian)
     ) - np.abs(np.asarray(real_g_minus_1_skycal_gaussian))
@@ -794,7 +792,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting prediction 2D grid (left) for gain offset")
+        print("Plotting prediction 2D grid (left) for gain offset")
     dev.plot_3d_data_as_2d_hist(
         x_array=vT_minus_m_gaussian,
         y_array=real_sigma_t_calculated_gaussian,
@@ -834,7 +832,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting prediction 2D grid (right) for gain offset")
+        print("Plotting prediction 2D grid (right) for gain offset")
     dev.plot_3d_data_as_2d_hist(
         x_array=vT_minus_m_gaussian,
         y_array=real_sigma_t_calculated_gaussian,
@@ -900,7 +898,7 @@ def main(
     #     metadata      = metadata,
     # )
     if verbose:
-        print(f"Plotting standard deviation in gain phase")
+        print("Plotting standard deviation in gain phase")
     dev.plot_3d_data_as_2d_hist(
         x_array=vT_minus_m_gaussian,
         y_array=real_sigma_t_calculated_gaussian,
@@ -925,7 +923,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting truth 2D grid for u offset")
+        print("Plotting truth 2D grid for u offset")
     dev.plot_3d_data_as_2d_hist(
         x_array=vT_minus_m_gaussian,
         y_array=real_sigma_t_calculated_gaussian,
@@ -952,7 +950,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting skycal 2D grid for u offset")
+        print("Plotting skycal 2D grid for u offset")
     dev.plot_3d_data_as_2d_hist(
         x_array=vT_minus_m_gaussian,
         y_array=real_sigma_t_calculated_gaussian,
@@ -979,7 +977,7 @@ def main(
         box_text=f"Optimizer: {optim_type}",
     )
     if verbose:
-        print(f"Plotting truth-skycal diff 2D grid for u offset")
+        print("Plotting truth-skycal diff 2D grid for u offset")
     sigma_uvT_diff = np.asarray(real_sigma_uvT_truth_gaussian) - np.asarray(
         real_sigma_uvT_skycal_gaussian
     )
@@ -1085,7 +1083,7 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=f"Gain Error Offset Analysis")
+    parser = argparse.ArgumentParser(description="Gain Error Offset Analysis")
     parser.add_argument(
         "-c",
         action="store_true",
