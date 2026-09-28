@@ -23,11 +23,11 @@ from calico.dev import variable_weights
 
 class DevTools:
     # def __init__(self):
-        # params_init_flattened = None
-        # caldata_obj = None
-        # Nants_unflagged = None
-        # freq_ind = None
-        # vis_pol_ind = None
+    # params_init_flattened = None
+    # caldata_obj = None
+    # Nants_unflagged = None
+    # freq_ind = None
+    # vis_pol_ind = None
 
     def format_var_name(self, input_string: str) -> str:
         output_string = input_string.replace("_", " ")
@@ -105,9 +105,7 @@ class DevTools:
         jac_numeric: np.ndarray[float],
         verbose: bool = False,
     ) -> None:
-        _, _, where_large = self.calc_error_vals(
-            jac_numeric, jac_analytic
-        )
+        _, _, where_large = self.calc_error_vals(jac_numeric, jac_analytic)
         n_vals = len(where_large[0])
         # find large errors
         analytic_vals = jac_analytic[where_large]
@@ -625,20 +623,18 @@ class DevTools:
             for i in range(num_model_realizations):
                 if verbose:
                     print(f"Creating model error realization {i + 1}")
-                model_error_real, model_error_imag, _, _ = (
-                    sim.simulate_model_error(
-                        caldata_obj=caldata_obj,
-                        n_times=caldata_obj.Ntimes,
-                        n_bls=caldata_obj.Nbls,
-                        n_freqs=n_freqs,
-                        sigma_e_0=np.abs(run_params["sigma_e"]),
-                        uv_norm_array=caldata_obj.uv_norm,
-                        threshold_length=threshold_length,
-                        weighting_function=run_params["weighting_function"],
-                        scaling_factor=run_params["scaling_factor_sim"],
-                        seed=i + 100,
-                        same_sky_all_times=same_sky_all_times,
-                    )
+                model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
+                    caldata_obj=caldata_obj,
+                    n_times=caldata_obj.Ntimes,
+                    n_bls=caldata_obj.Nbls,
+                    n_freqs=n_freqs,
+                    sigma_e_0=np.abs(run_params["sigma_e"]),
+                    uv_norm_array=caldata_obj.uv_norm,
+                    threshold_length=threshold_length,
+                    weighting_function=run_params["weighting_function"],
+                    scaling_factor=run_params["scaling_factor_sim"],
+                    seed=i + 100,
+                    same_sky_all_times=same_sky_all_times,
                 )
                 if model_error_real is None:
                     if verbose:
@@ -815,15 +811,15 @@ class DevTools:
                         "\tmodel err long realizations\t",
                         model_err_realizations_long[0].shape,
                     )
-                except:
-                    print("No model error simulated on long baselines.")
+                except TypeError as e:
+                    print(f"No model error simulated on long baselines.\n{e}")
                 try:
                     print(
                         "\tmodel err short realizations\t",
                         model_err_realizations_short[0].shape,
                     )
-                except:
-                    print("No model error simulated on short baselines.")
+                except TypeError as e:
+                    print(f"No model error simulated on short baselines.\n{e}")
                 print("\tuv array\t\t\t", uv_array.shape)
                 print(
                     "\tcost function realizations\t\t", len(cost_function_realizations)
@@ -844,9 +840,11 @@ class DevTools:
             try:
                 output_arrays["e runs long"] = model_err_realizations_long[0]
                 output_arrays["e runs short"] = model_err_realizations_short[0]
-            except:
+            except TypeError as e:
                 if verbose:
-                    print("No baseline dependent model error realizations to write")
+                    print(
+                        f"No baseline dependent model error realizations to write\n{e}"
+                    )
             # with open(f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl') as file:
             # print(f"data path {model_path}")
             # print(f"file\n\t{file}")
@@ -951,7 +949,10 @@ class DevTools:
             try:
                 e_short_arr = output_arrays["e runs short"]
                 e_long_arr = output_arrays["e runs long"]
-            except:
+            except TypeError as e:
+                print(
+                    f"Long and short baseline model error arrays not found, setting to None\n{e}"
+                )
                 e_short_arr = None
                 e_long_arr = None
             if not (np.any(e_short_arr) and np.any(e_long_arr)):
@@ -2045,9 +2046,9 @@ class DevTools:
             f"Threshold Length {threshold_length}\n"
         )
         bbox = {
-            "boxstyle": "round", 
-            "fc": "blanchedalmond", 
-            "ec": "orange", 
+            "boxstyle": "round",
+            "fc": "blanchedalmond",
+            "ec": "orange",
             "alpha": 0.85,
         }
         plt.text(150, 100, params, fontsize=9, bbox=bbox, horizontalalignment="right")
@@ -2257,9 +2258,9 @@ class DevTools:
             f"Threshold Length {threshold_length}\n"
         )
         bbox = {
-            "boxstyle": "round", 
-            "fc": "blanchedalmond", 
-            "ec": "orange", 
+            "boxstyle": "round",
+            "fc": "blanchedalmond",
+            "ec": "orange",
             "alpha": 0.7,
         }
         plt.text(
@@ -2347,9 +2348,9 @@ class DevTools:
             text_x = np.max(main_array)
             text_y = max(main_hist) / 2
         bbox = {
-            "boxstyle": "round", 
-            "fc": "blanchedalmond", 
-            "ec": "orange", 
+            "boxstyle": "round",
+            "fc": "blanchedalmond",
+            "ec": "orange",
             "alpha": 0.7,
         }
         plt.text(
@@ -2437,9 +2438,9 @@ class DevTools:
         ax.set_title(title, fontsize="15")
         ax.tick_params(labelbottom=True, labelleft=True)
         bbox = {
-            "boxstyle": "round", 
-            "fc": "blanchedalmond", 
-            "ec": "orange", 
+            "boxstyle": "round",
+            "fc": "blanchedalmond",
+            "ec": "orange",
             "alpha": 0.7,
         }
         text_x = np.max(main_real)
@@ -2652,8 +2653,8 @@ def plot_3d_data_as_2d_hist(
     plt.xlim(plot_xlim_l, plot_xlim_h)
     plt.ylim(plot_ylim_l, plot_ylim_h)
     props = {
-        "boxstyle": "round", 
-        "facecolor": "wheat", 
+        "boxstyle": "round",
+        "facecolor": "wheat",
         "alpha": 0.5,
     }
     ax.text(
