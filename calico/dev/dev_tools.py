@@ -22,12 +22,12 @@ from calico.dev import variable_weights
 
 
 class DevTools:
-    def __init__(self):
-        params_init_flattened = None
-        caldata_obj = None
-        Nants_unflagged = None
-        freq_ind = None
-        vis_pol_ind = None
+    # def __init__(self):
+        # params_init_flattened = None
+        # caldata_obj = None
+        # Nants_unflagged = None
+        # freq_ind = None
+        # vis_pol_ind = None
 
     def format_var_name(self, input_string: str) -> str:
         output_string = input_string.replace("_", " ")
@@ -54,7 +54,7 @@ class DevTools:
             jac_analytic_result,
             jac_numeric_result,
         )
-        jac_error, jac_frac, where_large = self.calc_error_vals(jac_numeric, jac)
+        _, _, where_large = self.calc_error_vals(jac_numeric, jac)
         n_vals = len(where_large[0])
         # find large errors
         analytic_vals = jac[where_large]
@@ -105,7 +105,7 @@ class DevTools:
         jac_numeric: np.ndarray[float],
         verbose: bool = False,
     ) -> None:
-        jac_error, jac_frac, where_large = self.calc_error_vals(
+        _, _, where_large = self.calc_error_vals(
             jac_numeric, jac_analytic
         )
         n_vals = len(where_large[0])
@@ -454,7 +454,7 @@ class DevTools:
             else:
                 model_path = f"calico/data/{data_file}.uvfits"
             print("***TEST - sigma_e_0***", run_params["sigma_e"])
-            uvc, g, u, m, v, vT, n, el, es, uv = calwrap.unified_calibration_wrapper(
+            _, g, u, m, v, vT, n, el, es, uv = calwrap.unified_calibration_wrapper(
                 data=data_path,
                 model=model_path,
                 parallel=False,
@@ -547,7 +547,7 @@ class DevTools:
         #       instead the filenames could be programmatically determined from the data
         #       and model paths which are naturally exposed in the wrapper?
         start_many_real_time = time.time()
-        data_path = os.getcwd() + f"/calico/data/{vis_data_writeout_filename}"
+        # data_path = os.getcwd() + f"/calico/data/{vis_data_writeout_filename}"
         model_path = os.getcwd() + f"/calico/data/{model_data_writeout_filename}"
         run_params_path = os.getcwd() + f"/calico/data/{run_params_filename}"
         if verbose:
@@ -625,7 +625,7 @@ class DevTools:
             for i in range(num_model_realizations):
                 if verbose:
                     print(f"Creating model error realization {i + 1}")
-                model_error_real, model_error_imag, me_real_long, me_real_short = (
+                model_error_real, model_error_imag, _, _ = (
                     sim.simulate_model_error(
                         caldata_obj=caldata_obj,
                         n_times=caldata_obj.Ntimes,
@@ -681,9 +681,9 @@ class DevTools:
                 this_thermal_noise = thermal_noise_real + 1.0j * thermal_noise_imag
                 data_vis_realizations.append(initial_data_vis + this_thermal_noise)
                 noise_realizations.append(thermal_noise_real)
-            n_times = caldata_obj.Ntimes
+            # n_times = caldata_obj.Ntimes
             n_bls = caldata_obj.Nbls
-            n_ants = caldata_obj.Nants
+            # n_ants = caldata_obj.Nants
             full_data_realizations = np.empty((0, n_bls, n_freqs))
             full_model_realizations = np.empty((0, n_bls, n_freqs))
             gain_params_realizations = np.empty((0, n_freqs))
@@ -966,15 +966,15 @@ class DevTools:
 
             u_minus_m = u_arr - m_arr
             u_minus_vT = u_arr - vT_arr
-            v_minus_vT = v_arr - vT_arr
+            # v_minus_vT = v_arr - vT_arr
 
             # set constants
             if variation == "stddev":
                 g_var = np.std(g_arr)
                 um_var = np.std(u_minus_m)
                 uvT_var = np.std(u_minus_vT)
-                v_var = np.std(v_arr)
-                vT_var = np.std(vT_arr)
+                # v_var = np.std(v_arr)
+                # vT_var = np.std(vT_arr)
             elif variation == "iqr":
                 g_var_real = np.percentile(g_arr.real, 75) - np.percentile(
                     g_arr.real, 25
@@ -1066,35 +1066,35 @@ class DevTools:
             g_step = g_boundary / 3
             # um_step = um_boundary / 10
             # uvT_step = uvT_boundary / 10
-            v_step = vT_var / 7.5  # change to appropriate fixed size
+            # v_step = vT_var / 7.5  # change to appropriate fixed size
             e_step = 0.2
 
             g_bins = np.arange(-g_boundary, g_boundary, g_step)
             # um_bins = np.arange(-um_boundary, um_boundary, um_step)
             # uvT_bins = np.arange(-uvT_boundary, uvT_boundary, uvT_step)
             # vT_bins = np.arange(-vT_boundary, vT_boundary, uvT_step)
-            v_bins = np.arange(-v_boundary, v_boundary, e_step)
+            # v_bins = np.arange(-v_boundary, v_boundary, e_step)
             m_bins = np.arange(-m_boundary, m_boundary, e_step)
-            n_bins = np.arange(-n_boundary, n_boundary, e_step)
-            if el_boundary is not None:
-                el_bins = np.arange(-el_boundary, el_boundary, e_step)
-            if es_boundary is not None:
-                es_bins = np.arange(-es_boundary, es_boundary, e_step)
+            # n_bins = np.arange(-n_boundary, n_boundary, e_step)
+            # if el_boundary is not None:
+            #     el_bins = np.arange(-el_boundary, el_boundary, e_step)
+            # if es_boundary is not None:
+            #     es_bins = np.arange(-es_boundary, es_boundary, e_step)
 
             # calculate centers
             if variation == "stddev":
                 g_center_real = np.mean(g_arr.real)
                 g_center_imag = np.mean(g_arr.imag)
-                um_center_real = np.mean(u_minus_m.real)
-                um_center_imag = np.mean(u_minus_m.imag)
+                # um_center_real = np.mean(u_minus_m.real)
+                # um_center_imag = np.mean(u_minus_m.imag)
                 # uvT_center_real = np.mean(u_minus_vT.real)
                 # uvT_center_imag = np.mean(u_minus_vT.imag)
-                vT_center_real = np.mean(v_arr.real)
-                vT_center_imag = np.mean(v_arr.imag)
-            elif variation == "iqr":
-                g_center = np.median(g_arr)
-                um_center = np.median(u_minus_m)
-                uvT_center = np.median(u_minus_vT)
+                # vT_center_real = np.mean(v_arr.real)
+                # vT_center_imag = np.mean(v_arr.imag)
+            # elif variation == "iqr":
+            #     g_center = np.median(g_arr)
+            #     um_center = np.median(u_minus_m)
+            #     uvT_center = np.median(u_minus_vT)
 
             if verbose:
                 print(
@@ -1110,17 +1110,17 @@ class DevTools:
             #     bins=vT_bins,
             #     density=True
             # )
-            data_hist, data_bins = np.histogram(v_arr.real, bins=v_bins, density=True)
+            # data_hist, data_bins = np.histogram(v_arr.real, bins=v_bins, density=True)
             model_hist, model_bins = np.histogram(m_arr.real, bins=m_bins, density=True)
-            noise_hist, noise_bins = np.histogram(n_arr.real, bins=n_bins, density=True)
-            if el_boundary is not None:
-                error_long_hist, error_long_bins = np.histogram(
-                    e_long_arr, bins=el_bins, density=True
-                )
-            if es_boundary is not None:
-                error_short_hist, error_short_bins = np.histogram(
-                    e_short_arr, bins=es_bins, density=True
-                )
+            # noise_hist, noise_bins = np.histogram(n_arr.real, bins=n_bins, density=True)
+            # if el_boundary is not None:
+            #     error_long_hist, error_long_bins = np.histogram(
+            #         e_long_arr, bins=el_bins, density=True
+            #     )
+            # if es_boundary is not None:
+            #     error_short_hist, error_short_bins = np.histogram(
+            #         e_short_arr, bins=es_bins, density=True
+            #     )
             g_real_hist, g_real_bins = np.histogram(
                 g_arr.real, bins=g_bins, density=True
             )
@@ -1196,7 +1196,7 @@ class DevTools:
                     print("Ploting - g_vmax is inf or nan, setting to 1")
                 g_vmax = 1
             # g_vmax = 15000
-            im = ax[run, 2].pcolormesh(
+            ax[run, 2].pcolormesh(
                 gains_real2d,
                 gains_imag2d,
                 gains_hist2d.T,
@@ -1529,11 +1529,11 @@ class DevTools:
             )
             # using calculated thermal noise and model error
             # instead of passed because that's available
-            alpha = 2.6e-4
-            angle = np.radians(26.57)
-            avg_g_offset_predict_right = alpha * (
-                np.cos(angle) * avg_mag_vTm - np.sin(angle) * sigma_re_n
-            )
+            # alpha = 2.6e-4
+            # angle = np.radians(26.57)
+            # avg_g_offset_predict_right = alpha * (
+            #     np.cos(angle) * avg_mag_vTm - np.sin(angle) * sigma_re_n
+            # )
 
             re_g_minus_one_left = g_squared_left - 1
             re_g_minus_one_right = g_squared_right - 1
@@ -1620,7 +1620,7 @@ class DevTools:
         # )
         plt.close()
 
-        fix, ax = plt.subplots()
+        _, ax = plt.subplots()
         plt.scatter(g_arr.real, g_arr.imag)
         ax.add_patch(
             plt.Circle(
@@ -1643,9 +1643,9 @@ class DevTools:
         plt.ylim(-glim, glim)
         ax.set_aspect("equal", adjustable="datalim")
         ax.autoscale_view()
-        filename = (
-            f"calico/images/sigma_t_{which_sigma_t}_gains2d_{variation}_{suffix}.png"
-        )
+        # filename = (
+        #     f"calico/images/sigma_t_{which_sigma_t}_gains2d_{variation}_{suffix}.png"
+        # )
         # plt.savefig(
         #     filename,
         #     bbox_inches=0,
@@ -1684,7 +1684,7 @@ class DevTools:
         cutoff_function: str = "constant_weights",
     ) -> float:
 
-        uvc, g_arr, u_arr = calwrap.unified_calibration_wrapper(
+        _, g_arr, _ = calwrap.unified_calibration_wrapper(
             data_path,
             data_path,
             parallel=False,
