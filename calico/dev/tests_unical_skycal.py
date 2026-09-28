@@ -805,7 +805,7 @@ class TestStringMethods(unittest.TestCase):
             )
             fit_vis = fit_vis[:, 0] + 1j * fit_vis[:, 1]
             print(f"\nCost-wrapper unpack OK, shape {fit_vis.shape}")
-        except Exception as e:
+        except ValueError as e:
             print(f"\nCost-wrapper unpack FAILS\n  {type(e).__name__}: {e}\n")
 
         # how the result reshape reads it; should equal `known`
@@ -898,10 +898,7 @@ class TestStringMethods(unittest.TestCase):
         # filename = "fhd_data_one_freq_015"
         gaussian_simulation = True
         caldata_obj = caldata.CalData()
-        (
-            skycal_model_error,
-            skycal_thermal_noise,
-        ) = dev_tools.prepare_standard_unical_test_run(
+        skycal_model_error = dev_tools.prepare_standard_unical_test_run(
             filename=filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
@@ -911,7 +908,6 @@ class TestStringMethods(unittest.TestCase):
             scaling_factor=scaling_factor_skycal,
             same_sky_all_times=same_sky_all_times,
             return_model_error=True,
-            return_thermal_noise=True,
         )
         orig_data = caldata_obj.data_visibilities.copy()
         orig_model = caldata_obj.model_visibilities.copy()
@@ -923,12 +919,8 @@ class TestStringMethods(unittest.TestCase):
         skycal_u = np.ravel(caldata_obj.fit_vis[..., 0, 0])
         skycal_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
         skycal_e = np.ravel(skycal_model_error[..., 0])
-        skycal_n = np.ravel(skycal_thermal_noise[..., 0])
 
-        (
-            unical_model_error,
-            unical_thermal_noise,
-        ) = dev_tools.prepare_standard_unical_test_run(
+        unical_model_error = dev_tools.prepare_standard_unical_test_run(
             filename=filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
@@ -938,7 +930,6 @@ class TestStringMethods(unittest.TestCase):
             scaling_factor=scaling_factor_unical,
             same_sky_all_times=same_sky_all_times,
             return_model_error=True,
-            return_thermal_noise=True,
         )
         caldata_obj.data_visibilities = orig_data
         caldata_obj.model_visibilities = orig_model
@@ -950,7 +941,6 @@ class TestStringMethods(unittest.TestCase):
         unical_u = np.ravel(caldata_obj.fit_vis[..., 0, 0])
         unical_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
         unical_e = np.ravel(unical_model_error[..., 0])
-        unical_n = np.ravel(unical_thermal_noise[..., 0])
 
         # plotting quantities
         ants = np.arange(unical_gains.size)
@@ -958,8 +948,6 @@ class TestStringMethods(unittest.TestCase):
         unical_vT_u_diff = np.abs(unical_m + unical_e - unical_u)
         skycal_e = np.abs(skycal_e)
         unical_e = np.abs(unical_e)
-        skycal_n = np.abs(skycal_n)
-        unical_n = np.abs(unical_e)
 
         # plotting gains over ants
         plt.scatter(
@@ -1004,12 +992,6 @@ class TestStringMethods(unittest.TestCase):
             alpha=0.5,
             label="$|e|$",
         )
-        # plt.hist(
-        #     skycal_n,
-        #     bins=50,
-        #     color="pink",
-        #     label="$|n|$",
-        # )
         plt.xlabel("Jy")
         plt.title(
             "Fit model parameter $u$s convergence (skycal)"
@@ -1053,8 +1035,8 @@ class TestStringMethods(unittest.TestCase):
     def examine_gains_fit_time_by_time(self):
         seed = 421
         same_sky_all_times = True
-        scaling_factor_skycal = 0.001
-        scaling_factor_unical = 1
+        scaling_factor_skycal = 0.0001
+        # scaling_factor_unical = 1
         sigma_m = 0.1
         sigma_t = 5
         caldata_obj = caldata.CalData()
@@ -1160,7 +1142,7 @@ class TestStringMethods(unittest.TestCase):
         gain_offsets = []
         seed = 100
         same_sky_all_times = True
-        scaling_factor_skycal = 0.0001
+        # scaling_factor_skycal = 0.0001
         scaling_factor_unical = 1
         sigma_m = 1.5
         sigma_t = 5
