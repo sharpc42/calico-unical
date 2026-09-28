@@ -3,7 +3,7 @@ import os
 import subprocess
 import time
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -271,7 +271,7 @@ class TestStringMethods(unittest.TestCase):
         )
         git_time_suffix = f"g{git_hash}_t{start_time_suffix}"
         file_suffix = git_time_suffix
-        start_time_dt = datetime.fromtimestamp(start_time)
+        start_time_dt = datetime.fromtimestamp(start_time, tz=timezone.utc)
         metadata = {
             "Date": f"{start_time_dt:%B %d, %Y}",
             "Time": f"{start_time_dt:%H:%M:%S}",
@@ -682,7 +682,6 @@ class TestStringMethods(unittest.TestCase):
                 + np.abs(avg_vn)
                 + np.abs(avg_ve)
             )
-            denominator = avg_abs_v_squared + np.mean(np.abs(model_error) ** 2)
             # fill arrays
             abs_avg_sum_vals.append(abs_avg_sum / avg_abs_v_squared)
             sum_abs_mag_vals.append(sum_abs_mag / 1)
@@ -699,12 +698,10 @@ class TestStringMethods(unittest.TestCase):
         sum_abs_mag_mean = np.mean(sum_abs_mag_vals)
         subtract_off_v_mean = np.mean(subtract_off_v)
         n_and_e_terms_mean = np.mean(n_and_e_terms)
-        avg_sum_mean = np.mean(avg_sum)
         avg_ne_mean = np.mean(avg_ne_arr)
         avg_ve_mean = np.mean(avg_ve_arr)
         avg_vn_mean = np.mean(avg_vn_arr)
         avg_v_squared_mean = np.mean(avg_v_squared)
-        model_error_mean = np.mean(e_arr)
 
         print(f"\n\n***RESULTS***\n{abs_avg_sum_mean=:.3f}\t{sum_abs_mag_mean=:.3f}")
         print(f"{subtract_off_v_mean=:.3f}\t{n_and_e_terms_mean=:.3f}")
@@ -759,11 +756,11 @@ class TestStringMethods(unittest.TestCase):
             f"$<|v_T|^2> - <|m|^2> - <|e|^2>$ {avg_abs_vT_squared - avg_abs_m_squared - avg_model_error_squared:.3f}"
         )
 
-        fig, ax = plt.subplots()
+        _, ax = plt.subplots()
         plt.hist(abs_avg_sum_vals, bins=50)
         plt.title("$\\frac{|< |v_T|^2 + v_T^* e + n^* v_T + n^* e >|}{<|v_T|^2>}$")
         plt.xlabel("Realizations")
-        props = dict(boxstyle="round", color="wheat", alpha=0.7)
+        props = {"boxstyle": "round", "color": "wheat", "alpha": 0.7}
         plt.text(
             x=0.85,
             y=0.95,
