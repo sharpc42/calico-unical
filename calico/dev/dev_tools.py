@@ -657,8 +657,6 @@ class DevTools:
                 elif run_params["sigma_e"] >= 0:
                     model_vis_realizations.append(initial_model_vis)
                     initial_data_vis += this_model_error
-                # model_err_realizations_long.append(me_real_long)
-                # model_err_realizations_short.append(me_real_short)
             for i in range(num_thermal_realizations):
                 if verbose:
                     print(f"Creating thermal noise realization {i + 1}")
@@ -677,9 +675,7 @@ class DevTools:
                 this_thermal_noise = thermal_noise_real + 1.0j * thermal_noise_imag
                 data_vis_realizations.append(initial_data_vis + this_thermal_noise)
                 noise_realizations.append(thermal_noise_real)
-            # n_times = caldata_obj.Ntimes
             n_bls = caldata_obj.Nbls
-            # n_ants = caldata_obj.Nants
             full_data_realizations = np.empty((0, n_bls, n_freqs))
             full_model_realizations = np.empty((0, n_bls, n_freqs))
             gain_params_realizations = np.empty((0, n_freqs))
@@ -767,14 +763,6 @@ class DevTools:
                     full_error_realizations = np.concatenate(
                         (full_error_realizations, model_err_realizations[k])
                     )
-                    # full_m_err_long_realizations = np.concatenate((
-                    #     full_m_err_long_realizations,
-                    #     model_err_long_read_realizations[k]
-                    # ))
-                    # full_m_err_long_realizations = np.concatenate((
-                    #     full_m_err_short_realizations,
-                    #     model_err_short_read_realizations[k]
-                    # ))
                     uv_array = caldata_obj.uv_array
                     # get value of first cost function term g*gv-u
                     gains_expanded = (
@@ -845,9 +833,6 @@ class DevTools:
                     print(
                         f"No baseline dependent model error realizations to write\n{e}"
                     )
-            # with open(f'{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl') as file:
-            # print(f"data path {model_path}")
-            # print(f"file\n\t{file}")
             hkl.dump(
                 output_arrays,
                 f"{model_path}_many_reals_output_data_{run_params_filename}_{run}.hkl",
@@ -911,10 +896,6 @@ class DevTools:
         save_plot: bool = True,
     ) -> None:
 
-        # with open(
-        #     f'calico/data/{run_params_filename}.hkl',
-        #     mode='r',
-        # ) as file:
         run_params_list = hkl.load(f"calico/data/{run_params_filename}.hkl")
 
         output_dicts = []
@@ -967,15 +948,12 @@ class DevTools:
 
             u_minus_m = u_arr - m_arr
             u_minus_vT = u_arr - vT_arr
-            # v_minus_vT = v_arr - vT_arr
 
             # set constants
             if variation == "stddev":
                 g_var = np.std(g_arr)
                 um_var = np.std(u_minus_m)
                 uvT_var = np.std(u_minus_vT)
-                # v_var = np.std(v_arr)
-                # vT_var = np.std(vT_arr)
             elif variation == "iqr":
                 g_var_real = np.percentile(g_arr.real, 75) - np.percentile(
                     g_arr.real, 25
@@ -1016,21 +994,6 @@ class DevTools:
             if np.isnan(g_boundary) or np.isinf(g_boundary):
                 print("Plot Many Realizations - g_boundary is inf or nan, setting to 1")
                 g_boundary = 1
-            # um_boundary = np.max([np.abs(np.min(u_minus_m.real)),
-            #                       np.abs(np.max(u_minus_m.real))])
-            # if np.isnan(um_boundary) or np.isinf(um_boundary):
-            #     print("Plot Many Realizations - um_boundary is inf or nan, setting to 1")
-            #     um_boundary = 1
-            # uvT_boundary = np.max([np.abs(np.min(u_minus_vT.real)),
-            #                        np.abs(np.max(u_minus_vT.real))])
-            # if np.isnan(uvT_boundary) or np.isinf(uvT_boundary):
-            #     print("Plot Many Realizations - uvT_boundary is inf or nan, setting to 1")
-            #     uvT_boundary = 1
-            # vT_boundary = np.max([np.abs(np.min(vT_arr)),
-            #                       np.abs(np.max(vT_arr))])
-            # if np.isnan(vT_boundary) or np.isinf(vT_boundary):
-            #     print("Plot Many Realizations - vT_boundary is inf or nan, setting to 1")
-            #     vT_boundary = 1
             v_boundary = np.max(
                 [np.abs(np.min(v_arr.real)), np.abs(np.max(v_arr.real))]
             )
@@ -1060,42 +1023,15 @@ class DevTools:
                 )
 
             # set bin sizes
-            # g_step = g_var / 7.5
-            # g_step = 0.1
-            # um_step = 0.05
-            # uvT_step = 0.05
             g_step = g_boundary / 3
-            # um_step = um_boundary / 10
-            # uvT_step = uvT_boundary / 10
-            # v_step = vT_var / 7.5  # change to appropriate fixed size
             e_step = 0.2
-
             g_bins = np.arange(-g_boundary, g_boundary, g_step)
-            # um_bins = np.arange(-um_boundary, um_boundary, um_step)
-            # uvT_bins = np.arange(-uvT_boundary, uvT_boundary, uvT_step)
-            # vT_bins = np.arange(-vT_boundary, vT_boundary, uvT_step)
-            # v_bins = np.arange(-v_boundary, v_boundary, e_step)
             m_bins = np.arange(-m_boundary, m_boundary, e_step)
-            # n_bins = np.arange(-n_boundary, n_boundary, e_step)
-            # if el_boundary is not None:
-            #     el_bins = np.arange(-el_boundary, el_boundary, e_step)
-            # if es_boundary is not None:
-            #     es_bins = np.arange(-es_boundary, es_boundary, e_step)
 
             # calculate centers
             if variation == "stddev":
                 g_center_real = np.mean(g_arr.real)
                 g_center_imag = np.mean(g_arr.imag)
-                # um_center_real = np.mean(u_minus_m.real)
-                # um_center_imag = np.mean(u_minus_m.imag)
-                # uvT_center_real = np.mean(u_minus_vT.real)
-                # uvT_center_imag = np.mean(u_minus_vT.imag)
-                # vT_center_real = np.mean(v_arr.real)
-                # vT_center_imag = np.mean(v_arr.imag)
-            # elif variation == "iqr":
-            #     g_center = np.median(g_arr)
-            #     um_center = np.median(u_minus_m)
-            #     uvT_center = np.median(u_minus_vT)
 
             if verbose:
                 print(
@@ -1106,22 +1042,7 @@ class DevTools:
                 )
 
             # get histograms
-            # vT_real_hist, vT_real_bins = np.histogram(
-            #     vT_arr.real,
-            #     bins=vT_bins,
-            #     density=True
-            # )
-            # data_hist, data_bins = np.histogram(v_arr.real, bins=v_bins, density=True)
             model_hist, model_bins = np.histogram(m_arr.real, bins=m_bins, density=True)
-            # noise_hist, noise_bins = np.histogram(n_arr.real, bins=n_bins, density=True)
-            # if el_boundary is not None:
-            #     error_long_hist, error_long_bins = np.histogram(
-            #         e_long_arr, bins=el_bins, density=True
-            #     )
-            # if es_boundary is not None:
-            #     error_short_hist, error_short_bins = np.histogram(
-            #         e_short_arr, bins=es_bins, density=True
-            #     )
             g_real_hist, g_real_bins = np.histogram(
                 g_arr.real, bins=g_bins, density=True
             )
@@ -1131,26 +1052,10 @@ class DevTools:
             gains_hist2d, gains_real2d, gains_imag2d = np.histogram2d(
                 g_arr.real, g_arr.imag, bins=g_bins, density=True
             )
-            # um_hist2d, um_real2d, um_imag2d = np.histogram2d(
-            #     u_minus_m.real,
-            #     u_minus_m.imag,
-            #     bins=um_bins,
-            #     density=True
-            # )
-            # uvT_hist2d, uvT_real2d, uvT_imag2d = np.histogram2d(
-            #     u_minus_vT.real,
-            #     u_minus_vT.imag,
-            #     bins=uvT_bins,
-            #     density=True
-            # )
 
             glim = 1.0 * g_boundary
-            # uvT_lim = 0.5*uvT_boundary
-
             if np.isnan(glim) or np.isinf(glim):
                 glim = 1
-            # if np.isnan(uvT_lim) or np.isinf(uvT_lim):
-            #     uvT_lim = 1
 
             uv_norm = np.linalg.norm(uv_arr, axis=1)
             uv_extend = np.array([])
@@ -1240,10 +1145,6 @@ class DevTools:
                 ax[run, 3].hist(
                     long_um, bins=50, label="Long Baselines", histtype="step"
                 )
-            # else:
-            #     ax[run,3].hist(np.abs(u_minus_m), bins=um_bins, histtype="step")
-            # ax[run,3].set_xlim(0,um_boundary)
-            # ax[run,3].set_xlim(0,5)
             ax[run, 3].set_xlabel("(Jy)")
             if run == 0:
                 ax[run, 3].set_title("1D False Model Error", fontsize="22")
@@ -1269,14 +1170,6 @@ class DevTools:
                     label="Long Baselines",
                     histtype="step",
                 )
-            # else:
-            #     ax[run,4].hist(
-            #         np.abs(u_minus_vT),
-            #         bins=uvT_bins,
-            #         histtype="step",
-            #     )
-            # ax[run,4].set_xlim(0,uvT_boundary)
-            # ax[run,4].set_xlim(0,4)
             ax[run, 4].set_xlabel("(Jy)")
             if run == 0:
                 ax[run, 4].set_title(
@@ -1286,41 +1179,7 @@ class DevTools:
             ax[run, 4].tick_params(labelbottom=True, labelleft=True)
             ax[run, 4].legend()
 
-            # initial models
-            # uvT_vmax = np.max(uvT_hist2d)
-            # if np.isnan(uvT_vmax) or np.isinf(uvT_vmax):
-            #     print("Plot Many Realizations - uvT_vmax is inf or nan, setting to 1")
-            #     uvT_vmax = 1
-            # uvT_vmax = 2
-            # im2 = ax[run,5].pcolormesh(
-            #     uvT_real2d,
-            #     uvT_imag2d,
-            #     uvT_hist2d,
-            #     cmap="inferno",
-            #     vmin=0,
-            #     vmax=uvT_vmax,
-            #     rasterized=True,
-            # )
-            # ax[run,5].add_patch(plt.Circle(
-            #     (uvT_center_real,
-            #      uvT_center_imag),
-            #      radius=uvT_var,
-            #      fill=False,
-            #      color="white",
-            # ))
-            # ax[run,5].set_ylabel("Imag")
-            # ax[run,5].set_xlabel("Real")
-            # uvT_lim = 1.5
-            # ax[run,5].set_xlim(-uvT_lim, uvT_lim)
-            # ax[run,5].set_ylim(-uvT_lim, uvT_lim)
-            # if run == 0:
-            #     ax[run,5].set_title(
-            #         f"2D True Model Error\n(Complex Plane)",
-            #         fontsize="22",
-            #     )
-
-            # plot distributions for vis data, thermal noise, and long/short model errors
-            # ax[run,6].stairs(vT_real_hist, vT_real_bins, label="vT")
+            # plot distributions for vis data and thermal noise
             ax[run, 6].stairs(model_hist, model_bins, label="m")
             ax[run, 6].set_xlabel("Real")
             if run == 0:
@@ -1505,28 +1364,12 @@ class DevTools:
 
             # predict gains based on whether model error
             # is "additive" or "subtractive"
-            # if np.mean(vT_arr) > np.mean(m_arr):
-            #     e_arr_mag = np.sqrt(np.abs(vT_arr)**2 - np.abs(m_arr)**2)
-            # else:
-            #     e_arr_mag = np.sqrt(np.abs(m_arr)**2 - np.abs(vT_arr)**2)
-            # e_arr_mag = np.abs(e_arr)
             g_squared_left = np.sqrt(
                 np.sqrt(np.abs(vT_arr) ** 2 + np.abs(n_arr) ** 2)
                 / np.sqrt(np.abs(vT_arr) ** 2 + np.abs(e_arr) ** 2)
             )
-            # g_squared_right = np.sqrt(
-            g_squared_right = (
-                # np.sqrt(
-                (
-                    np.abs(m_arr) ** 2 + (m_arr * (e_arr + n_arr)).real
-                    # (m_arr * (e_arr + n_arr)).real
-                    # np.abs(vT_arr**2) + e_arr_mag**2 +
-                    # np.abs(n_arr)**2
-                )
-                /
-                # np.abs(m_arr)
-                # np.sqrt(
-                (np.abs(m_arr) ** 2)
+            g_squared_right = np.abs(m_arr) ** 2 + (m_arr * (e_arr + n_arr)).real / (
+                np.abs(m_arr) ** 2
             )
             # using calculated thermal noise and model error
             # instead of passed because that's available
@@ -1659,12 +1502,6 @@ class DevTools:
         # img_metadata = PngImagePlugin.PngInfo()
         # img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
         # img.save(filename, pnginfo=img_metadata)
-
-        # with open(f'calico/data/output_calcs_{suffix}.hkl') as file:
-        #     if verbose:
-        #         print(f"***calculated values***")
-        #         print(f"data path {data_filepath}")
-        #         print(f"file\n\t{file}")
         hkl.dump(
             output_dicts, f"calico/data/output_calcs_{suffix}.hkl", compression="gzip"
         )
