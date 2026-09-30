@@ -11,7 +11,7 @@ class VariableWeightsArray:
     length.
 
     Attributes
-    -------
+    ----------
     uv_norm_array :
         * Shape (Nbls,)
         * Array of the norms of vectors in the uv plane per baseline
@@ -92,7 +92,7 @@ class VariableWeightsArray:
         array or dynamically according other passed parameters.
 
         Parameters
-        -------
+        ----------
         sigma_t_0 : float
             * The characteristic thermal noise for the user's problem.
             Calculations by weight functions treat this value as unity.
@@ -141,7 +141,7 @@ class VariableWeightsArray:
             string exactly matches the function name, and the necessary
             parameters are added as class attributes.
         """
-        if threshold_length == None:
+        if threshold_length is None:
             raise ValueError("Need threshold length even if zero -- Variable Weights")
 
         caldata_obj.sigma_t_0 = sigma_t_0
@@ -225,10 +225,7 @@ class VariableWeightsArray:
             self.power = int(self.power)
         except TypeError as e:
             print(sys.exc_info())
-            print(
-                f"Error: {e}",
-                end=" ",
-            )
+            print(f"Error: {e}", end=" ")
             print("Defaulting to power=2")
             self.power = 2
         x = (
