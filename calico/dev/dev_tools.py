@@ -8,17 +8,11 @@ import hickle as hkl
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, PngImagePlugin
-from pyuvdata import UVData
 from scipy.differentiate import jacobian
 
-from calico import (
-    calibration_optimization as cal_opt,
-)
-from calico import (
-    calibration_wrappers as calwrap,
-)
-from calico.dev import noise_and_error_simulation as sim
-from calico.dev import variable_weights
+from calico import calibration_optimization as cal_opt, calibration_wrappers as calwrap
+from calico.dev import noise_and_error_simulation as sim, variable_weights
+from pyuvdata import UVData
 
 
 class DevTools:
@@ -46,13 +40,9 @@ class DevTools:
             self.freq_ind,
             self.vis_pol_ind,
         )
-        self.display_where_large_real_or_imag(
-            jac_analytic_result,
-            jac_numeric_result,
-        )
+        self.display_where_large_real_or_imag(jac_analytic_result, jac_numeric_result)
         jac, jac_numeric = self.assemble_jac_into_complex_array(
-            jac_analytic_result,
-            jac_numeric_result,
+            jac_analytic_result, jac_numeric_result
         )
         _, _, where_large = self.calc_error_vals(jac_numeric, jac)
         n_vals = len(where_large[0])
@@ -115,18 +105,26 @@ class DevTools:
         np.set_printoptions(precision=4)
         if verbose:
             print("***WHERE ERROR IS LARGE***")
-        part = lambda x: "Real" if x == 0 else "Imag"
+
+        def part(x):
+            if x == 0:
+                return "Real"
+            else:
+                return "Imag"
+
         if verbose:
             for val in range(n_vals):
                 print("Value", val + 1)
                 print(
-                    f"aj: {analytic_vals[val]} nj: {numeric_vals[val]} val: {param_vals[val]} bl_ind: {part((where_large[0][val] - 2 * self.Nants_unflagged) % 2)}"
+                    f"aj: {analytic_vals[val]} nj: {numeric_vals[val]} "
+                    f"val: {param_vals[val]} "
+                    f"bl_ind: {
+                        part((where_large[0][val] - 2 * self.Nants_unflagged) % 2)
+                    }"
                 )
 
     def calc_error_vals(
-        self,
-        numeric_jac: np.ndarray,
-        analytic_jac: np.ndarray,
+        self, numeric_jac: np.ndarray, analytic_jac: np.ndarray
     ) -> tuple[float, float, np.ndarray[int]]:
         jac_error = np.abs(analytic_jac - numeric_jac) / (
             np.abs(analytic_jac) + np.abs(numeric_jac)
@@ -225,10 +223,7 @@ class DevTools:
                     starting_complex_point[val].real,
                     starting_complex_point[val].imag,
                 ),
-                xy=(
-                    complex_step[val].real,
-                    complex_step[val].imag,
-                ),
+                xy=(complex_step[val].real, complex_step[val].imag),
                 arrowprops={"arrowstyle": "->"},
             )
         ax.set_xlabel(xlabel)
@@ -373,7 +368,9 @@ class DevTools:
                 ax1.set_xlim(glim[0], glim[1])
                 ax1.set_ylim(glim[0], glim[1])
             ax1.set_title(
-                f"Final Gains (Error: {error_type}, sigma_T = {stddev_thermal}, sigma_M = {stddev_model})"
+                f"Final Gains (Error: {error_type}, "
+                f"sigma_T = {stddev_thermal}, "
+                f"sigma_M = {stddev_model})"
             )
             ax1.set_xlabel("Real - 1")
             ax1.set_ylabel("Imag")
@@ -400,7 +397,9 @@ class DevTools:
                 ax2.set_xlim(ulim[0], ulim[1])
                 ax2.set_ylim(ulim[0], ulim[1])
             ax2.set_title(
-                f"Final u-m (Error: {error_type}, sigma_T = {stddev_thermal}, sigma_M = {stddev_model})"
+                f"Final u-m (Error: {error_type}, "
+                f"sigma_T = {stddev_thermal}, "
+                f"sigma_M = {stddev_model})"
             )
             ax2.set_xlabel("Real")
             ax2.set_ylabel("Imag")
@@ -533,12 +532,12 @@ class DevTools:
         # TODO: Currently freq ind will work for 0 and we're not worried about multiple
         #       freqs so there's no immediate issue. However we will want to get there
         #       eventually, and right now the used freq ind is set inside the unical
-        #       function on the caldata object in a for loop through the different freqs.
-        #       So that's not accessible right now to this many realizations study. It's
-        #       worth think about whether or not we do in fact care about doing many
-        #       freqs for the many realizations study and if we do if it's possible to
-        #       move the freq ind loop out of the unical function somehow. Ditto for
-        #       the pol inds which are being done in the optimization wrappers.
+        #       function on the caldata object in a for loop through the different
+        #       freqs. So that's not accessible right now to this many realizations
+        #       study. It's worth think about whether or not we do in fact care about
+        #       doing many freqs for the many realizations study and if we do if it's
+        #       possible to move the freq ind loop out of the unical function somehow.
+        #       Ditto for the pol inds which are being done in the optim wrappers.
         # TODO: Also, should the filenames be passed through the unical wrapper? I don't
         #       know of another to get it here but I don't like the idea of exposing
         #       that to the unical wrapper (which the user is interacting with). Perhaps
@@ -553,9 +552,7 @@ class DevTools:
         run_params_list = hkl.load(f"{run_params_path}.hkl")
         if simulate_visibilities:
             sim.simulate_visibilities(
-                caldata_obj=caldata_obj,
-                seed=42,
-                same_sky_all_times=same_sky_all_times,
+                caldata_obj=caldata_obj, seed=42, same_sky_all_times=same_sky_all_times
             )
         # preserve deep copies of original data and model from uvfits file
         original_data_vis = copy.deepcopy(
@@ -701,7 +698,9 @@ class DevTools:
                     caldata_obj.model_visibilities[:, :, :n_freqs, vis_pol_ind] = model
                     caldata_obj.fit_vis[:, :, :n_freqs, vis_pol_ind] = model
                     # if force_fit_to_true_vis:
-                    #     caldata_obj.fit_vis[:,:,num_freqs-1,vis_pol_ind] = original_data_vis
+                    # caldata_obj.fit_vis[
+                    #     :,:,num_freqs-1,vis_pol_ind
+                    # ] = original_data_vis
                     if gains_real_guess is not None:
                         # NOTE: Does this work for multiple frequencies? Seems not
                         caldata_obj.gains[:, n_freqs - 1, feed_pol_ind] = (
@@ -709,7 +708,8 @@ class DevTools:
                         )
                         if len(gains_real_guess) != caldata_obj.Nants:
                             raise ValueError(
-                                "Gains guess length must be the same as Nants for this run"
+                                "Gains guess length must be the same "
+                                "as Nants for this run"
                             )
                     vwa = variable_weights.VariableWeightsArray()
                     vwa.set_algorithm_weights(
@@ -729,13 +729,12 @@ class DevTools:
                         )
                     elif calibration_type == "skycal":
                         caldata_obj.sky_based_calibration(
-                            verbose=verbose,
-                            maxiter=maxiter,
-                            xtol=xtol,
+                            verbose=verbose, maxiter=maxiter, xtol=xtol
                         )
                     else:
                         raise ValueError(
-                            "Unknown calibration type -- possibilities are 'unical' and 'skycal'"
+                            "Unknown calibration type -- "
+                            "possibilities are 'unical' and 'skycal'"
                         )
                     # store data
                     full_data_realizations = np.concatenate(
@@ -870,9 +869,15 @@ class DevTools:
             # uvg.extra_keywords = metadata
 
             # uvfits_writeout_filename = f"calico/data/many_realizations_out_{run}_avg"
-            # uvd.write_uvfits(f"calico/data/{uvfits_writeout_filename}_v_{suffix}.uvfits")
-            # uvm.write_uvfits(f"calico/data/{uvfits_writeout_filename}_m_{suffix}.uvfits")
-            # uvu.write_uvfits(f"calico/data/{uvfits_writeout_filename}_u_{suffix}.uvfits")
+            # uvd.write_uvfits(
+            #     f"calico/data/{uvfits_writeout_filename}_v_{suffix}.uvfits"
+            # )
+            # uvm.write_uvfits(
+            #     f"calico/data/{uvfits_writeout_filename}_m_{suffix}.uvfits"
+            # )
+            # uvu.write_uvfits(
+            #     f"calico/data/{uvfits_writeout_filename}_u_{suffix}.uvfits"
+            # )
             # # uvg.write_calfits(f"{uvfits_writeout_filename}_g_{suffix}.calfits")
 
             # np.save(f"calico/data/{uvfits_writeout_filename}_g_{suffix}.npy",
@@ -932,7 +937,8 @@ class DevTools:
                 e_long_arr = output_arrays["e runs long"]
             except TypeError as e:
                 print(
-                    f"Long and short baseline model error arrays not found, setting to None\n{e}"
+                    "Long and short baseline model error arrays not found, "
+                    f"setting to None\n{e}"
                 )
                 e_short_arr = None
                 e_long_arr = None
@@ -979,13 +985,23 @@ class DevTools:
 
             sigma_re_vT = np.std(vT_arr.real)
             if simulation_type == "fhd":
-                title = f"FHD simulation with source cutoff at 0.15 Jy\n$\\sigma_v$ = {sigma_re_vT:.2f} for True Visibilities\n\n"
+                title = (
+                    f"FHD simulation with source cutoff at 0.15 Jy\n"
+                    f"$\\sigma_v$ = {sigma_re_vT:.2f} for True Visibilities\n\n"
+                )
             elif simulation_type == "gaussian":
-                title = f"Gaussian simulation of data, model, noise, and error (additive)\n$\\sigma_v$ = {sigma_re_vT:.2f} for True Visibilities\n\n"
+                title = (
+                    f"Gaussian simulation of data, model, noise, and error "
+                    f"(additive)\n$\\sigma_v$ = {sigma_re_vT:.2f} "
+                    "for True Visibilities\n\n"
+                )
             else:
                 if verbose:
                     print("Warning: Invalid simulation type given")
-                title = f"<<Unrecognized simulation type>>\n$\\sigma_v$ = {sigma_re_vT:.2f} for True Visibilities\n\n"
+                title = (
+                    f"<<Unrecognized simulation type>>\n"
+                    f"$\\sigma_v$ = {sigma_re_vT:.2f} for True Visibilities\n\n"
+                )
             fig.suptitle(title, fontsize="25", fontweight="bold")
 
             g_boundary = np.max(
@@ -1035,10 +1051,12 @@ class DevTools:
 
             if verbose:
                 print(
-                    f"g arr mean {np.mean(g_arr)}\ng arr real/imag of mean {np.mean(g_arr).real} {np.mean(g_arr).imag}"
+                    f"g arr mean {np.mean(g_arr)}\ng arr real/imag "
+                    f"of mean {np.mean(g_arr).real} {np.mean(g_arr).imag}"
                 )
                 print(
-                    f"g arr mean of real {np.mean(g_arr.real)} mean of imag {np.mean(g_arr.imag)}\n"
+                    f"g arr mean of real {np.mean(g_arr.real)} mean "
+                    f"of imag {np.mean(g_arr.imag)}\n"
                 )
 
             # get histograms
@@ -1070,16 +1088,8 @@ class DevTools:
             ax[run, 0].text(0.4, 0.6, f"{np.mean(cost_arr):.2f}", fontsize="17")
 
             # plot g real and imaginary histograms
-            ax[run, 1].plot(
-                g_real_bins[:-1],
-                g_real_hist,
-                label="Real",
-            )
-            ax[run, 1].plot(
-                g_imag_bins[:-1],
-                g_imag_hist,
-                label="Imaginary",
-            )
+            ax[run, 1].plot(g_real_bins[:-1], g_real_hist, label="Real")
+            ax[run, 1].plot(g_imag_bins[:-1], g_imag_hist, label="Imaginary")
             # glim = 0.4
             ax[run, 1].set_xlim(-glim, glim)
             g_1d_max = np.max([np.max(g_real_hist), np.max(g_imag_hist)])
@@ -1090,8 +1100,7 @@ class DevTools:
             ax[run, 1].set_ylim(0, g_1d_max)
             if run == 0:
                 ax[run, 1].set_title(
-                    "1D Gains Error\n(Real=Blue, Imag=Orange)",
-                    fontsize="22",
+                    "1D Gains Error\n(Real=Blue, Imag=Orange)", fontsize="22"
                 )
             ax[run, 1].tick_params(labelbottom=True, labelleft=True)
 
@@ -1126,10 +1135,7 @@ class DevTools:
             ax[run, 2].set_xlim(-glim, glim)
             ax[run, 2].set_ylim(-glim, glim)
             if run == 0:
-                ax[run, 2].set_title(
-                    "2D Gains Error\n(Complex Plane)",
-                    fontsize="22",
-                )
+                ax[run, 2].set_title("2D Gains Error\n(Complex Plane)", fontsize="22")
             ax[run, 2].tick_params(labelbottom=True, labelleft=True)
 
             # |u-m| hist for short and long baselines
@@ -1158,24 +1164,15 @@ class DevTools:
                 short_uvT = np.abs(u_minus_vT)[uv_extend < threshold_length]
             if es_boundary is not None:
                 ax[run, 4].hist(
-                    short_uvT,
-                    bins=50,
-                    label="Short Baselines",
-                    histtype="step",
+                    short_uvT, bins=50, label="Short Baselines", histtype="step"
                 )
             if el_boundary is not None:
                 ax[run, 4].hist(
-                    long_uvT,
-                    bins=50,
-                    label="Long Baselines",
-                    histtype="step",
+                    long_uvT, bins=50, label="Long Baselines", histtype="step"
                 )
             ax[run, 4].set_xlabel("(Jy)")
             if run == 0:
-                ax[run, 4].set_title(
-                    "1D True Model Error",
-                    fontsize="22",
-                )
+                ax[run, 4].set_title("1D True Model Error", fontsize="22")
             ax[run, 4].tick_params(labelbottom=True, labelleft=True)
             ax[run, 4].legend()
 
@@ -1183,10 +1180,7 @@ class DevTools:
             ax[run, 6].stairs(model_hist, model_bins, label="m")
             ax[run, 6].set_xlabel("Real")
             if run == 0:
-                ax[run, 6].set_title(
-                    "Data Distributions",
-                    fontsize="22",
-                )
+                ax[run, 6].set_title("Data Distributions", fontsize="22")
             ax[run, 6].tick_params(labelbottom=True, labelleft=True)
             ax[run, 6].legend()
 
@@ -1202,23 +1196,10 @@ class DevTools:
             if run == 0:
                 ax[run, 7].text(0.0, 1.03, "Output Calcs", fontsize="22")
             ax[run, 7].text(
-                0.0,
-                0.85,
-                f"$\\sigma$ Re($m$) = {sigma_re_m:.2f}",
-                fontsize="13",
+                0.0, 0.85, f"$\\sigma$ Re($m$) = {sigma_re_m:.2f}", fontsize="13"
             )
-            ax[run, 7].text(
-                0.0,
-                0.71,
-                f"$<|m|>$ = {avg_mag_model:.2f}",
-                fontsize="13",
-            )
-            ax[run, 7].text(
-                0.0,
-                0.57,
-                f"$<|v_T|>$ = {avg_mag_vT:.2f}",
-                fontsize="13",
-            )
+            ax[run, 7].text(0.0, 0.71, f"$<|m|>$ = {avg_mag_model:.2f}", fontsize="13")
+            ax[run, 7].text(0.0, 0.57, f"$<|v_T|>$ = {avg_mag_vT:.2f}", fontsize="13")
             ax[run, 7].text(
                 0.0,
                 0.43,
@@ -1227,10 +1208,7 @@ class DevTools:
                 fontweight="bold",
             )
             ax[run, 7].text(
-                0.0,
-                0.29,
-                f"$<|v_T-m|>$ = {avg_mag_vTm:.2f}",
-                fontsize="13",
+                0.0, 0.29, f"$<|v_T-m|>$ = {avg_mag_vTm:.2f}", fontsize="13"
             )
             ax[run, 7].text(
                 0.0,
@@ -1239,25 +1217,12 @@ class DevTools:
                 fontsize="13",
                 fontweight="bold",
             )
-            ax[run, 7].text(
-                0.0,
-                0.0,
-                f"$<|v|>$ = {avg_mag_v:.2f}",
-                fontsize="13",
-            )
+            ax[run, 7].text(0.0, 0.0, f"$<|v|>$ = {avg_mag_v:.2f}", fontsize="13")
 
             if run == 0:
-                ax[run, 7].text(
-                    1.02,
-                    1.03,
-                    "Given to Algo",
-                    fontsize="22",
-                )
+                ax[run, 7].text(1.02, 1.03, "Given to Algo", fontsize="22")
             ax[run, 7].text(
-                1.05,
-                0.85,
-                f"$\\sigma_t$ = {run_params['sigma_t']:.2f}",
-                fontsize="13",
+                1.05, 0.85, f"$\\sigma_t$ = {run_params['sigma_t']:.2f}", fontsize="13"
             )
             ax[run, 7].text(
                 1.05,
@@ -1298,12 +1263,7 @@ class DevTools:
             sigma_re_u = np.std(u_arr.real)
             ax[run, 8].set_axis_off()
             if run == 0:
-                ax[run, 8].text(
-                    0.2,
-                    1.03,
-                    "More Calcs",
-                    fontsize="22",
-                )
+                ax[run, 8].text(0.2, 1.03, "More Calcs", fontsize="22")
             ax[run, 8].text(
                 0.2,
                 0.85,
@@ -1312,10 +1272,7 @@ class DevTools:
                 fontweight="bold",
             )
             ax[run, 8].text(
-                0.2,
-                0.71,
-                f"$<Im(g)>$ = {avg_im_g_offset:.6f}",
-                fontsize="13",
+                0.2, 0.71, f"$<Im(g)>$ = {avg_im_g_offset:.6f}", fontsize="13"
             )
             ax[run, 8].text(
                 0.2,
@@ -1327,39 +1284,28 @@ class DevTools:
                 ax[run, 8].text(
                     0.2,
                     0.43,
-                    f"$\\sigma$ Re($g$) = {sigma_re_g:.2f}\t\t  $\\sigma$ Im($g$): {sigma_im_g:.2f}",
+                    f"$\\sigma$ Re($g$) = {sigma_re_g:.2f}\t\t  "
+                    f"$\\sigma$ Im($g$): {sigma_im_g:.2f}",
                     fontsize="13",
                 )
                 ax[run, 8].text(
                     0.2,
                     0.29,
-                    f"$\\sigma$ Re($u-m$) = {sigma_re_um:.2f}    $\\sigma$ Re($u-v_T$): {sigma_re_uvT:.2f}",
+                    f"$\\sigma$ Re($u-m$) = {sigma_re_um:.2f}    "
+                    f"$\\sigma$ Re($u-v_T$): {sigma_re_uvT:.2f}",
                     fontsize="13",
                 )
             elif variation == "iqr":
-                ax[run, 8].text(
-                    0.2,
-                    0.43,
-                    f"IQR($g$): {g_var:.2f}",
-                    fontsize="13",
-                )
+                ax[run, 8].text(0.2, 0.43, f"IQR($g$): {g_var:.2f}", fontsize="13")
                 ax[run, 8].text(
                     0.2,
                     0.29,
                     f"IQR($u-m$): {um_var:.2f}\tIQR($u-v_T$): {uvT_var:.2f}",
                     fontsize="13",
                 )
+            ax[run, 8].text(0.2, 0.15, f"$<|u|>$ = {avg_mag_u:.3f}", fontsize="13")
             ax[run, 8].text(
-                0.2,
-                0.15,
-                f"$<|u|>$ = {avg_mag_u:.3f}",
-                fontsize="13",
-            )
-            ax[run, 8].text(
-                0.2,
-                0.00,
-                f"$\\sigma$ Re($u$) = {sigma_re_u:.3f}",
-                fontsize="13",
+                0.2, 0.00, f"$\\sigma$ Re($u$) = {sigma_re_u:.3f}", fontsize="13"
             )
 
             # predict gains based on whether model error
@@ -1457,7 +1403,8 @@ class DevTools:
             sigma_t *= 10
         which_sigma_t += str(int(sigma_t * 100))
 
-        # filename = f'calico/images/sigma_t_{which_sigma_t}_{max_realizations}-realizations_{variation}_{suffix}.png'
+        # filename = f"calico/images/sigma_t_{which_sigma_t}_" \
+        #            f"{max_realizations}-realizations_{variation}_{suffix}.png"
         # plt.savefig(
         #     filename,
         #     bbox_inches=0,
@@ -1467,11 +1414,7 @@ class DevTools:
         _, ax = plt.subplots()
         plt.scatter(g_arr.real, g_arr.imag)
         ax.add_patch(
-            plt.Circle(
-                (g_center_real, g_center_imag),
-                radius=g_var,
-                fill=False,
-            )
+            plt.Circle((g_center_real, g_center_imag), radius=g_var, fill=False)
         )
         which_model_error_type = ""
         if avg_mag_model < avg_mag_vT:
@@ -1479,7 +1422,9 @@ class DevTools:
         else:
             which_model_error_type += "m > v_T"
         plt.title(
-            f"Gain Fits ${which_model_error_type}$\nsigma_re_vTm {sigma_re_vTm:.2f} sigma_re_n {sigma_re_n:.2f}"
+            f"Gain Fits ${which_model_error_type}$"
+            f"\nsigma_re_vTm {sigma_re_vTm:.2f} "
+            f"sigma_re_n {sigma_re_n:.2f}"
         )
         plt.ylabel("Imag")
         plt.xlabel("Real - 1")
@@ -1488,7 +1433,7 @@ class DevTools:
         ax.set_aspect("equal", adjustable="datalim")
         ax.autoscale_view()
         # filename = (
-        #     f"calico/images/sigma_t_{which_sigma_t}_gains2d_{variation}_{suffix}.png"
+        #     f"calico/images/sigma_t_{which_sigma_t}_"gains2d_{variation}_{suffix}.png"
         # )
         # plt.savefig(
         #     filename,
@@ -1500,14 +1445,13 @@ class DevTools:
         # metadata_str = "\n".join([f"{key}: {val}" for key, val in metadata.items()])
         # img = Image.open(filename)
         # img_metadata = PngImagePlugin.PngInfo()
-        # img_metadata.add_text("Description", f"Project Settings and Info:\n{metadata_str}")
+        # img_metadata.add_text(
+        #     "Description", f"Project Settings and Info:\n{metadata_str}"
+        # )
         # img.save(filename, pnginfo=img_metadata)
         hkl.dump(
             output_dicts, f"calico/data/output_calcs_{suffix}.hkl", compression="gzip"
         )
-
-    def test_function(self) -> None:
-        return "Returning a new and beautiful string, some say the best string, from within dev tools test function"
 
     # plot gain errors across realizations for one antenna at a time at two
     # scales: one set to "var" (stddev/IQR), the other to "max" (outliers)
@@ -1587,7 +1531,8 @@ class DevTools:
             # plot scatter of realizations for this antenna scaled to "var" (stddev/IQR)
             ax[ant, 0].scatter(ant_array.real - 1, ant_array.imag)
             ax[ant, 0].set_title(
-                f"Gain Error across {num_realizations} Realizations for Antenna {ant + 1} (Lim: Var) Func: ({cutoff_function})",
+                f"Gain Error across {num_realizations} Realizations "
+                f"for Antenna {ant + 1} (Lim: Var) Func: ({cutoff_function})",
                 fontsize="7.5",
             )
             ax[ant, 0].set_xlabel("Real - 1", fontsize="7.5")
@@ -1631,7 +1576,8 @@ class DevTools:
                 g_center = np.median(ant_array)
             antenna_gain_error_centers[ant] = g_center
 
-            # for plot limits for outlier plot (we want a square plot so same for real and imag)
+            # for plot limits for outlier plot
+            # (we want a square plot so same for real and imag)
             g_max_lo = np.max(
                 [
                     np.min(g_center.real - ant_array.real),
@@ -1646,10 +1592,12 @@ class DevTools:
             )
             g_boundary = np.max([np.abs(g_max_lo), np.abs(g_max_hi)])
 
-            # plot scatter of realizations for this antenna scaled to "max" (outliers)
+            # plot scatter of realizations for this antenna
+            # scaled to "max" (outliers)
             ax[ant, 1].scatter(ant_array.real - 1, ant_array.imag)
             ax[ant, 1].set_title(
-                f"Gain Error across {num_realizations} Realizations for Antenna {ant + 1} (Lim: Max) Func: ({cutoff_function})",
+                f"Gain Error across {num_realizations} Realizations for "
+                f"Antenna {ant + 1} (Lim: Max) Func: ({cutoff_function})",
                 fontsize="7.5",
             )
             ax[ant, 1].set_xlabel("Real - 1", fontsize="7.5")
@@ -1677,14 +1625,17 @@ class DevTools:
             "images/realizations_per_antenna_limit_"
             + str(Nants)
             + "_"
-            # + subprocess.check_output(['git','rev-parse','--short','HEAD']).decode('ascii').strip()
+            + subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+            .decode("ascii")
+            .strip()
             + cutoff_function
             + ".png",
             bbox_inches=0,
         )
         plt.close(fig)
 
-        # print("***AVERAGE OF CENTERS ACROSS ANTENNAS***", np.mean(antenna_gain_error_centers))
+        # print("***AVERAGE OF CENTERS ACROSS ANTENNAS***"
+        #       f"{np.mean(antenna_gain_error_centers)})
         return np.mean(np.abs(antenna_gain_error_centers - 1)), np.abs(
             np.mean(antenna_gain_error_centers) - 1
         )
@@ -1786,7 +1737,8 @@ class DevTools:
                 g_center = np.median(gain_errors)
             realization_centers[realization] = g_center
 
-            # for plot limits for outlier plot (we want a square plot so same for real and imag)
+            # for plot limits for outlier plot
+            # (we want a square plot so same for real and imag)
             g_max_lo = np.max(
                 [
                     np.min(g_center.real - gain_errors.real),
@@ -2083,7 +2035,8 @@ class DevTools:
     ) -> None:
         plt.scatter(uv_norm_array, weight_array, marker="_")
         plt.title(
-            f"Weight per baseline length\nWeighting Function: {self.format_var_name(weighting_function)}"
+            "Weight per baseline length\nWeighting Function:"
+            f"{self.format_var_name(weighting_function)}"
         )
         plt.xlabel("Baseline length (m)")
         plt.ylabel(f"1 / $\\{sigma}^2$")
@@ -2304,40 +2257,28 @@ class DevTools:
     def get_caldata_obj(self) -> object:
         return self.caldata_obj
 
-    def set_caldata_obj(
-        self,
-        val: object,
-    ) -> None:
+    def set_caldata_obj(self, val: object) -> None:
         self.caldata_obj = val
 
     # Nants_unflagged
     def get_Nants_unflagged(self) -> int:
         return self.Nants_unflagged
 
-    def set_Nants_unflagged(
-        self,
-        val: int,
-    ) -> None:
+    def set_Nants_unflagged(self, val: int) -> None:
         self.Nants_unflagged = val
 
     # freq_ind
     def get_freq_ind(self) -> int:
         return self.num_freqs - 1
 
-    def set_freq_ind(
-        self,
-        val: int,
-    ) -> None:
+    def set_freq_ind(self, val: int) -> None:
         self.num_freqs = val + 1
 
     # vis_pol_ind
     def get_vis_pol_ind(self) -> int:
         return self.vis_pol_ind
 
-    def set_vis_pol_ind(
-        self,
-        val: int,
-    ) -> None:
+    def set_vis_pol_ind(self, val: int) -> None:
         self.vis_pol_ind = val
 
 
@@ -2451,11 +2392,7 @@ def plot_3d_data_as_2d_hist(
             extent=[np.min(x_array), np.max(x_array), np.min(y_array), np.max(y_array)],
             aspect="equal",
             origin="lower",
-            norm=colors.SymLogNorm(
-                10**-4,
-                vmin=-1 * max_abs,
-                vmax=max_abs,
-            ),
+            norm=colors.SymLogNorm(10**-4, vmin=-1 * max_abs, vmax=max_abs),
         )
     else:
         im = plt.imshow(
@@ -2489,11 +2426,7 @@ def plot_3d_data_as_2d_hist(
     ax.set_ylabel(plot_ylabel)
     plt.xlim(plot_xlim_l, plot_xlim_h)
     plt.ylim(plot_ylim_l, plot_ylim_h)
-    props = {
-        "boxstyle": "round",
-        "facecolor": "wheat",
-        "alpha": 0.5,
-    }
+    props = {"boxstyle": "round", "facecolor": "wheat", "alpha": 0.5}
     ax.text(
         0.95,
         0.95,
@@ -2505,11 +2438,7 @@ def plot_3d_data_as_2d_hist(
     )
     # plt.grid(visible=True, axis='both', which='major', color='black', linewidth=1)
     plt.tight_layout()
-    plt.savefig(
-        filename,
-        bbox_inches="tight",
-        metadata=metadata,
-    )
+    plt.savefig(filename, bbox_inches="tight", metadata=metadata)
     plt.close()
 
     metadata_str = "\n".join([f"{key}: {val}" for key, val in metadata.items()])
@@ -2563,9 +2492,7 @@ def prepare_standard_unical_test_run(
     )
     if gaussian_simulation:
         sim.simulate_visibilities(
-            caldata_obj=caldata_obj,
-            seed=42,
-            same_sky_all_times=same_sky_all_times,
+            caldata_obj=caldata_obj, seed=42, same_sky_all_times=same_sky_all_times
         )
     vwa = variable_weights.VariableWeightsArray()
     vwa.set_algorithm_weights(
