@@ -104,7 +104,8 @@ def main(
                     sigma_m = 0.1
                 if verbose:
                     print(
-                        f"Creating settings files\n\tsigma_m {sigma_m}\tsigma_t {sigma_t}"
+                        f"Creating settings files\n"
+                        f"\tsigma_m {sigma_m}\tsigma_t {sigma_t}"
                     )
                 sigma_suffix = f"{int(sigma_t * 100):d}_{int(sigma_m * 10):d}"
                 suffix = sigma_suffix + git_time_suffix
@@ -129,7 +130,7 @@ def main(
                             "scaling_factor_sim": scaling_factor_sim,
                             "optimization_scheme": optim_type,
                             "threshold_length": 0,
-                        },
+                        }
                     )
                 cwd = os.getcwd()
                 # with open(
@@ -179,7 +180,8 @@ def main(
                         candidates[best_idx]["g_arr_real"]
                     ) + 1.0j * np.asarray(candidates[best_idx]["g_arr_imag"])
                     print(
-                        f"Loading gains guess time - {time.time() - start_load_gains_guess_time:.3f} seconds"
+                        "Loading gains guess time - "
+                        f"{time.time() - start_load_gains_guess_time:.3f} seconds"
                     )
                 __import__(
                     "calico.dev.many_realizations_study",
@@ -212,13 +214,7 @@ def main(
 
                 if verbose:
                     print("Reading in calculations...")
-                # with open(
-                #     f'{data_path}/output_calcs_{suffix}.hkl',
-                #     mode='r',
-                # ) as file:
                 output_calcs_list = hkl.load(f"{data_path}/output_calcs_{suffix}.hkl")
-                # for output_calc_dict in output_calcs:
-                #     output_calcs_list.append(output_calc_dict)
 
                 if verbose:
                     print("Cleaning up calculated saved files")
@@ -243,7 +239,8 @@ def main(
         )
         if verbose:
             print(
-                f"Calibration tests done.\n\n*Git ID* {git_hash}\t*Start time ID* {start_time_suffix}\n"
+                f"Calibration tests done.\n\n*Git ID* {git_hash}"
+                f"\t*Start time ID* {start_time_suffix}\n"
             )
     else:
         file_suffix = f"g{git_id}_t{time_id}"
@@ -353,244 +350,6 @@ def main(
     """
     # angle = -26.57    # degrees; scipy rotates clockwise
     angle = 0
-    # if verbose:
-    #     print(f"Plotting skycal 2D grid for e-n correlation (abs)")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = e_n_corr_coeff,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"|e|-|n| Correlation vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(e_n_corr_coeff)),
-    #                         np.abs(min(e_n_corr_coeff))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(e_n_corr_coeff)),
-    #                         np.abs(min(e_n_corr_coeff))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_e_n_corr_coeff_abs_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "|e|-|n| CorrCoef",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
-    # if verbose:
-    #     print(f"Plotting skycal 2D grid for n-m correlation (abs)")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = n_m_corr_coeff,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"|n|-|m| Correlation vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(n_m_corr_coeff)),
-    #                         np.abs(min(n_m_corr_coeff))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(n_m_corr_coeff)),
-    #                         np.abs(min(n_m_corr_coeff))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_n_m_corr_coeff_abs_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "|n|-|m| CorrCoef",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
-    # if verbose:
-    #     print(f"Plotting skycal 2D grid for e-m correlation (abs)")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = e_m_corr_coeff,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"|e|-|m| Correlation vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(e_m_corr_coeff)),
-    #                         np.abs(min(e_m_corr_coeff))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(e_m_corr_coeff)),
-    #                         np.abs(min(e_m_corr_coeff))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_e_m_corr_coeff_abs_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "|e|-|m| CorrCoef",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
-    # if verbose:
-    #     print(f"Plotting skycal 2D grid for e-n correlation (phase)")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = e_n_corr_coeff_phase,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"Phase e-n Correlation vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(e_n_corr_coeff_phase)),
-    #                         np.abs(min(e_n_corr_coeff_phase))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(e_n_corr_coeff_phase)),
-    #                         np.abs(min(e_n_corr_coeff_phase))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_e_m_corr_coeff_phase_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "Phase e-n CorrCoef",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
-    # if verbose:
-    #     print(f"Plotting skycal 2D grid for n-m correlation (phase)")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = n_m_corr_coeff_phase,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"Phase n-m Correlation vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(n_m_corr_coeff_phase)),
-    #                         np.abs(min(n_m_corr_coeff_phase))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(n_m_corr_coeff_phase)),
-    #                         np.abs(min(n_m_corr_coeff_phase))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_n_m_corr_coeff_phase_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "Phase n-m CorrCoef",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
-    # if verbose:
-    #     print(f"Plotting skycal 2D grid for e-m correlation (phase)")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = e_m_corr_coeff_phase,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"Phase e-m Correlation vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(e_m_corr_coeff_phase)),
-    #                         np.abs(min(e_m_corr_coeff_phase))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(e_m_corr_coeff_phase)),
-    #                         np.abs(min(e_m_corr_coeff_phase))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_e_m_corr_coeff_phase_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "Phase e-m CorrCoef",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
-    # if verbose:
-    #     print(f"Plotting unical 2D grid for final cost function value")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = avg_cost_func_val_truth,
-    #     num_y_vals    = len(sigma_m_scales),
-    #     num_x_vals    = len(sigma_t_scales),
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     plot_title    = f"Avg Final Cost Func. Value vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Unical) - {scaling_factor_truth:.2f}",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = min([
-    #                         np.abs(max(avg_cost_func_val_truth)),
-    #                         np.abs(min(avg_cost_func_val_truth))
-    #                     ]),
-    #     plot_vmin     = min([
-    #                         np.abs(max(avg_cost_func_val_truth)),
-    #                         np.abs(min(avg_cost_func_val_truth))
-    #                     ]),
-    #     plot_xlim_h   = max(sigma_m_scales),
-    #     plot_xlim_l   = min(sigma_m_scales),
-    #     plot_ylim_h   = max(sigma_t_scales),
-    #     plot_ylim_l   = min(sigma_t_scales),
-    #     filename      = f'{image_path}/{filename_2d_gains}_avg_cost_func_val_unical_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "viridis",
-    #     cmap_label    = "Avg. Final Cost Func. Val.",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    #     box_text      = f"Optimizer: {optim_type}",
-    # )
     if verbose:
         print("Plotting skycal 2D grid for final cost function value")
     dev.plot_3d_data_as_2d_hist(
@@ -601,10 +360,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title=f"Avg Final Cost Func. Value vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
+        plot_title="Avg Final Cost Func. Value vs $\\sigma_t$ "
+        f"& $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=min(
             [
@@ -641,11 +402,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        # plot_title  = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth) - Scale Factor: {scaling_factor_truth:.2f}",
-        plot_title=f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\nGain bias at target: {real_g_minus_1_truth_gaussian[55]:.6f}",
+        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$"
+        f"\nGain bias at target: {real_g_minus_1_truth_gaussian[55]:.6f}",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         # plot_vmax     = min([
         #                     np.abs(max(real_g_minus_1_truth_gaussian)),
@@ -655,8 +417,6 @@ def main(
         #                     np.abs(max(real_g_minus_1_truth_gaussian)),
         #                     np.abs(min(real_g_minus_1_truth_gaussian))
         #                 ]),
-        # plot_vmin = -0.001,
-        # plot_vmax = 0.001,
         plot_vmin=-0.01,
         plot_vmax=0.01,
         plot_xlim_h=max(sigma_m_scales),
@@ -683,11 +443,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        # plot_title    = f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal) - {scaling_factor_skycal:.2f}",
-        plot_title=f"Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\nGain bias at target: {real_g_minus_1_skycal_gaussian[55]:.6f}",
+        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$"
+        f"\nGain bias at target: {real_g_minus_1_skycal_gaussian[55]:.6f}",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         # plot_vmax     = min([
         #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
@@ -697,8 +458,6 @@ def main(
         #                     np.abs(max(real_g_minus_1_skycal_gaussian)),
         #                     np.abs(min(real_g_minus_1_skycal_gaussian))
         #                 ]),
-        # plot_vmax=0.001,
-        # plot_vmin=-0.001,
         plot_vmax=0.01,
         plot_vmin=-0.01,
         plot_xlim_h=max(sigma_m_scales),
@@ -729,10 +488,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth Skycal Diff)",
+        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$"
+        "\n(Calculated, Truth Skycal Diff)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         # log_cmap      = True,
         plot_vmax=min(
@@ -764,10 +525,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth Skycal Diff of Abs)",
+        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$"
+        "\n(Calculated, Truth Skycal Diff of Abs)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         # log_cmap      = True,
         plot_vmax=min(
@@ -801,10 +564,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Predicted, Skycal, Left)",
+        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$"
+        "\n(Predicted, Skycal, Left)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=min(
             [
@@ -841,10 +606,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Predicted, Skycal, Right)",
+        plot_title="Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$"
+        "\n(Predicted, Skycal, Right)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=min(
             [
@@ -858,8 +625,6 @@ def main(
                 np.abs(min(avg_real_g_right_skycal_gaussian)),
             ]
         ),
-        # plot_vmax     = 0.004,
-        # plot_vmin     = -0.004,
         plot_xlim_h=5,
         plot_xlim_l=-5,
         plot_ylim_h=5,
@@ -871,32 +636,6 @@ def main(
         metadata=metadata,
         box_text=f"Optimizer: {optim_type}",
     )
-    # if verbose:
-    #     print(f"Plotting prediction 2D grid (joined) for gain offset")
-    # dev.plot_3d_data_as_2d_hist(
-    #     x_array       = vT_minus_m_gaussian,
-    #     y_array       = real_sigma_t_calculated_gaussian,
-    #     z_array       = avg_real_g_right_skycal_gaussian,
-    #     x_array_2     = sigma_re_m,
-    #     x_array_3     = sigma_re_vT,
-    #     z_array_2     = avg_real_g_left_skycal_gaussian,
-    #     plot_title    = "Gain Offset vs $\\sigma_t$ & $Re(v_T-m)$\n(Predicted, Skycal, Joined)",
-    #     plot_xlabel   = "$Re(v_T - m)$",
-    #     # plot_xlabel_2 = "$\\sigma Re(m)$",
-    #     plot_xlabel_3 = "$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
-    #     plot_ylabel   = "$\\sigma_t (Re)$",
-    #     plot_vmax     = 0.5,
-    #     plot_vmin     = -0.5,
-    #     plot_xlim_h   = 10,
-    #     plot_xlim_l   = -10,
-    #     plot_ylim_h   = 10,
-    #     plot_ylim_l   = 0,
-    #     filename      = f'{image_path}/{filename_2d_gains}_predict_joined_{file_suffix}_gaussian.png',
-    #     plot_cmap     = "PuOr",
-    #     cmap_label    = "$Re(g)-1$",
-    #     suffix        = file_suffix,
-    #     metadata      = metadata,
-    # )
     if verbose:
         print("Plotting standard deviation in gain phase")
     dev.plot_3d_data_as_2d_hist(
@@ -910,7 +649,8 @@ def main(
         plot_title="Standard Deviation in Gain Phase (Skycal)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=np.pi,
         plot_vmin=0,
@@ -932,10 +672,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="$\\sigma_u - \\sigma_v$ vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth)",
+        plot_title="$\\sigma_u - \\sigma_v$ vs $\\sigma_t$ "
+        "& $Re(v_T-m)$\n(Calculated, Truth)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=15,
         plot_vmin=-15,
@@ -959,10 +701,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="$\\sigma_u - \\sigma_v$ vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Skycal)",
+        plot_title="$\\sigma_u - \\sigma_v$ vs $\\sigma_t$ & $Re(v_T-m)$"
+        "\n(Calculated, Skycal)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=15,
         plot_vmin=-15,
@@ -989,10 +733,12 @@ def main(
         num_x_vals=len(sigma_t_scales),
         x_array_2=sigma_re_m,
         x_array_3=sigma_re_vT,
-        plot_title="$\\sigma_u - \\sigma_v$ vs $\\sigma_t$ & $Re(v_T-m)$\n(Calculated, Truth Skycal Diff)",
+        plot_title="$\\sigma_u - \\sigma_v$ vs $\\sigma_t$ & "
+        "$Re(v_T-m)$\n(Calculated, Truth Skycal Diff)",
         plot_xlabel="$Re(v_T - m)$",
         # plot_xlabel_2 = "$\\sigma Re(m)$",
-        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) (\\uparrow \\sigma Re(v_T) \\uparrow)$",
+        plot_xlabel_3="$(\\downarrow \\sigma Re(m) \\downarrow) "
+        "(\\uparrow \\sigma Re(v_T) \\uparrow)$",
         plot_ylabel="$\\sigma_t (Re)$",
         plot_vmax=15,
         plot_vmin=-15,
@@ -1058,7 +804,8 @@ def main(
     )
 
     print(
-        f"\n\tTime taken for many error vals:\n\t{(time.time() - top_start_time) / 3600:.4f} hours ({calibrate=})"
+        "\n\tTime taken for many error vals:"
+        f"\n\t{(time.time() - top_start_time) / 3600:.4f} hours ({calibrate=})"
     )
 
     if not no_notifs:
@@ -1086,21 +833,9 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gain Error Offset Analysis")
-    parser.add_argument(
-        "-c",
-        action="store_true",
-        help="run calibrations",
-    )
-    parser.add_argument(
-        "-v",
-        action="store_true",
-        help="verbose",
-    )
-    parser.add_argument(
-        "-s",
-        action="store_true",
-        help="show 3D scatter plot",
-    )
+    parser.add_argument("-c", action="store_true", help="run calibrations")
+    parser.add_argument("-v", action="store_true", help="verbose")
+    parser.add_argument("-s", action="store_true", help="show 3D scatter plot")
     parser.add_argument(
         "-n",
         "--nosave",
@@ -1108,14 +843,10 @@ if __name__ == "__main__":
         help="don't save files (requires re-running calibration next time)",
     )
     parser.add_argument(
-        "--time",
-        type=str,
-        help="time ID for loading saved calibration run",
+        "--time", type=str, help="time ID for loading saved calibration run"
     )
     parser.add_argument(
-        "--git",
-        type=str,
-        help="git ID for loading saved calibration run",
+        "--git", type=str, help="git ID for loading saved calibration run"
     )
     parser.add_argument(
         "--optim", type=str, help="type of optimization scheme to use for calibration"
@@ -1133,13 +864,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--flatten",
         action="store_true",
-        help="flatten the (Ntimes, Nbls) plane into a single Ntimes*Nbls axis for the fit visibilities/optimizer",
+        help="flatten the (Ntimes, Nbls) plane into a single Ntimes*Nbls axis "
+        "for the fit visibilities/optimizer",
     )
     parser.add_argument(
         "--data",
         type=str,
         default="tutorial_full_onetime_unflagged",
-        help="input dataset name in calico/data (structure/metadata only); e.g. 'tutorial_medium' for multi-time",
+        help="input dataset name in calico/data (structure/metadata only); "
+        "e.g. 'tutorial_medium' for multi-time",
     )
     parser.add_argument(
         "--simulate",
