@@ -5,14 +5,7 @@ import numpy as np
 from calico.dev import dev_tools as dev
 
 
-def simulate_thermal_noise(
-    sigma_t_0,
-    n_times,
-    n_bls,
-    seed,
-    verbose=True,
-    n_freqs=1,
-):
+def simulate_thermal_noise(sigma_t_0, n_times, n_bls, seed, verbose=True, n_freqs=1):
     np.random.seed(seed)
     try:
         thermal_noise_real = np.random.normal(
@@ -31,7 +24,9 @@ def simulate_thermal_noise(
     except ValueError as e:
         print(sys.exc_info())
         if verbose:
-            print(f"Initial thermal noise failed. Was sigma_t_0 set correctly?\nGot:\n{e}")
+            print(
+                f"Initial thermal noise failed. Was sigma_t_0 set correctly?\nGot:\n{e}"
+            )
 
 
 def simulate_model_error(
@@ -62,24 +57,16 @@ def simulate_model_error(
         threshold_mask = uv_norm_array < threshold_length
 
         model_error_real_hi[~threshold_mask] += np.random.normal(
-            0.0,
-            1,
-            size=(n_times, n_bls, n_freqs),
+            0.0, 1, size=(n_times, n_bls, n_freqs)
         )[~threshold_mask]
         model_error_imag_hi[~threshold_mask] += np.random.normal(
-            0.0,
-            1,
-            size=(n_times, n_bls, n_freqs),
+            0.0, 1, size=(n_times, n_bls, n_freqs)
         )[~threshold_mask]
         model_error_real_lo[threshold_mask] += np.random.normal(
-            0.0,
-            1,
-            size=(n_times, n_bls, n_freqs),
+            0.0, 1, size=(n_times, n_bls, n_freqs)
         )[threshold_mask]
         model_error_imag_lo[threshold_mask] += np.random.normal(
-            0.0,
-            1,
-            size=(n_times, n_bls, n_freqs),
+            0.0, 1, size=(n_times, n_bls, n_freqs)
         )[threshold_mask]
         model_error_real = (
             model_error_real_hi + model_error_real_lo / np.sqrt(scaling_factor)
@@ -93,18 +80,10 @@ def simulate_model_error(
         )
 
         model_error_real_hi = np.random.normal(
-            0.0,
-            sigma_e_0,
-            size=(
-                n_times,
-                n_bls,
-                n_freqs,
-            ),
+            0.0, sigma_e_0, size=(n_times, n_bls, n_freqs)
         )
         model_error_imag_hi = np.random.normal(
-            0.0,
-            sigma_e_0,
-            size=(n_times, n_bls, n_freqs),
+            0.0, sigma_e_0, size=(n_times, n_bls, n_freqs)
         )
         return (
             model_error_real_hi,
@@ -119,24 +98,16 @@ def simulate_model_error(
         if verbose:
             print("Constant weighting function in simulation")
         model_error_real = np.random.normal(
-            0.0,
-            sigma_e_0,
-            size=(n_times, n_bls, n_freqs),
+            0.0, sigma_e_0, size=(n_times, n_bls, n_freqs)
         )
         model_error_imag = np.random.normal(
-            0.0,
-            sigma_e_0,
-            size=(n_times, n_bls, n_freqs),
+            0.0, sigma_e_0, size=(n_times, n_bls, n_freqs)
         )
         this_model_error = model_error_real + 1.0j * model_error_imag
         if same_sky_all_times:
             this_model_error = np.broadcast_to(
                 this_model_error,
-                (
-                    caldata_obj.Ntimes,
-                    caldata_obj.Nbls,
-                    caldata_obj.Nfreqs,
-                ),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, caldata_obj.Nfreqs),
             ).copy()
         return this_model_error.real, this_model_error.imag, None, None
     else:
@@ -179,22 +150,12 @@ def simulate_visibilities(
     real_throw = np.random.normal(
         0,
         sigma_m,
-        size=(
-            num_times,
-            caldata_obj.Nbls,
-            caldata_obj.Nfreqs,
-            caldata_obj.N_vis_pols,
-        ),
+        size=(num_times, caldata_obj.Nbls, caldata_obj.Nfreqs, caldata_obj.N_vis_pols),
     )
     imag_throw = np.random.normal(
         0,
         sigma_m,
-        size=(
-            num_times,
-            caldata_obj.Nbls,
-            caldata_obj.Nfreqs,
-            caldata_obj.N_vis_pols,
-        ),
+        size=(num_times, caldata_obj.Nbls, caldata_obj.Nfreqs, caldata_obj.N_vis_pols),
     )
     model_vis_throw = real_throw + 1.0j * imag_throw
     if same_sky_all_times:
