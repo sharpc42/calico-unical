@@ -1,12 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 from pyuvdata import UVData
 
 # get v and m arrays back from unical
 # data = UVData.from_file('calico/data/fhd_data_one_freq.uvfits')
 # model = UVData.from_file('calico/data/fhd_model_one_freq_01.uvfits')
-data = UVData.from_file("calico/data/tutorial_medium.uvfits")
+data_path = os.path.join("calico", "data", "tutorial_medium.uvfits")
+data = UVData.from_file(data_path)
 model = data.copy()
 v = data.data_array[: data.Nbls, 0, 0]
 m = model.data_array[: model.Nbls, 0, 0]
@@ -75,7 +77,8 @@ plt.title("v-m hist for FHD runs (coarse)\nCutoff Threshold: 0.1 Jy")
 plt.legend()
 # plt.yscale('log')
 plt.xlabel("Jy")
-plt.savefig("calico/images/examining_fhd_runs_coarse_01.png")
+image_path = os.path.join("calico", "images", "examining_fhd_runs_coarse_01.png")
+plt.savefig(image_path)
 plt.close()
 
 # plt.hist(
@@ -113,5 +116,6 @@ plt.title("v-m hist for FHD runs (fine)\nCutoff Threshold: 0.1 Jy")
 plt.legend()
 # plt.yscale('log')
 plt.xlabel("Jy")
-plt.savefig("calico/images/examining_fhd_runs_fine_01.png")
+image_path = os.path.join("calico", "images", "examining_fhd_runs_fine_01.png")
+plt.savefig(image_path)
 plt.close()
