@@ -38,8 +38,6 @@ def main(
             f"simulate_visibilities set to {simulate_visibilities}"
             f"- value of true is needed to do same sky at all times"
         )
-    data_path = "calico/data"
-    image_path = "calico/images"
     file_suffix = ""
     # Input dataset used only for metadata / visibility-array structure (the
     # visibilities themselves are Gaussian throws when simulate_visibilities=True).
@@ -142,11 +140,10 @@ def main(
                 #         file,
                 #         compression='gzip',
                 #     )
-                hkl.dump(
-                    custom_file,
-                    f"{cwd}/calico/data/{filename}_settings.hkl",
-                    compression="gzip",
+                settings_path = os.path.join(
+                    cwd, "calico", "data", f"{filename}_settings.hkl"
                 )
+                hkl.dump(custom_file, settings_path, compression="gzip")
 
                 if verbose:
                     print("Beginning realizations")
@@ -165,7 +162,10 @@ def main(
                 if give_gains_guess:
                     start_load_gains_guess_time = time.time()
                     print("Loading gains guess")
-                    guess_list = hkl.load(f"{cwd}/calico/data/{guess_filename}.hkl")
+                    guess_path = os.path.join(
+                        cwd, "calico", "data", f"{guess_filename}.hkl"
+                    )
+                    guess_list = hkl.load(guess_path)
                     target_sf = 1000000.0  # 1.0 for unical, 1000000.0 for skycal
                     candidates = [
                         g
@@ -214,29 +214,31 @@ def main(
 
                 if verbose:
                     print("Reading in calculations...")
-                output_calcs_list = hkl.load(f"{data_path}/output_calcs_{suffix}.hkl")
+                output_calcs_path = os.path.join(
+                    cwd, "calico", "data", f"output_calcs_{suffix}.hkl"
+                )
+                output_calcs_list = hkl.load(output_calcs_path)
 
                 if verbose:
                     print("Cleaning up calculated saved files")
-                os.system(f"rm {data_path}/output_calcs_{suffix}.hkl")
+                os.system(f"rm {output_calcs_path}")
 
         if verbose:
             print("Calibration tests done.")
 
         if verbose:
             print("Writing out collection of output calcs...")
-        hkl.dump(
-            output_calcs_list,
-            f"{data_path}/output_calcs_list_{file_suffix}.hkl",
-            compression="gzip",
+        output_calcs_list_path = os.path.join(
+            cwd, "calico", "data", f"output_calcs_list_{file_suffix}.hkl"
         )
+        hkl.dump(output_calcs_list, output_calcs_list_path, compression="gzip")
 
         if verbose:
             print("Writing out initial metadata...")
-        # with open(f'{data_path}/metadata_{file_suffix}.hkl') as file:
-        hkl.dump(
-            metadata, f"{data_path}/metadata_{file_suffix}.hkl", compression="gzip"
+        metadata_path = os.path.join(
+            cwd, "calico", "data", f"metadata_{file_suffix}.hkl"
         )
+        hkl.dump(metadata, metadata_path, compression="gzip")
         if verbose:
             print(
                 f"Calibration tests done.\n\n*Git ID* {git_hash}"
@@ -246,19 +248,17 @@ def main(
         file_suffix = f"g{git_id}_t{time_id}"
         if verbose:
             print("Reading in initial metadata...")
-        # with open(
-        #     f'{data_path}/metadata_{file_suffix}.hkl',
-        #     mode='r',
-        # ) as file:
-        metadata = hkl.load(f"{data_path}/metadata_{file_suffix}.hkl")
+        metadata_path = os.path.join(
+            cwd, "calico", "data", f"metadata_{file_suffix}.hkl"
+        )
+        metadata = hkl.load(metadata_path)
 
     if verbose:
         print("Reading in output calcs...")
-    # with open(
-    #     f'{data_path}/output_calcs_list_{file_suffix}.hkl',
-    #     mode='r',
-    # ) as file:
-    output_calcs_list = hkl.load(f"{data_path}/output_calcs_list_{file_suffix}.hkl")
+    output_calcs_list_path = os.path.join(
+        cwd, "calico", "data", f"output_calcs_list_{file_suffix}.hkl"
+    )
+    output_calcs_list = hkl.load(output_calcs_list_path)
 
     vT_minus_m_gaussian = []
     real_sigma_t_calculated_gaussian = []
@@ -383,7 +383,12 @@ def main(
         plot_xlim_l=min(sigma_m_scales),
         plot_ylim_h=max(sigma_t_scales),
         plot_ylim_l=min(sigma_t_scales),
-        filename=f"{image_path}/{filename_2d_gains}_avg_cost_func_val_skycal_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_avg_cost_func_val_skycal_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="viridis",
         cmap_label="Avg. Final Cost Func. Val.",
         suffix=file_suffix,
@@ -423,7 +428,12 @@ def main(
         plot_xlim_l=min(sigma_m_scales),
         plot_ylim_h=max(sigma_t_scales),
         plot_ylim_l=min(sigma_t_scales),
-        filename=f"{image_path}/{filename_2d_gains}_truth_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_truth_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="PuOr",
         cmap_label="<$Re(g)>-1$",
         suffix=file_suffix,
@@ -464,7 +474,12 @@ def main(
         plot_xlim_l=min(sigma_m_scales),
         plot_ylim_h=max(sigma_t_scales),
         plot_ylim_l=min(sigma_t_scales),
-        filename=f"{image_path}/{filename_2d_gains}_skycal_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_skycal_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="PuOr",
         cmap_label="$<Re(g)>-1$",
         suffix=file_suffix,
@@ -510,7 +525,12 @@ def main(
         ),
         # plot_vmax=0.004,
         # plot_vmin=-0.004,
-        filename=f"{image_path}/{filename_2d_gains}_diff_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_diff_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="PuOr",
         cmap_label="$<Re(g)>-1$",
         suffix=file_suffix,
@@ -547,7 +567,12 @@ def main(
         ),
         # plot_vmax=0.004,
         # plot_vmin=-0.004,
-        filename=f"{image_path}/{filename_2d_gains}_diff_abs_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_diff_abs_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="PuOr",
         cmap_label="$<Re(g)>-1$",
         suffix=file_suffix,
@@ -589,7 +614,12 @@ def main(
         plot_xlim_l=-5,
         plot_ylim_h=5,
         plot_ylim_l=0,
-        filename=f"{image_path}/{filename_2d_gains}_predict_left_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_predict_left_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="PuOr",
         cmap_label="$<Re(g)>-1$",
         suffix=file_suffix,
@@ -629,7 +659,12 @@ def main(
         plot_xlim_l=-5,
         plot_ylim_h=5,
         plot_ylim_l=0,
-        filename=f"{image_path}/{filename_2d_gains}_predict_right_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calio",
+            "images",
+            f"{filename_2d_gains}_predict_right_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="PuOr",
         cmap_label="$<Re(g)>-1$",
         suffix=file_suffix,
@@ -655,7 +690,12 @@ def main(
         plot_vmax=np.pi,
         plot_vmin=0,
         # log_cmap      = True,
-        filename=f"{image_path}/{filename_2d_gains}_gain_phase_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_gains}_gain_phase_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="viridis",
         cmap_label="$Std Phase Re(g)-1$",
         suffix=file_suffix,
@@ -685,7 +725,12 @@ def main(
         plot_xlim_l=-0.1,
         plot_ylim_h=0.1,
         plot_ylim_l=0,
-        filename=f"{image_path}/{filename_2d_u_err}_truth_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_u_err}_truth_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="seismic",
         suffix=file_suffix,
         metadata=metadata,
@@ -714,7 +759,12 @@ def main(
         plot_xlim_l=-0.1,
         plot_ylim_h=0.1,
         plot_ylim_l=0,
-        filename=f"{image_path}/{filename_2d_u_err}_skycal_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_u_err}_skycal_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="seismic",
         suffix=file_suffix,
         metadata=metadata,
@@ -746,7 +796,12 @@ def main(
         plot_xlim_l=-0.1,
         plot_ylim_h=0.1,
         plot_ylim_l=0,
-        filename=f"{image_path}/{filename_2d_u_err}_diff_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_2d_u_err}_diff_{file_suffix}_gaussian.png",
+        ),
         plot_cmap="seismic",
         suffix=file_suffix,
         metadata=metadata,
@@ -772,7 +827,12 @@ def main(
         ylim_lo=-1,
         zlim_hi=0.5,
         zlim_lo=-0.5,
-        filename=f"{image_path}/{filename_3d_scatter_gain}_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_3d_scatter_gain}_{file_suffix}_gaussian.png",
+        ),
         suffix=file_suffix,
         metadata=metadata,
         first_plot_label="truth",
@@ -796,7 +856,12 @@ def main(
         ylim_lo=-1,
         zlim_hi=15,
         zlim_lo=-15,
-        filename=f"{image_path}/{filename_3d_scatter_model}_{file_suffix}_gaussian.png",
+        filename=os.path.join(
+            cwd,
+            "calico",
+            "images",
+            f"{filename_3d_scatter_model}_{file_suffix}_gaussian.png",
+        ),
         suffix=file_suffix,
         metadata=metadata,
         first_plot_label="truth",
