@@ -5,10 +5,10 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pyuvdata import UVData, UVFlag
 
 from calico import caldata
 from calico.dev import dev_tools, make_run_params
+from pyuvdata import UVData, UVFlag
 
 # def update_calico()
 
@@ -36,8 +36,8 @@ def examine_flags(uvd):
     uvf = UVFlag(uvd)
     uvf.to_waterfall()
     uvf.to_flag()
-    print(f"***all flagged?***\n\t{np.all(uvf.flag_array == True)}\n")
-    print(f"***any flagged?***\n\t{np.any(uvf.flag_array == True)}\n")
+    print(f"***all flagged?***\n\t{np.all(uvf.flag_array)}\n")
+    print(f"***any flagged?***\n\t{np.any(uvf.flag_array)}\n")
 
     plt.pcolormesh(np.squeeze(uvf.flag_array[:, :, 0]))
     plt.title("Waterfall of Flag Array (uvf)")
@@ -138,8 +138,8 @@ def prepare_data_files(
             f"times {uvd_data.Ntimes}\tbls {uvd_data.Nbls}\tblts {uvd_data.Nblts}"
         )
 
-        print(f"\n***all flagged? before***\n\t{np.all(uvd_data.flag_array == True)}")
-        print(f"\n***any flagged? before***\n\t{np.any(uvd_data.flag_array == True)}")
+        print(f"\n***all flagged? before***\n\t{np.all(uvd_data.flag_array)}")
+        print(f"\n***any flagged? before***\n\t{np.any(uvd_data.flag_array)}")
 
         # remove flagged data (need to handle in unical code in future)
         print(f"\n***shape before removing flags***\n\t{uvd_data.data_array.shape}")
@@ -147,8 +147,8 @@ def prepare_data_files(
         print(f"\n***flagged bls shape***\n\t{flagged_bls_data.shape}")
         uvd_data.select(blt_inds=flagged_bls_data, invert=True)
         print(f"\n***shape after removing flags***\n\t{uvd_data.data_array.shape}\n")
-        print(f"\n***all flagged? after***\n\t{np.all(uvd_data.flag_array == True)}")
-        print(f"\n***any flagged? after***\n\t{np.any(uvd_data.flag_array == True)}")
+        print(f"\n***all flagged? after***\n\t{np.all(uvd_data.flag_array)}")
+        print(f"\n***any flagged? after***\n\t{np.any(uvd_data.flag_array)}")
         uvd_data.write_uvfits(uv_data_path)
 
     sav_model_path = os.getcwd() + f"/calico/data/{sav_model_filename}"
@@ -192,7 +192,8 @@ def prepare_data_files(
         uvd_model.write_uvfits(uv_model_path)
         print(f"\n***shape after removing flags***\n\t{uvd_model.data_array.shape}\n")
         print(
-            f"\n***how many***\ntimes {uvd_model.Ntimes}\tbls {uvd_model.Nbls}\tblts {uvd_model.Nblts}"
+            f"\n***how many***\ntimes {uvd_model.Ntimes}"
+            f"\tbls {uvd_model.Nbls}\tblts {uvd_model.Nblts}"
         )
 
     return 1
@@ -200,11 +201,11 @@ def prepare_data_files(
 
 def init_many_realizations(
     fhd_prefix="1061316296_",
-    sav_data_filename="tutorial_full_onetime_unflagged",  # sav directory name (gaussian sim)
-    sav_model_filename="tutorial_full_onetime_unflagged",  # sav directory name (gaussian sim)
+    sav_data_filename="tutorial_full_onetime_unflagged",  # sav
+    sav_model_filename="tutorial_full_onetime_unflagged",  # sav
     run_params_filename="baseline_dependence_runs_large_noise",
-    vis_data_writeout_filename="tutorial_full_onetime_unflagged",  # uvfits filename (gaussian sim)
-    model_data_writeout_filename="tutorial_full_onetime_unflagged",  # uvfits filename (using FHD)
+    vis_data_writeout_filename="tutorial_full_onetime_unflagged",  # uvfits
+    model_data_writeout_filename="tutorial_full_onetime_unflagged",  # uvfits
     verbose=True,
     simulate_visibilities=False,
     same_sky_all_times=False,
@@ -234,7 +235,7 @@ def init_many_realizations(
         )
         > 0
     ):
-        if threshold_length == None:
+        if threshold_length is None:
             raise ValueError(
                 "Need threshold length even if zero -- Init Many Realizations"
             )
@@ -264,7 +265,8 @@ def init_many_realizations(
             if verbose:
                 if print_data_read_time:
                     print(
-                        f"Done. Data read time {(time.time() - data_read_start_time) / 60.0} minutes."
+                        "Done. Data read time "
+                        f"{(time.time() - data_read_start_time) / 60.0} minutes."
                     )
                 print("Formatting data...")
                 sys.stdout.flush()
@@ -287,14 +289,16 @@ def init_many_realizations(
                 flatten_blts=flatten_blts,
             )
             print(
-                f"\n\n***AFTER LOAD***\n  data {np.std(np.abs(caldata_obj.data_visibilities))}"
+                "\n\n***AFTER LOAD***\n  "
+                f"data {np.std(np.abs(caldata_obj.data_visibilities))}"
                 f"\n  model {np.std(np.abs(caldata_obj.model_visibilities))}\n\n"
             )
             print(f"\n\n***Nfreqs***\n  {caldata_obj.Nfreqs}\n\n")
             print(f"\n\n***Ntimes***\n  {caldata_obj.Ntimes}\n\n")
             if verbose:
                 print(
-                    f"Done. Data formatting time {(time.time() - data_format_start_time) / 60.0} minutes."
+                    "Done. Data formatting time "
+                    f"{(time.time() - data_format_start_time) / 60.0} minutes."
                 )
                 print("Running calibration optimization...")
                 sys.stdout.flush()
@@ -325,29 +329,28 @@ def init_many_realizations(
             dev = dev_tools.DevTools()
             xtol = 1e-5
             maxiter = 200
-            # antenna_flagging_iterations = 1
-            # if calibration_type == "skycal":
-            #     for ant_flag_iter in range(antenna_flagging_iterations):
-            #         caldata_obj.sky_based_calibration(
-            #             xtol=xtol / 10,  # Lower tolerance for antenna flagging
-            #             maxiter=int(maxiter / 2),  # Lower maxiter for antenna flagging
-            #             get_crosspol_phase=False,  # No crosspol phase needed for antenna flagging
-            #             parallel=False,
-            #             verbose=verbose,
-            #             pool=None,
-            #         )
-            #         if verbose:
-            #             print(f"Initial calibration optimization done.", end="")
-            #             print(f"Antenna flagging iteration {ant_flag_iter+1} of {antenna_flagging_iterations}.")
-            #             print(f"Optimization time: {caldata_obj.Nfreqs} frequency channels", end="")
-            #             print(f"in {(time.time() - optimization_start_time)/60.} minutes.")
-            #             sys.stdout.flush()
-            # caldata_obj.flag_antennas_from_per_ant_cost(
-            #     flagging_threshold=2.5,
-            #     parallel=False,
-            #     pool=None,
-            #     verbose=verbose,
-            # )
+            antenna_flagging_iterations = 1
+            if calibration_type == "skycal":
+                for ant_flag_iter in range(antenna_flagging_iterations):
+                    # lower xtol/maxiter and no crosspol for ant flagging
+                    caldata_obj.sky_based_calibration(
+                        xtol=xtol / 10,
+                        maxiter=int(maxiter / 2),
+                        get_crosspol_phase=False,
+                        parallel=False,
+                        verbose=verbose,
+                        pool=None,
+                    )
+                    if verbose:
+                        print(f"Initial calibration optimization done.", end="")
+                        print(
+                            f"Antenna flagging iteration {ant_flag_iter + 1} "
+                            f"of {antenna_flagging_iterations}."
+                        )
+                        sys.stdout.flush()
+            caldata_obj.flag_antennas_from_per_ant_cost(
+                flagging_threshold=2.5, parallel=False, pool=None, verbose=verbose
+            )
             dev.calculate_many_realizations(
                 caldata_obj=caldata_obj,
                 example_data=data,
@@ -377,274 +380,12 @@ def init_many_realizations(
         print("Problem with data files - exiting")
 
 
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'baseline_dependence_runs_large_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',      # uvfits filename (using FHD)
-#     verbose=False,
-#     simulate_visibilities=False,
-#     calibrate=True,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'baseline_dependence_runs_large_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
-#     verbose=False,
-#     simulate_visibilities=True,
-#     calibrate=True,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'baseline_dependence_runs_small_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
-#     verbose=False,
-#     simulate_visibilities=False,
-#     calibrate=True,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'baseline_dependence_runs_small_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',     # uvfits filename (using FHD)
-#     verbose=False,
-#     simulate_visibilities=True,
-#     calibrate=True,
-# )
-
 prepare_data_files(
     fhd_prefix="1061316296_",
-    sav_data_filename="fhd_runs/fhd_baseline",  # sav directory name (using FHD)
-    sav_model_filename="fhd_runs/fhd_cutoff015",  # sav directory name (using FHD)
-    model_data_writeout_filename="fhd_model_one_freq_015",  # uvfits filename (using FHD)
-    vis_data_writeout_filename="fhd_data_one_freq_015",  # uvfits filename (using FHD)
+    sav_data_filename="fhd_runs/fhd_baseline",  # FHD sav
+    sav_model_filename="fhd_runs/fhd_015",  # FHD sav
+    model_data_writeout_filename="fhd_model_one_freq_015",  # uvfits
+    vis_data_writeout_filename="fhd_data_one_freq_015",  # uvfits
     reconstruct_data=False,
     reconstruct_model=False,
 )
-
-"""
-    Below FHD runs had model and data swapped
-"""
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_01',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_medium_noise_01',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_01',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_015',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_medium_noise_015',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_015',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_05',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_medium_noise_05',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_05',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_1',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_medium_noise_1',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_1',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_01',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_small_noise_01',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_01',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_015',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_small_noise_015',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_015',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_05',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_small_noise_05',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_05',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_1',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_small_noise_1',
-#     model_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     vis_data_writeout_filename = 'fhd_model_one_freq_1',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=False,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_1',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_large_noise_01',
-#     vis_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     model_data_writeout_filename = 'fhd_model_one_freq_1',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_1',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_large_noise_015',
-#     vis_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     model_data_writeout_filename = 'fhd_model_one_freq_1',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_1',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_large_noise_05',
-#     vis_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     model_data_writeout_filename = 'fhd_model_one_freq_1',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'fhd_data',                                     # sav directory name (using FHD)
-#     sav_model_filename = 'fhd_model_1',                                   # sav directory name (using FHD)
-#     run_params_filename = 'fhd_runs_large_noise_1',
-#     vis_data_writeout_filename = 'fhd_data_one_freq',                   # uvfits filename (using FHD)
-#     model_data_writeout_filename = 'fhd_model_one_freq_1',                # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=False,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'add_gaussian_error_large_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=True,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'add_gaussian_error_medium_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=True,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
-
-# init_many_realizations(
-#     fhd_prefix = '1061316296_',
-#     sav_data_filename = 'tutorial_full_onetime_unflagged',                  # sav directory name (gaussian sim)
-#     sav_model_filename = 'tutorial_full_onetime_unflagged',                 # sav directory name (gaussian sim)
-#     run_params_filename = 'add_gaussian_error_small_noise',
-#     vis_data_writeout_filename = 'tutorial_full_onetime_unflagged',         # uvfits filename (gaussian sim)
-#     model_data_writeout_filename = 'tutorial_full_onetime_unflagged',       # uvfits filename (using FHD)
-#     verbose=True,
-#     simulate_visibilities=True,
-#     calibrate=True,
-#     reconstruct_data=False,
-#     reconstruct_model=False,
-# )
