@@ -2038,94 +2038,94 @@ fhd_runs_large_noise_1 = [
 
 def generate_files():
     cwd = os.getcwd()
-    # with open(f'{cwd}/calico/data/sigma_combos_many_realizations.hkl', 'wb') as file:
-    # hkl.dump(
-    #     many_sigma_combos,
-    #     f"{cwd}/calico/data/sigma_combos_many_realizations.hkl",
-    #     compression="gzip",
-    # )
+    file_path_base = os.path.join(cwd, "calico", "data")
+    hkl.dump(
+        many_sigma_combos,
+        os.path.join(file_path_base, "sigma_combos_many_realizations.hkl"),
+        compression="gzip",
+    )
     # with open(
-    #     f'{cwd}/calico/data/baseline_dependence_runs_large_noise.hkl',
+    #     os.path.join(file_path_base, "baseline_dependence_runs_large_noise.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(baseline_dependence_runs_large_noise, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/baseline_dependence_runs_small_noise.hkl',
+    #     os.path.join(file_path_base, "baseline_dependence_runs_small_noise.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(baseline_dependence_runs_small_noise, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/add_gaussian_error_large_noise.hkl',
+    #     os.path.join(file_path_base, "add_gaussian_error_large_noise.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(add_gaussian_error_large_noise, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/add_gaussian_error_medium_noise.hkl',
+    #     os.path.join(file_path_base, "add_gaussian_error_medium_noise.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(add_gaussian_error_medium_noise, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/add_gaussian_error_small_noise.hkl',
+    #     os.path.join(file_path_base, "add_gaussian_error_small_noise.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(add_gaussian_error_small_noise, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_medium_noise_01.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_medium_noise_01.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_medium_noise_01, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_medium_noise_015.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_medium_noise_015.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_medium_noise_015, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_medium_noise_05.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_medium_noise_05.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_medium_noise_05, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_medium_noise_1.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_medium_noise_1.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_medium_noise_1, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_small_noise_01.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_small_noise_01.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_small_noise_01, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_small_noise_015.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_small_noise_015.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_small_noise_015, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_small_noise_05.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_small_noise_05.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_small_noise_05, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_small_noise_1.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_small_noise_1.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_small_noise_1, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_large_noise_01.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_large_noise_01.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_large_noise_01, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_large_noise_015.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_large_noise_015.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_large_noise_015, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_large_noise_05.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_large_noise_05.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_large_noise_05, file, compression='gzip')
     # with open(
-    #     f'{cwd}/calico/data/fhd_runs_large_noise_1.hkl',
+    #     os.path.join(file_path_base, "fhd_runs_large_noise_1.hkl"),
     #     'wb'
     # ) as file:
     #     hkl.dump(fhd_runs_large_noise_1, file, compression='gzip')
@@ -2165,5 +2165,6 @@ def generate_custom_file(
             }
         )
     cwd = os.getcwd()
-    with open(f"{cwd}/calico/data/{filename}_run_params.hkl", "wb") as file:
+    custom_file_path = os.path.join(cwd, "calico", "data", f"{filename}_run_params.hkl")
+    with open(custom_file_path, "wb") as file:
         hkl.dump(custom_file, file, compression="gzip")
