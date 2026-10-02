@@ -33,6 +33,7 @@ def display_all_images():
 
 def examine_flags(uvd):
     print("\n***beginning flag waterfall***")
+    cwd = os.getcwd()
     uvf = UVFlag(uvd)
     uvf.to_waterfall()
     uvf.to_flag()
@@ -45,7 +46,8 @@ def examine_flags(uvd):
     plt.xlabel("Frequency")
     plt.gca().invert_yaxis()
     plt.colorbar()
-    plt.savefig("calico/images/flag_watterfall_uvf.png")
+    image_path = os.path.join(cwd, "calico", "images", "flag_watterfall_uvf.png")
+    plt.savefig(image_path)
     plt.close()
 
     plt.pcolormesh(np.squeeze(uvd.flag_array[:, :, 0]))
@@ -54,7 +56,8 @@ def examine_flags(uvd):
     plt.xlabel("Frequency")
     plt.gca().invert_yaxis()
     plt.colorbar()
-    plt.savefig("calico/images/flag_watterfall_uvd.png")
+    image_path = os.path.join(cwd, "calico", "images", "flag_watterfall_uvd.png")
+    plt.savefig(image_path)
     plt.close()
 
     print("***finished with flag watefall***\n")
@@ -84,9 +87,11 @@ def prepare_data_files(
     if model_data_writeout_filename is None:
         print("ERROR: uvfits model filename is missing")
         return -1
-
-    sav_data_path = os.getcwd() + f"/calico/data/{sav_data_filename}"
-    uv_data_path = os.getcwd() + f"/calico/data/{vis_data_writeout_filename}.uvfits"
+    cwd = os.getcwd()
+    sav_data_path = os.path.join(cwd, "calico", "data", f"{sav_data_filename}")
+    uv_data_path = os.path.join(
+        cwd, "calico", "data", f"{vis_data_writeout_filename}.uvfits"
+    )
     print("uv data path", uv_data_path)
     if fhd_prefix[-1] != "_":
         fhd_prefix += "_"
@@ -100,10 +105,10 @@ def prepare_data_files(
         print("Data uvfits file not found - creating")
         # Set up the files we need
         data_vis_files = os.path.join(
-            sav_data_path, "cal_prerun", "vis_data", fhd_prefix + "vis_model_XX.sav"
+            sav_data_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
         )
         data_flags_file = os.path.join(
-            sav_data_path, "cal_prerun", "vis_data", fhd_prefix + "flags.sav"
+            sav_data_path, "vis_data", fhd_prefix + "flags.sav"
         )
         data_layout_file = os.path.join(
             sav_data_path, "metadata", fhd_prefix + "layout.sav"
@@ -151,19 +156,20 @@ def prepare_data_files(
         print(f"\n***any flagged? after***\n\t{np.any(uvd_data.flag_array)}")
         uvd_data.write_uvfits(uv_data_path)
 
-    sav_model_path = os.getcwd() + f"/calico/data/{sav_model_filename}"
-    uv_model_path = os.getcwd() + f"/calico/data/{model_data_writeout_filename}.uvfits"
-
+    sav_model_path = os.path.join(cwd, "calico", "data", sav_model_filename)
+    uv_model_path = os.path.join(
+        cwd, "calico", "data", f"{model_data_writeout_filename}.uvfits"
+    )
     if os.path.isfile(uv_model_path) and not reconstruct_model:
         print("Model uvfits file exists - skipping")
     else:
         print("Model uvfits file not found - creating")
         # Set up the files we need
         model_vis_files = os.path.join(
-            sav_model_path, "cal_prerun", "vis_data", fhd_prefix + "vis_model_XX.sav"
+            sav_model_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
         )
         model_flags_file = os.path.join(
-            sav_model_path, "cal_prerun", "vis_data", fhd_prefix + "flags.sav"
+            sav_model_path, "vis_data", fhd_prefix + "flags.sav"
         )
         model_layout_file = os.path.join(
             sav_model_path, "metadata", fhd_prefix + "layout.sav"
@@ -240,16 +246,16 @@ def init_many_realizations(
                 "Need threshold length even if zero -- Init Many Realizations"
             )
         make_run_params.generate_files()
-        model_path = os.getcwd() + f"/calico/data/{model_data_writeout_filename}"
+        cwd = os.getcwd()
+        model_file_path = os.path.join(
+            cwd, "calico", "data", f"{model_data_writeout_filename}.uvfits"
+        )
+        data_file_path = os.path.join(
+            cwd, "calico", "data", f"{vis_data_writeout_filename}.uvfits"
+        )
         if calibrate:
             if verbose:
                 data_read_start_time = time.time()
-            data_file_path = (
-                os.getcwd() + f"/calico/data/{vis_data_writeout_filename}.uvfits"
-            )
-            model_file_path = (
-                os.getcwd() + f"/calico/data/{model_data_writeout_filename}.uvfits"
-            )
             print_data_read_time = False
             if isinstance(data_file_path, str):  # Read data
                 data = UVData()
