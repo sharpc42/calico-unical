@@ -131,7 +131,6 @@ class CalData:
         self.ant2_inds = None
         self.ant1_inds_flat = None
         self.ant2_inds_flat = None
-        self.flatten_blts = False
         self.bl_inds = None
         self.gains_multiply_model = None
         self.antenna_names = None
@@ -236,7 +235,6 @@ class CalData:
         sigma_t_0=0.1,
         sigma_m_0=0.1,
         threshold_length=0,
-        flatten_blts=False,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -406,22 +404,10 @@ class CalData:
 
         # Format visibilities
         self.data_visibilities = np.zeros(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=complex,
+            (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=complex
         )
         self.model_visibilities = np.zeros(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=complex,
+            (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=complex
         )
         flag_array = np.zeros(
             (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=bool
@@ -447,7 +433,6 @@ class CalData:
 
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
-
             self.model_visibilities[time_ind, :, :, :] = np.reshape(
                 model_copy.data_array,
                 (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
@@ -527,11 +512,6 @@ class CalData:
                 self.antenna_numbers == metadata_reference.ant_2_array[baseline]
             )[0]
 
-        self.flatten_blts = flatten_blts
-        if flatten_blts:
-            self.ant1_inds_flat = np.tile(self.ant1_inds, self.Ntimes)
-            self.ant2_inds_flat = np.tile(self.ant2_inds, self.Ntimes)
-
         # Get ordered list of antenna names
         # self.antenna_names = np.array(
         #     [
@@ -599,12 +579,7 @@ class CalData:
         self.gains_multiply_model = gains_multiply_model
         if gain_init_calfile is None:
             self.gains = np.ones(
-                (
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-                dtype=complex,
+                (self.Nants, self.Nfreqs, self.N_feed_pols), dtype=complex
             )
             if gain_init_to_vis_ratio:  # Use mean ratio of visibility amplitudes
                 vis_amp_ratio = np.abs(self.model_visibilities) / np.abs(
@@ -648,12 +623,7 @@ class CalData:
                         )
                         flag_freq = nan_gains[1][flag_ind]
                         for flag_pol in flag_pols:
-                            flag_array[
-                                :,
-                                flag_bls,
-                                flag_freq,
-                                flag_pol,
-                            ] = True
+                            flag_array[:, flag_bls, flag_freq, flag_pol] = True
                     self.gains[nan_gains, feed_pol_ind] = (
                         0.0  # Nans in the gains produce matrix multiplication errors, set to zero
                     )
@@ -701,19 +671,8 @@ class CalData:
             sigma_m_0=sigma_m_0,
             threshold_length=self.threshold_length,
         )
-        # # NOTE: Incorporate this into VWA
-        # print(f"\n\n***MAX FLAG ARRAY***\n  {np.max(flag_array)=}\n\n")
-        # if np.max(flag_array):  # Apply flagging
-        #     self.visibility_weights[np.where(flag_array)] = 0.0
-        # print(f"All weights zero? {not np.any(self.visibility_weights)}\n\n")
-        # vwa.plot_weights_per_baseline(self, scaling_factor=scaling_factor_cost)
 
         self.lambda_val = lambda_val
-
-        # # DEV: make copies of original data vis, fit vis, and gains
-        # self.data_vis_orig = self.data_visibilities.copy()
-        # self.fit_vis_orig = self.fit_vis.copy()
-        # self.gains_orig = self.gains.copy()
 
         self.glim = glim
         self.ulim = ulim
@@ -889,7 +848,7 @@ class CalData:
         uvcal.flex_spw_id_array = np.zeros(self.Nfreqs, dtype=int)
 
         # Get flags from nan-ed gains and zeroed weights
-        uvcal.flag_array = (np.isnan(self.gains))[:, :, np.newaxis, :]
+        uvcal.flag_array = (np.isnan(self.gains))[..., np.newaxis, :]
 
         # Get flags from visibility_weights
         antenna_weights = np.zeros(
@@ -934,7 +893,7 @@ class CalData:
                 antenna_weights[ant_ind, :, pol_ind] = (
                     ant1_antenna_weights + ant2_antenna_weights
                 )
-        uvcal.flag_array[np.where(antenna_weights[:, :, np.newaxis, :] == 0)] = True
+        uvcal.flag_array[np.where(antenna_weights[..., np.newaxis, :] == 0)] = True
 
         try:
             uvcal.check()
@@ -1054,10 +1013,7 @@ class CalData:
         for freq_ind in range(self.Nfreqs):
             abscal_params = (
                 calibration_optimization.run_abscal_optimization_single_freq(
-                    caldata_list[freq_ind],
-                    xtol,
-                    maxiter,
-                    verbose=verbose,
+                    caldata_list[freq_ind], xtol, maxiter, verbose=verbose
                 )
             )
             self.abscal_params[:, [freq_ind], :] = abscal_params[:, [0], :]
@@ -1078,10 +1034,7 @@ class CalData:
         """
 
         self.abscal_params = calibration_optimization.run_dw_abscal_optimization(
-            self,
-            xtol,
-            maxiter,
-            verbose=verbose,
+            self, xtol, maxiter, verbose=verbose
         )
 
     def flag_antennas_from_per_ant_cost(
@@ -1215,11 +1168,7 @@ class CalData:
             self.Nfreqs * int(oversample_factor), d=self.channel_width
         )
         dwcal_variance_use = np.zeros(
-            (
-                self.Nbls,
-                self.Nfreqs * int(oversample_factor),
-            ),
-            dtype=float,
+            (self.Nbls, self.Nfreqs * int(oversample_factor)), dtype=float
         )
         for bl_ind, bl_length in enumerate(bl_lengths):
             bin_ind = np.max(np.where(bl_length_bin_edges <= bl_length)[0])
@@ -1358,30 +1307,15 @@ class CalData:
         self.fit_vis_imag = self.fit_vis[:, self.bl_inds, freq_ind, feed_pol_ind].imag
 
         # interweave real and imaginary parts of gains
-        gains_flattened = np.stack(
-            (
-                self.gains_real,
-                self.gains_imag,
-            ),
-            axis=1,
-        ).flatten()
+        gains_flattened = np.stack((self.gains_real, self.gains_imag), axis=1).flatten()
         if not unical:
             return gains_flattened
         else:
             # interweave real and imaginary parts of u's
             fit_vis_flattened = np.stack(
-                (
-                    self.fit_vis_real,
-                    self.fit_vis_imag,
-                ),
-                axis=-1,
+                (self.fit_vis_real, self.fit_vis_imag), axis=-1
             ).flatten()
-            params_flattened = np.hstack(
-                (
-                    gains_flattened,
-                    fit_vis_flattened,
-                )
-            )
+            params_flattened = np.hstack((gains_flattened, fit_vis_flattened))
             return params_flattened
 
     def reshape_data(self, freq_ind, vis_pol_ind, unical=False):
@@ -1398,26 +1332,21 @@ class CalData:
             Visibility polarization index.
         """
         reshaped_shape = (
-            (1, self.Ntimes * self.Nbls)
-            if self.flatten_blts
-            else (np.size(self.data_visibilities, axis=0), self.Nbls)
+            np.size(self.data_visibilities, axis=0),
+            np.size(self.data_visibilities, axis=1),
         )
         self.data_vis_reshaped = np.reshape(
-            self.data_visibilities[:, :, freq_ind, vis_pol_ind],
-            reshaped_shape,
+            self.data_visibilities[:, :, freq_ind, vis_pol_ind], reshaped_shape
         )
         self.model_vis_reshaped = np.reshape(
-            self.model_visibilities[:, :, freq_ind, vis_pol_ind],
-            reshaped_shape,
+            self.model_visibilities[:, :, freq_ind, vis_pol_ind], reshaped_shape
         )
         self.vis_weights_reshaped = np.reshape(
-            self.visibility_weights[:, :, freq_ind, vis_pol_ind],
-            reshaped_shape,
+            self.visibility_weights[:, :, freq_ind, vis_pol_ind], reshaped_shape
         )
         if unical:
             self.model_weights_reshaped = np.reshape(
-                self.model_weights[:, :, freq_ind, vis_pol_ind],
-                reshaped_shape,
+                self.model_weights[:, :, freq_ind, vis_pol_ind], reshaped_shape
             )
 
     def set_ant_inds(self, freq_ind, feed_pol_ind):
@@ -1439,13 +1368,9 @@ class CalData:
             self.visibility_weights[:, :, freq_ind, feed_pol_ind], axis=0
         )
         weight_per_ant = np.bincount(
-            self.ant1_inds,
-            weights=vis_weights_summed,
-            minlength=self.Nants,
+            self.ant1_inds, weights=vis_weights_summed, minlength=self.Nants
         ) + np.bincount(
-            self.ant2_inds,
-            weights=vis_weights_summed,
-            minlength=self.Nants,
+            self.ant2_inds, weights=vis_weights_summed, minlength=self.Nants
         )
         self.ant_inds = np.where(weight_per_ant > 0.0)[0]
 
@@ -1542,8 +1467,7 @@ class CalData:
                     else:
                         use_pool = multiprocessing.Pool(processes=max_processes)
                 gains_fit = use_pool.starmap(
-                    calibration_optimization.run_unical_optimization,
-                    args_list,
+                    calibration_optimization.run_unical_optimization, args_list
                 )
                 for freq_ind in range(self.Nfreqs):
                     self.gains[:, [freq_ind], :] = gains_fit[freq_ind][:, np.newaxis, :]

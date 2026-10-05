@@ -9,16 +9,12 @@ from calico import cost_function_calculations
 
 """
     Return the (ant1_inds, ant2_inds) maps that match the current unical
-    visibility axis. When caldata_obj.flatten_blts is True the time-baseline
-    plane is a single axis of length Ntimes*Nbls, so the per-baseline antenna
-    maps are tiled across times; otherwise the plain (Nbls,) maps are used.
+    visibility axis.
 """
 
 
 def _unical_ant_inds(caldata_obj):
-    if getattr(caldata_obj, "flatten_blts", False):
-        return caldata_obj.ant1_inds_flat, caldata_obj.ant2_inds_flat
-    return caldata_obj.ant1_inds, caldata_obj.ant2_inds
+    return caldata_obj.ant1_inds_flat, caldata_obj.ant2_inds_flat
 
 
 """
@@ -30,11 +26,8 @@ def _unical_ant_inds(caldata_obj):
 
 
 def _unpack_unical_fit_vis(u_part_flat, caldata_obj):
-    if getattr(caldata_obj, "flatten_blts", False):
-        u = np.reshape(u_part_flat, (caldata_obj.Ntimes * caldata_obj.Nbls, 2))
-        return (u[:, 0] + 1.0j * u[:, 1]).reshape(caldata_obj.Ntimes, caldata_obj.Nbls)
-    u = np.reshape(u_part_flat, (caldata_obj.Ntimes, caldata_obj.Nbls, 2))
-    return u[:, :, 0] + 1.0j * u[:, :, 1]
+    u = np.reshape(u_part_flat, (caldata_obj.Ntimes * caldata_obj.Nbls, 2))
+    return (u[:, 0] + 1.0j * u[:, 1]).reshape(caldata_obj.Ntimes, caldata_obj.Nbls)
 
 
 """
@@ -48,12 +41,7 @@ def _unpack_unical_fit_vis(u_part_flat, caldata_obj):
 """
 
 
-def flatten_hessian(
-    hess_arrays,
-    Nants_unflagged,
-    Ntimes=None,
-    Nbls=None,
-):
+def flatten_hessian(hess_arrays, Nants_unflagged, Ntimes=None, Nbls=None):
     unical = len(hess_arrays[:]) > 3  # see if additional arrays for unical are passed
     if not unical:
         hess_flattened = np.full(
@@ -87,8 +75,7 @@ def flatten_hessian(
                 if hess_row_ind >= Nants_unflagged and hess_col_ind >= Nants_unflagged:
                     # real-real
                     hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = hess_arrays[3][
-                        hess_row_ind - Nants_unflagged,
-                        hess_col_ind - Nants_unflagged,
+                        hess_row_ind - Nants_unflagged, hess_col_ind - Nants_unflagged
                     ]
                     # imag-real
                     hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = (
@@ -120,65 +107,36 @@ def flatten_hessian(
                 else:
                     if hess_row_ind >= Nants_unflagged:
                         hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = (
-                            hess_arrays[6][
-                                hess_row_ind - Nants_unflagged,
-                                hess_col_ind,
-                            ]
+                            hess_arrays[6][hess_row_ind - Nants_unflagged, hess_col_ind]
                         )
                         hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = (
-                            hess_arrays[7][
-                                hess_row_ind - Nants_unflagged,
-                                hess_col_ind,
-                            ]
+                            hess_arrays[7][hess_row_ind - Nants_unflagged, hess_col_ind]
                         )
                         hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = (
-                            hess_arrays[8][
-                                hess_row_ind - Nants_unflagged,
-                                hess_col_ind,
-                            ]
+                            hess_arrays[8][hess_row_ind - Nants_unflagged, hess_col_ind]
                         )
                         hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = (
-                            hess_arrays[9][
-                                hess_row_ind - Nants_unflagged,
-                                hess_col_ind,
-                            ]
+                            hess_arrays[9][hess_row_ind - Nants_unflagged, hess_col_ind]
                         )
                     # transpose (and complex conjugate?) of above block
                     elif hess_col_ind >= Nants_unflagged:
                         hess_flattened[2 * hess_row_ind, 2 * hess_col_ind] = (
-                            hess_arrays[6][
-                                hess_col_ind - Nants_unflagged,
-                                hess_row_ind,
-                            ]
+                            hess_arrays[6][hess_col_ind - Nants_unflagged, hess_row_ind]
                         )
                         hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind] = (
-                            hess_arrays[8][
-                                hess_col_ind - Nants_unflagged,
-                                hess_row_ind,
-                            ]
+                            hess_arrays[8][hess_col_ind - Nants_unflagged, hess_row_ind]
                         )
                         hess_flattened[2 * hess_row_ind, 2 * hess_col_ind + 1] = (
-                            hess_arrays[7][
-                                hess_col_ind - Nants_unflagged,
-                                hess_row_ind,
-                            ]
+                            hess_arrays[7][hess_col_ind - Nants_unflagged, hess_row_ind]
                         )
                         hess_flattened[2 * hess_row_ind + 1, 2 * hess_col_ind + 1] = (
-                            hess_arrays[9][
-                                hess_col_ind - Nants_unflagged,
-                                hess_row_ind,
-                            ]
+                            hess_arrays[9][hess_col_ind - Nants_unflagged, hess_row_ind]
                         )
 
     return hess_flattened
 
 
-def cost_skycal_wrapper(
-    gains_flattened,
-    caldata_obj,
-    ant_inds,
-    dev_type="",
-):
+def cost_skycal_wrapper(gains_flattened, caldata_obj, ant_inds, dev_type=""):
     """
     Wrapper for function cost_skycal. Reformats the input gains to be compatible
     with the scipy.optimize.minimize function.
@@ -242,11 +200,7 @@ def cost_skycal_wrapper(
     return cost
 
 
-def jacobian_skycal_wrapper(
-    gains_flattened,
-    caldata_obj,
-    ant_inds,
-):
+def jacobian_skycal_wrapper(gains_flattened, caldata_obj, ant_inds):
     """
     Wrapper for function jacobian_skycal. Reformats the input gains and
     output Jacobian to be compatible with the scipy.optimize.minimize function.
@@ -304,11 +258,7 @@ def jacobian_skycal_wrapper(
     return jac_flattened
 
 
-def hessian_skycal_wrapper(
-    gains_flattened,
-    caldata_obj,
-    ant_inds,
-):
+def hessian_skycal_wrapper(gains_flattened, caldata_obj, ant_inds):
     """
     Wrapper for function hessian_skycal. Reformats the input gains and
     output Hessian to be compatible with the scipy.optimize.minimize function.
@@ -339,45 +289,36 @@ def hessian_skycal_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     if caldata_obj.gains_multiply_model:
-        (
-            hess_real_real,
-            hess_real_imag,
-            hess_imag_imag,
-        ) = cost_function_calculations.hessian_skycal(
-            gains,
-            caldata_obj.Nants,
-            caldata_obj.Nbls,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
+        (hess_real_real, hess_real_imag, hess_imag_imag) = (
+            cost_function_calculations.hessian_skycal(
+                gains,
+                caldata_obj.Nants,
+                caldata_obj.Nbls,
+                caldata_obj.data_vis_reshaped,
+                caldata_obj.model_vis_reshaped,
+                caldata_obj.vis_weights_reshaped,
+                caldata_obj.ant1_inds,
+                caldata_obj.ant2_inds,
+                caldata_obj.lambda_val,
+            )
         )
     else:
-        (
-            hess_real_real,
-            hess_real_imag,
-            hess_imag_imag,
-        ) = cost_function_calculations.hessian_skycal(
-            gains,
-            caldata_obj.Nants,
-            caldata_obj.Nbls,
-            caldata_obj.model_vis_reshaped,
-            caldata_obj.data_vis_reshaped,
-            caldata_obj.vis_weights_reshaped,
-            caldata_obj.ant1_inds,
-            caldata_obj.ant2_inds,
-            caldata_obj.lambda_val,
+        (hess_real_real, hess_real_imag, hess_imag_imag) = (
+            cost_function_calculations.hessian_skycal(
+                gains,
+                caldata_obj.Nants,
+                caldata_obj.Nbls,
+                caldata_obj.model_vis_reshaped,
+                caldata_obj.data_vis_reshaped,
+                caldata_obj.vis_weights_reshaped,
+                caldata_obj.ant1_inds,
+                caldata_obj.ant2_inds,
+                caldata_obj.lambda_val,
+            )
         )
 
     skycal_hess = flatten_hessian(
-        [
-            hess_real_real,
-            hess_real_imag,
-            hess_imag_imag,
-        ],
-        Nants_unflagged,
+        [hess_real_real, hess_real_imag, hess_imag_imag], Nants_unflagged
     )
     return skycal_hess
 
@@ -761,18 +702,10 @@ def cost_unical_wrapper(
     if dev_type == "test gains rolled":
         return gains_reshaped
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
-    if caldata_obj.flatten_blts:
-        fit_vis_reshaped = np.reshape(
-            params_flattened[2 * n_ants_unflagged :], (n_times * len(bl_inds), 2)
-        )
-        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[
-            np.newaxis, :
-        ]
-    else:
-        fit_vis_reshaped = np.reshape(
-            params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
-        )
-        fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
+    fit_vis_reshaped = np.reshape(
+        params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
+    )
+    fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     if dev_type == "test fit vis rolled":
         return fit_vis_reshaped
     if dev_type == "test gains one run skycal":
@@ -867,18 +800,10 @@ def jacobian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
-    if caldata_obj.flatten_blts:
-        fit_vis_reshaped = np.reshape(
-            params_flattened[2 * n_ants_unflagged :], (n_times * len(bl_inds), 2)
-        )
-        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[
-            np.newaxis, :
-        ]
-    else:
-        fit_vis_reshaped = np.reshape(
-            params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
-        )
-        fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
+    fit_vis_reshaped = np.reshape(
+        params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
+    )
+    fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     jac = cost_function_calculations.jacobian_unical(
         gains,
         fit_vis_reshaped,
@@ -890,13 +815,7 @@ def jacobian_unical_wrapper(
         ant2_inds_use,
         caldata_obj.lambda_val,
     )
-    jac_gains = np.stack(
-        (
-            jac[ant_inds].real,
-            jac[ant_inds].imag,
-        ),
-        axis=1,
-    ).flatten()
+    jac_gains = np.stack((jac[ant_inds].real, jac[ant_inds].imag), axis=1).flatten()
     jac_fits = np.stack(
         (
             jac[bl_inds].real,
@@ -906,12 +825,7 @@ def jacobian_unical_wrapper(
         ),
         axis=1,
     ).flatten()
-    jac_flattened = np.hstack(
-        (
-            jac_gains,
-            jac_fits,
-        ),
-    )
+    jac_flattened = np.hstack((jac_gains, jac_fits))
     return jac_flattened
 
 
@@ -961,18 +875,10 @@ def hessian_unical_wrapper(
     gains = np.ones((caldata_obj.Nants), dtype=complex)
     gains[ant_inds] = gains_reshaped
     ant1_inds_use, ant2_inds_use = _unical_ant_inds(caldata_obj)
-    if caldata_obj.flatten_blts:
-        fit_vis_reshaped = np.reshape(
-            params_flattened[2 * n_ants_unflagged :], (n_times * len(bl_inds), 2)
-        )
-        fit_vis_reshaped = (fit_vis_reshaped[:, 0] + 1.0j * fit_vis_reshaped[:, 1])[
-            np.newaxis, :
-        ]
-    else:
-        fit_vis_reshaped = np.reshape(
-            params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
-        )
-        fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
+    fit_vis_reshaped = np.reshape(
+        params_flattened[2 * n_ants_unflagged :], (n_times, len(bl_inds), 2)
+    )
+    fit_vis_reshaped = fit_vis_reshaped[:, :, 0] + 1.0j * fit_vis_reshaped[:, :, 1]
     (
         gain_hess_real_real,
         gain_hess_real_imag,
@@ -1187,12 +1093,7 @@ def run_skycal_optimization_per_pol_single_freq(
     return gains_fit
 
 
-def run_abscal_optimization_single_freq(
-    caldata_obj,
-    xtol,
-    maxiter,
-    verbose=True,
-):
+def run_abscal_optimization_single_freq(caldata_obj, xtol, maxiter, verbose=True):
     """
     Run absolute calibration ("abscal").
 
@@ -1238,12 +1139,7 @@ def run_abscal_optimization_single_freq(
     return abscal_params
 
 
-def run_dw_abscal_optimization(
-    caldata_obj,
-    xtol,
-    maxiter,
-    verbose=True,
-):
+def run_dw_abscal_optimization(caldata_obj, xtol, maxiter, verbose=True):
     """
     Run absolute calibration with delay weighting.
 
@@ -1419,72 +1315,37 @@ def run_unical_optimization(
                 gains_fit_tensor = torch.from_numpy(
                     caldata_obj.gains[
                         caldata_obj.ant_inds, freq_ind, feed_pol_ind
-                    ].copy(),
-                ).to(
-                    device=device,
-                    dtype=torch.complex128,
-                )
-                # Fitted-visibility init: (Ntimes, Nbls) by default, or a flat
-                # (1, Ntimes*Nbls) view matching data_vis_reshaped when flatten_blts.
+                    ].copy()
+                ).to(device=device, dtype=torch.complex128)
                 _fit_vis_init = np.reshape(
                     caldata_obj.fit_vis[:, caldata_obj.bl_inds, freq_ind, vis_pol_ind],
                     (np.size(caldata_obj.data_visibilities, axis=0), caldata_obj.Nbls),
                 )
-                if caldata_obj.flatten_blts:
-                    _fit_vis_init = _fit_vis_init.reshape(
-                        1, caldata_obj.Ntimes * caldata_obj.Nbls
-                    )
-                fit_vis_fit_tensor = torch.from_numpy(
-                    _fit_vis_init.copy(),
-                ).to(
-                    device=device,
-                    dtype=torch.complex128,
+                fit_vis_fit_tensor = torch.from_numpy(_fit_vis_init.copy()).to(
+                    device=device, dtype=torch.complex128
                 )
                 # additional arrays as tensors
-                data_tensor = torch.from_numpy(
-                    caldata_obj.data_vis_reshaped.copy(),
-                ).to(
-                    device=device,
-                    dtype=torch.complex128,
+                data_tensor = torch.from_numpy(caldata_obj.data_vis_reshaped.copy()).to(
+                    device=device, dtype=torch.complex128
                 )
                 model_tensor = torch.from_numpy(
-                    caldata_obj.model_vis_reshaped.copy(),
-                ).to(
-                    device=device,
-                    dtype=torch.complex128,
-                )
+                    caldata_obj.model_vis_reshaped.copy()
+                ).to(device=device, dtype=torch.complex128)
                 vis_weights_tensor = torch.from_numpy(
-                    caldata_obj.vis_weights_reshaped.copy(),
-                ).to(
-                    device=device,
-                    dtype=torch.float64,
-                )
+                    caldata_obj.vis_weights_reshaped.copy()
+                ).to(device=device, dtype=torch.float64)
                 model_weights_tensor = torch.from_numpy(
-                    caldata_obj.model_weights_reshaped.copy(),
-                ).to(
-                    device=device,
-                    dtype=torch.float64,
+                    caldata_obj.model_weights_reshaped.copy()
+                ).to(device=device, dtype=torch.float64)
+                ant_inds_tensor = torch.from_numpy(caldata_obj.ant_inds.copy()).to(
+                    device=device, dtype=int
                 )
-                ant_inds_tensor = torch.from_numpy(
-                    caldata_obj.ant_inds.copy(),
-                ).to(
-                    device=device,
-                    dtype=int,
-                )
-                # Antenna maps matching the visibility axis: tiled (Ntimes*Nbls,)
-                # when flatten_blts, plain (Nbls,) otherwise.
                 _ant1_np, _ant2_np = _unical_ant_inds(caldata_obj)
-                ant1_inds_tensor = torch.from_numpy(
-                    _ant1_np.copy(),
-                ).to(
-                    device=device,
-                    dtype=int,
+                ant1_inds_tensor = torch.from_numpy(_ant1_np.copy()).to(
+                    device=device, dtype=int
                 )
-                ant2_inds_tensor = torch.from_numpy(
-                    _ant2_np.copy(),
-                ).to(
-                    device=device,
-                    dtype=int,
+                ant2_inds_tensor = torch.from_numpy(_ant2_np.copy()).to(
+                    device=device, dtype=int
                 )
                 gains_fit_tensor.requires_grad_(True)
                 fit_vis_fit_tensor.requires_grad_(True)
@@ -1578,17 +1439,10 @@ def run_unical_optimization(
                         break
                     previous_loss = loss_val
                 gains_best, fit_vis_best = best_params
-                gains_final = (
-                    gains_best.detach().cpu().numpy().astype(gains_fit.dtype)
-                )  # (Nants_unflagged,)
+                gains_final = gains_best.detach().cpu().numpy().astype(gains_fit.dtype)
                 fit_vis_final = (
                     fit_vis_best.detach().cpu().numpy().astype(fit_vis_fit.dtype)
-                )  # (Ntimes, Nbls) or (1, Ntimes*Nbls)
-                if caldata_obj.flatten_blts:
-                    # collapse the flat (1, Ntimes*Nbls) view back to (Ntimes, Nbls) for storage
-                    fit_vis_final = fit_vis_final.reshape(
-                        caldata_obj.Ntimes, caldata_obj.Nbls
-                    )
+                )
                 if verbose:
                     # recreate scipy
                     print(f"***PyTorch Result***")
