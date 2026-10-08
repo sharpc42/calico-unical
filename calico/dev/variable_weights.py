@@ -157,24 +157,8 @@ class VariableWeightsArray:
             caldata_obj.visibility_weights = self.thermal_noise_weight_array
             caldata_obj.model_weights = self.model_error_weight_array
         else:
-            self.thermal_noise_weight_array = np.zeros(
-                (
-                    caldata_obj.Ntimes,
-                    caldata_obj.Nbls,
-                    caldata_obj.Nfreqs,
-                    caldata_obj.N_vis_pols,
-                ),
-                dtype=float,
-            )
-            self.model_error_weight_array = np.zeros(
-                (
-                    caldata_obj.Ntimes,
-                    caldata_obj.Nbls,
-                    caldata_obj.Nfreqs,
-                    caldata_obj.N_vis_pols,
-                ),
-                dtype=float,
-            )
+            self.thermal_noise_weight_array = np.zeros_like(caldata_obj.data_visibilities)
+            self.model_error_weight_array = np.zeros_like(caldata_obj.data_visibilities)
 
             self.threshold_length = threshold_length
             self.uv_norm_array = np.linalg.norm(caldata_obj.uv_array, axis=1)

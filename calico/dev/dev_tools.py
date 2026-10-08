@@ -636,14 +636,7 @@ class DevTools:
                 if model_error_real is None:
                     if verbose:
                         print("Did not simulate model error")
-                    this_model_error = np.zeros(
-                        (
-                            caldata_obj.Ntimes,
-                            caldata_obj.Nbls,
-                            caldata_obj.Nfreqs,
-                            caldata_obj.N_vis_pols,
-                        )
-                    )
+                    this_model_error = np.zeros_like(caldata_obj.data_visiblities)
                 else:
                     this_model_error = model_error_real + 1.0j * model_error_imag
                 model_err_realizations.append(this_model_error)
@@ -2167,7 +2160,7 @@ class DevTools:
         radius: float | None = None,
         xlim: float | None = None,
         ylim: float | None = None,
-        ax: plt.axes | None = None,
+        ax: plt.axes = None,
     ) -> None:
 
         if variation == "stddev":
@@ -2462,8 +2455,9 @@ def plot_ntimes_nbls_array(array, this_func, str_upper, str_lower):
 
 
 def prepare_standard_unical_test_run(
-    filename,
     caldata_obj,
+    model_filename,
+    data_filename=None,
     gaussian_simulation=True,
     seed=100,
     sigma_t=0.1,
@@ -2476,9 +2470,18 @@ def prepare_standard_unical_test_run(
 ):
     import pyuvdata
 
+    base_path = os.path.join(
+        os.getcwd(),
+        "calico",
+        "data",
+    )
     model = pyuvdata.UVData()
-    model.read_uvfits(f"./calico/data/{filename}.uvfits")
-    data = model.copy()
+    model.read_uvfits(os.path.join(base_path, f"{model_filename}.uvfits"))
+    if data_filename:
+        data = pyuvdata.UVData()
+        data.read_uvfits(os.path.join(base_path, f"{data_filename}.uvfits"))
+    else:
+        data = model.copy()
     caldata_obj.load_data(
         data,
         model,
@@ -2491,6 +2494,8 @@ def prepare_standard_unical_test_run(
         lambda_val=100,
     )
     if gaussian_simulation:
+        if seed==42:
+            seed += 1
         sim.simulate_visibilities(
             caldata_obj=caldata_obj, seed=42, same_sky_all_times=same_sky_all_times
         )
@@ -2499,15 +2504,17 @@ def prepare_standard_unical_test_run(
         caldata_obj,
         weighting_function="constant_weights",
         scaling_factor=1 / (scaling_factor) ** 2,
-        sigma_t_0=sigma_t,
-        sigma_m_0=sigma_m,
+        sigma_t_0=1 if sigma_t == 0 else sigma_t,
+        sigma_m_0=1 if sigma_m == 0 else sigma_m,
         threshold_length=caldata_obj.threshold_length,
     )
     if sigma_m != 0:
         model_error_real, model_error_imag, _, _ = sim.simulate_model_error(
             caldata_obj=caldata_obj,
-            n_times=caldata_obj.Ntimes,
-            n_bls=caldata_obj.Nbls,
+            # n_times=caldata_obj.Ntimes,
+            # n_bls=caldata_obj.Nbls,
+            n_times=np.size(caldata_obj.data_visibilities, axis=0),
+            n_bls=np.size(caldata_obj.data_visibilities, axis=1),
             n_freqs=1,
             sigma_e_0=sigma_m,
             uv_norm_array=caldata_obj.uv_norm,
@@ -2523,8 +2530,8 @@ def prepare_standard_unical_test_run(
     if sigma_t != 0:
         thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
             sigma_t_0=sigma_t,
-            n_times=caldata_obj.Ntimes,
-            n_bls=caldata_obj.Nbls,
+            n_times=np.size(caldata_obj.data_visibilities, axis=0),
+            n_bls=np.size(caldata_obj.data_visibilities, axis=1),
             n_freqs=1,
             seed=seed + 1,
         )
@@ -2532,8 +2539,6 @@ def prepare_standard_unical_test_run(
         caldata_obj.data_visibilities[..., 0] += thermal_noise
     else:
         print("Sigma_t detected to be zero so not simulating thermal noise")
-    caldata_obj.fit_vis = caldata_obj.model_visibilities.copy()
-    # caldata_obj.gains = np.ones(shape=caldata_obj.gains.shape, dtype=np.complex128)
     if return_model_error and return_thermal_noise:
         return model_error, thermal_noise
     elif return_thermal_noise:
