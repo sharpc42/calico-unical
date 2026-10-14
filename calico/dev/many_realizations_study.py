@@ -1,3 +1,4 @@
+import argparse
 import os
 import os.path
 import sys
@@ -127,6 +128,8 @@ def prepare_data_files(
             params_file=data_params_file,
             settings_file=data_settings_file,
         )
+        uvd_data.set_rectangularity(force=True)
+        print(f"***data rectangular***\n\t{uvd_data.blts_are_rectangular}\n")
 
         # examine_flags(uvd_data)
 
@@ -150,11 +153,12 @@ def prepare_data_files(
         print(f"\n***shape before removing flags***\n\t{uvd_data.data_array.shape}")
         flagged_bls_data = np.nonzero(np.squeeze(uvd_data.flag_array))[0]
         print(f"\n***flagged bls shape***\n\t{flagged_bls_data.shape}")
-        uvd_data.select(blt_inds=flagged_bls_data, invert=True)
+        # uvd_data.select(blt_inds=flagged_bls_data, invert=True)
         print(f"\n***shape after removing flags***\n\t{uvd_data.data_array.shape}\n")
         print(f"\n***all flagged? after***\n\t{np.all(uvd_data.flag_array)}")
         print(f"\n***any flagged? after***\n\t{np.any(uvd_data.flag_array)}")
         uvd_data.write_uvfits(uv_data_path)
+        print(f"***data rectangular***\n\t{uvd_data.blts_are_rectangular}\n")
 
     sav_model_path = os.path.join(cwd, "calico", "data", sav_model_filename)
     uv_model_path = os.path.join(
@@ -188,19 +192,22 @@ def prepare_data_files(
             params_file=model_params_file,
             settings_file=model_settings_file,
         )
+        uvd_model.set_rectangularity(force=True)
+        print(f"***model rectangular***\n\t{uvd_model.blts_are_rectangular}")
 
         # probably full repeat selections from before
         uvd_model.select(ant_str="auto", invert=True)
         uvd_model.select(frequencies=[uvd_model.freq_array[freq_ind]])
         # uvd_model.select(times=[uvd_model.time_array[uvd_model.Nbls*2]])
         flagged_bls_model = np.nonzero(np.squeeze(uvd_model.flag_array))[0]
-        uvd_model.select(blt_inds=flagged_bls_model, invert=True)
+        # uvd_model.select(blt_inds=flagged_bls_model, invert=True)
         uvd_model.write_uvfits(uv_model_path)
         print(f"\n***shape after removing flags***\n\t{uvd_model.data_array.shape}\n")
         print(
             f"\n***how many***\ntimes {uvd_model.Ntimes}"
             f"\tbls {uvd_model.Nbls}\tblts {uvd_model.Nblts}"
         )
+        print(f"***model rectangular***\n\t{uvd_model.blts_are_rectangular}")
 
     return 1
 
@@ -385,13 +392,19 @@ def init_many_realizations(
     else:
         print("Problem with data files - exiting")
 
-
-prepare_data_files(
-    fhd_prefix="1061316296_",
-    sav_data_filename="fhd_runs/fhd_baseline",  # FHD sav
-    sav_model_filename="fhd_runs/fhd_015",  # FHD sav
-    model_data_writeout_filename="fhd_model_one_freq_015",  # uvfits
-    vis_data_writeout_filename="fhd_data_one_freq_015",  # uvfits
-    reconstruct_data=False,
-    reconstruct_model=False,
-)
+if __name__ == "main":
+    parser = argparse.ArgumentParser(description="Creating uvfits from FHD files")
+    parser.add_argument(
+        "--suffix", type=str, help="file suffix for FHD files only (the cutoff number)",
+    )
+    args = parser.parse_args()
+    if args.suffix:
+        prepare_data_files(
+            fhd_prefix="1061316296_",
+            sav_data_filename="fhd_runs/fhd_baseline",  # FHD sav
+            sav_model_filename=f"fhd_runs/fhd_{args.suffix}",  # FHD sav
+            model_data_writeout_filename=f"fhd_model_one_freq_{args.suffix}",  # uvfits
+            vis_data_writeout_filename=f"fhd_data_one_freq_{args.suffix}",  # uvfits
+            reconstruct_data=False,
+            reconstruct_model=False,
+        )
