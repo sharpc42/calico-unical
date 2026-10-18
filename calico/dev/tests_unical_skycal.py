@@ -956,6 +956,8 @@ class TestStringMethods(unittest.TestCase):
             sigma_t=sigma_t,
             scaling_factor=scaling_factor_skycal,
             same_sky_all_times=same_sky_all_times,
+            threshold_length=50,
+            weighting_function="hard_cutoff_weights",
         )
         real_gains_arr = []
         data_copy = caldata_obj.data_visibilities.copy()
