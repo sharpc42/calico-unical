@@ -790,8 +790,8 @@ class TestStringMethods(unittest.TestCase):
         scaling_factor_skycal = 0.0001
         scaling_factor_unical = 1
         sigma_t = 0.1
-        model_filename = "fhd_model_one_freq_05"
-        data_filename = "fhd_data_one_freq_05"
+        model_filename = "fhd_model_one_freq_1"
+        data_filename = "fhd_data_one_freq_1"
         print(f"\n{model_filename=}\n{data_filename=}\n")
         caldata_obj = caldata.CalData()
         base_path = os.path.join(os.getcwd(), "calico", "data")
@@ -799,6 +799,7 @@ class TestStringMethods(unittest.TestCase):
         model.read_uvfits(os.path.join(base_path, f"{model_filename}.uvfits"))
         data = pyuvdata.UVData()
         data.read_uvfits(os.path.join(base_path, f"{data_filename}.uvfits"))
+        threshold_length = 50  # wavelengths
         caldata_obj.load_data(
             data,
             model,
@@ -807,7 +808,6 @@ class TestStringMethods(unittest.TestCase):
             sigma_t_0=1,
             sigma_m_0=1,
             scaling_factor_cost=1,
-            threshold_length=0,
             lambda_val=100,
         )
         v_T = caldata_obj.data_visibilities.copy()
@@ -825,14 +825,17 @@ class TestStringMethods(unittest.TestCase):
         e = v_T - m
         sigma_m = np.std(e)
         vwa = variable_weights.VariableWeightsArray()
+        # weighting_function = "constant_weights"
+        weighting_function = "hard_cutoff_weights"
         vwa.set_algorithm_weights(
             caldata_obj,
-            weighting_function="constant_weights",
+            weighting_function=weighting_function,
             scaling_factor=1 / (scaling_factor_skycal) ** 2,
             sigma_t_0=1 if sigma_t == 0 else sigma_t,
             sigma_m_0=1 if sigma_m == 0 else sigma_m,
-            threshold_length=caldata_obj.threshold_length,
+            threshold_length=threshold_length,
         )
+        vwa.plot_weights_per_baseline(caldata_obj, 0, 0, filename_suffix="skycal")
         # skycal
         caldata_obj.unified_calibration(
             verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
@@ -852,15 +855,15 @@ class TestStringMethods(unittest.TestCase):
         # model error is missing sources so "v_T > m"
         e = v_T - m
         sigma_m = np.std(e)
-        vwa = variable_weights.VariableWeightsArray()
         vwa.set_algorithm_weights(
             caldata_obj,
-            weighting_function="constant_weights",
+            weighting_function=weighting_function,
             scaling_factor=1 / (scaling_factor_unical) ** 2,
             sigma_t_0=1 if sigma_t == 0 else sigma_t,
             sigma_m_0=1 if sigma_m == 0 else sigma_m,
-            threshold_length=caldata_obj.threshold_length,
+            threshold_length=threshold_length,
         )
+        vwa.plot_weights_per_baseline(caldata_obj, 0, 0, filename_suffix="unical")
         caldata_obj.unified_calibration(
             verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
         )
