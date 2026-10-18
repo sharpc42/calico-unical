@@ -1,10 +1,11 @@
-import numpy as np
-import sys
-import pyuvdata
-from astropy.units import Quantity
-from calico import calibration_qa, calibration_optimization
 import multiprocessing
-from calico.dev import variable_weights, dev_tools
+import sys
+
+import numpy as np
+import pyuvdata
+
+from calico import calibration_optimization, calibration_qa
+from calico.dev import dev_tools, variable_weights
 
 
 class CalData:
@@ -165,11 +166,6 @@ class CalData:
         self.sigma_t_0 = None
         self.sigma_m_0 = None
         self.antpos_enu = None
-        self.threshold_length = 0
-        self.threshold_mask = (None,)
-        self.thermal_noise_real = (None,)
-        self.model_error_real_long = (None,)
-        self.model_error_real_short = (None,)
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -234,7 +230,6 @@ class CalData:
         scaling_factor_cost=1,
         sigma_t_0=0.1,
         sigma_m_0=0.1,
-        threshold_length=0,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -371,10 +366,10 @@ class CalData:
         data.reorder_blts()
         model.conjugate_bls()
         model.reorder_blts()
-        if data.Nblts != model.Nblts:
-            select_baselines = True
-        elif (np.max(np.abs(data.ant_1_array - model.ant_1_array)) > 0) or (
-            np.max(np.abs(data.ant_2_array - model.ant_2_array)) > 0
+        if (
+            data.Nblts != model.Nblts
+            or (np.max(np.abs(data.ant_1_array - model.ant_1_array)) > 0)
+            or (np.max(np.abs(data.ant_2_array - model.ant_2_array)) > 0)
         ):
             select_baselines = True
         else:
@@ -660,17 +655,8 @@ class CalData:
         self.fit_vis = self.model_visibilities.copy()
 
         # Initialize data and model weights
-        self.threshold_length = threshold_length
-        self.uv_norm
-        vwa = variable_weights.VariableWeightsArray()
-        vwa.set_algorithm_weights(
-            self,
-            weighting_function=weighting_function,
-            scaling_factor=scaling_factor_cost,
-            sigma_t_0=sigma_t_0,
-            sigma_m_0=sigma_m_0,
-            threshold_length=self.threshold_length,
-        )
+        self.visibility_weights = np.ones_like(self.data_visibilities)
+        self.model_weights = np.ones_like(self.fit_vis)
 
         self.lambda_val = lambda_val
 
@@ -874,8 +860,8 @@ class CalData:
                         (self.vis_polarization_array == -6)
                         | (self.vis_polarization_array == -7)
                     )[0]
-                ant1_antenna_weights = np.zeros((self.Nfreqs))
-                ant2_antenna_weights = np.zeros((self.Nfreqs))
+                ant1_antenna_weights = np.zeros(self.Nfreqs)
+                ant2_antenna_weights = np.zeros(self.Nfreqs)
                 for vis_pol_ind in use_vis_pol_inds_ant1:
                     ant1_antenna_weights += np.sum(
                         self.visibility_weights[
