@@ -34,9 +34,15 @@ class VariableWeightsArray:
         * Power to be used in power law weighting function. Defaults
           to 2.
     scaling_factor : float
-        * How much weights for baselines below the threshold length
-          should be scaled by in relevant weighting functions. Values
-          less than 1 lower weights. Default is 1.
+        * Overall scale of the model error weights to multiply weighting
+          functions. Default is 1.
+    step_down_level : float
+        * Weight below the threshold length for step_down_weights, as a
+          fraction of the full weight. Default is 0.5.
+    transition_width : float
+        * Width in wavelengths of the transition for the sigmoid,
+          exponential, and damped sinusoid weighting functions.
+          Default is 1.
     thermal_noise_weights_array : array of float
         * Shape (Ntimes, Nbls, Nfreqs, N_vis_pols)
         * Array of weights corresponding to inverse sigma_t squared
@@ -72,6 +78,8 @@ class VariableWeightsArray:
         self.weighting_function = ""
         self.power = 0
         self.scaling_factor = (0.0,)
+        self.step_down_level = 0.5
+        self.transition_width = 1
         self.thermal_noise_weight_array = (None,)
         self.model_error_weight_array = (None,)
 
@@ -86,6 +94,10 @@ class VariableWeightsArray:
         weighting_function="constant_weights",
         power=2,
         scaling_factor=1,
+        step_down_level=0.5,
+        transition_width=1,
+        thermal_noise_weight_array=None,
+        model_error_weight_array=None,
     ):
         """
         This function sets weights according either to a passed user
@@ -93,6 +105,30 @@ class VariableWeightsArray:
 
         Parameters
         ----------
+        threshold_length : float
+            * Baseline length in wavelengths used by the weighting
+            function. Required unless both user weight arrays are passed.
+        scaling_factor : float
+            * Overall scale of the model error weights; the weighting
+            function's profile (between 0 and 1) is multiplied by it.
+        step_down_level : float
+            * Weight below the threshold for step_down_weights, as a
+            fraction of the full weight. Default is 0.5.
+        transition_width : float
+            * Width in wavelengths of the transition for sigmoid_weights,
+            exponential_weights, and damped_sinusoid_weights; baseline
+            lengths are measured from the threshold in units of this.
+            Must be positive. Default is 1.
+        thermal_noise_weight_array : array of float, optional
+            * Shape (Ntimes, Nbls, Nfreqs, N_vis_pols)
+            * User weights (inverse sigma_t squared) applied directly to
+            caldata_obj.visibility_weights in place of the computed ones.
+            Not divided by sigma_t_0 squared.
+        model_error_weight_array : array of float, optional
+            * Shape (Ntimes, Nbls, Nfreqs, N_vis_pols)
+            * User weights (inverse sigma_m squared) applied directly to
+            caldata_obj.model_weights in place of the computed ones.
+            Not divided by sigma_m_0 squared.
         sigma_t_0 : float
             * The characteristic thermal noise for the user's problem.
             Calculations by weight functions treat this value as unity.
@@ -121,7 +157,7 @@ class VariableWeightsArray:
                 * step_down_weights : This a modified Heaviside step function
                 where below threshold is set to some lower, nonzero
                 weights i.e. higher, finite uncertaintities according to
-                the scaling_factor.
+                step_down_level.
                 * sigmoid_weights : This is a sigmoid "logistics" function
                 that is centered at the threshold baseline length, smoothly
                 increasing from zero weighting below to full value
@@ -141,7 +177,9 @@ class VariableWeightsArray:
             string exactly matches the function name, and the necessary
             parameters are added as class attributes.
         """
-        if threshold_length is None:
+        use_user_thermal = thermal_noise_weight_array is not None
+        use_user_model = model_error_weight_array is not None
+        if threshold_length is None and not (use_user_thermal and use_user_model):
             raise ValueError("Need threshold length even if zero -- Variable Weights")
 
         caldata_obj.sigma_t_0 = sigma_t_0
@@ -149,14 +187,12 @@ class VariableWeightsArray:
 
         self.power = power
         self.weighting_function = weighting_function
+        self.step_down_level = step_down_level
+        if transition_width <= 0:
+            raise ValueError("transition_width must be positive -- Variable Weights")
+        self.transition_width = transition_width
 
-        self.thermal_noise_weight_array = None
-        # set the weight arrays to user arrays if passed
-        if self.thermal_noise_weight_array:
-            print("***thermal noise weight array***", self.thermal_noise_weight_array)
-            caldata_obj.visibility_weights = self.thermal_noise_weight_array
-            caldata_obj.model_weights = self.model_error_weight_array
-        else:
+        if not (use_user_thermal and use_user_model):
             self.thermal_noise_weight_array = np.zeros_like(
                 caldata_obj.data_visibilities, dtype=np.float64
             )
@@ -180,45 +216,68 @@ class VariableWeightsArray:
 
             getattr(self, self.weighting_function)(caldata_obj, freq_ind, pol_ind)
 
-            caldata_obj.visibility_weights = self.thermal_noise_weight_array
-            caldata_obj.model_weights = self.model_error_weight_array
+            # weights from the weighting functions are in units of the
+            # characteristic sigmas
+            self.thermal_noise_weight_array /= sigma_t_0**2
+            self.model_error_weight_array /= sigma_m_0**2
 
-        caldata_obj.visibility_weights /= caldata_obj.sigma_t_0**2
-        caldata_obj.model_weights /= caldata_obj.sigma_m_0**2
-
-    def constant_weights(self, caldata_obj, freq_ind, pol_ind):
-        self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
-        self.model_error_weight_array[:, :, freq_ind, pol_ind] += self.scaling_factor
-
-    def hard_cutoff_weights(self, caldata_obj, freq_ind, pol_ind):
-        self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
-        for time_ind in range(caldata_obj.Ntimes):
-            self.model_error_weight_array[time_ind, :, freq_ind, pol_ind] = (
-                np.heaviside(self.uv_norm_array[time_ind, :] - self.threshold_length, 1)
-                * self.scaling_factor
+        # user arrays are already inverse variances, so they are used as is
+        if use_user_thermal:
+            self.thermal_noise_weight_array = self._check_user_weight_array(
+                thermal_noise_weight_array, caldata_obj, "thermal_noise_weight_array"
+            )
+        if use_user_model:
+            self.model_error_weight_array = self._check_user_weight_array(
+                model_error_weight_array, caldata_obj, "model_error_weight_array"
             )
 
-    def sigmoid_weights(self, caldata_obj, freq_ind, pol_ind):
+        caldata_obj.visibility_weights = self.thermal_noise_weight_array
+        caldata_obj.model_weights = self.model_error_weight_array
+
+    @staticmethod
+    def _check_user_weight_array(weight_array, caldata_obj, name):
+        weight_array = np.array(weight_array, dtype=np.float64)
+        if weight_array.shape != caldata_obj.data_visibilities.shape:
+            raise ValueError(
+                f"{name} must have shape {caldata_obj.data_visibilities.shape} "
+                f"(Ntimes, Nbls, Nfreqs, N_vis_pols), got {weight_array.shape}"
+            )
+        return weight_array
+
+    # each weighting function builds a profile in [0, 1] over self.uv_norm_array
+    # (Ntimes, Nbls) that reaches 1 at and above the threshold length; the
+    # model weights are that profile times scaling_factor
+    def _set_weights_from_profile(self, profile, freq_ind, pol_ind):
         self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
-        self.model_error_weight_array[:, :, freq_ind, pol_ind] += 1 / (
-            1 + np.exp(-caldata_obj.uv_norm + self.threshold_length)
+        self.model_error_weight_array[:, :, freq_ind, pol_ind] = (
+            profile * self.scaling_factor
         )
+
+    # baseline length minus the threshold, in units of the transition width
+    def _distance_from_threshold(self):
+        return (self.uv_norm_array - self.threshold_length) / self.transition_width
+
+    def constant_weights(self, caldata_obj, freq_ind, pol_ind):
+        self._set_weights_from_profile(
+            np.ones_like(self.uv_norm_array), freq_ind, pol_ind
+        )
+
+    def hard_cutoff_weights(self, caldata_obj, freq_ind, pol_ind):
+        profile = np.heaviside(self.uv_norm_array - self.threshold_length, 1)
+        self._set_weights_from_profile(profile, freq_ind, pol_ind)
+
+    def sigmoid_weights(self, caldata_obj, freq_ind, pol_ind):
+        # tanh form of the logistic function avoids overflow in np.exp
+        x = self._distance_from_threshold()
+        profile = 0.5 * (1 + np.tanh(x / 2))
+        self._set_weights_from_profile(profile, freq_ind, pol_ind)
 
     def exponential_weights(self, caldata_obj, freq_ind, pol_ind):
-        self.hard_cutoff_weights(caldata_obj)
-        x = (
-            caldata_obj.uv_norm[caldata_obj.threshold_mask]
-            - caldata_obj.threshold_length
-        )
-        self.model_error_weight_array[:, :, freq_ind, pol_ind][
-            caldata_obj.threshold_mask
-        ] += np.exp(x)
+        x = np.minimum(self._distance_from_threshold(), 0)
+        profile = np.exp(x)
+        self._set_weights_from_profile(profile, freq_ind, pol_ind)
 
     def power_law_weights(self, caldata_obj, freq_ind, pol_ind):
-        self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
-        self.model_error_weight_array[:, :, freq_ind, pol_ind] = np.heaviside(
-            caldata_obj.uv_norm - caldata_obj.threshold_length, 1
-        )
         try:
             self.power = int(self.power)
         except TypeError as e:
@@ -226,29 +285,21 @@ class VariableWeightsArray:
             print(f"Error: {e}", end=" ")
             print("Defaulting to power=2")
             self.power = 2
-        x = (
-            caldata_obj.uv_norm[caldata_obj.uv_norm < self.threshold_length]
-            - self.threshold_length
-        )
-        self.model_error_weight_array[:, :, freq_ind, pol_ind][
-            caldata_obj.threshold_mask
-        ] += (-1 / x) ** self.power
+        if self.threshold_length == 0:
+            profile = np.ones_like(self.uv_norm_array)
+        else:
+            x = np.minimum(self.uv_norm_array / self.threshold_length, 1)
+            profile = x**self.power
+        self._set_weights_from_profile(profile, freq_ind, pol_ind)
 
     def damped_sinusoid_weights(self, caldata_obj, freq_ind, pol_ind):
-        self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
-        self.model_error_weight_array[:, :, freq_ind, pol_ind] = np.heaviside(
-            caldata_obj.uv_norm - self.threshold_length, 1
-        )
-        x = caldata_obj.uv_norm[caldata_obj.threshold_mask] - self.threshold_length
-        self.model_error_weight_array[:, :, freq_ind, pol_ind][
-            caldata_obj.threshold_mask
-        ] += np.exp(x) * np.cos(x) ** 2
+        x = np.minimum(self._distance_from_threshold(), 0)
+        profile = np.exp(x) * np.cos(x) ** 2
+        self._set_weights_from_profile(profile, freq_ind, pol_ind)
 
     def step_down_weights(self, caldata_obj, freq_ind, pol_ind):
-        self.hard_cutoff_weights(caldata_obj)
-        self.model_error_weight_array[:, :, freq_ind, pol_ind][
-            caldata_obj.threshold_mask
-        ] += self.scaling_factor
+        profile = np.where(caldata_obj.threshold_mask, self.step_down_level, 1.0)
+        self._set_weights_from_profile(profile, freq_ind, pol_ind)
 
     # basic plot of weights per baseline
     def plot_weights_per_baseline(
