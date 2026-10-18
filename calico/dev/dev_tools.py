@@ -2025,13 +2025,15 @@ class DevTools:
         threshold_length=50,
         sigma: str = "sigma_m",
         ylim: float | None = None,
+        filename_suffix: str = "",
     ) -> None:
         plt.scatter(uv_norm_array, weight_array, marker="_")
+        plt.axvline(threshold_length, color="gray", linestyle="--")
         plt.title(
             "Weight per baseline length\nWeighting Function:"
             f"{self.format_var_name(weighting_function)}"
         )
-        plt.xlabel("Baseline length (m)")
+        plt.xlabel("Baseline length ($\\lambda$)")
         plt.ylabel(f"1 / $\\{sigma}^2$")
         if not ylim:
             ylim = np.max(weight_array) + 0.1
@@ -2054,7 +2056,9 @@ class DevTools:
             bbox=bbox,
             horizontalalignment="right",
         )
-        plt.savefig(f"calico/images/weights_per_baseline_{sigma}.png")
+        if filename_suffix:
+            filename_suffix = f"_{filename_suffix}"
+        plt.savefig(f"calico/images/weights_per_baseline_{sigma}{filename_suffix}.png")
         plt.close()
 
     def plot_histogram(
@@ -2467,6 +2471,8 @@ def prepare_standard_unical_test_run(
     same_sky_all_times=False,
     return_model_error=False,
     return_thermal_noise=False,
+    threshold_length=0,
+    weighting_function="constant_weights",
 ):
     import pyuvdata
 
@@ -2486,7 +2492,6 @@ def prepare_standard_unical_test_run(
         sigma_t_0=1,
         sigma_m_0=1,
         scaling_factor_cost=1,
-        threshold_length=0,
         lambda_val=100,
     )
     if gaussian_simulation:
@@ -2498,11 +2503,11 @@ def prepare_standard_unical_test_run(
     vwa = variable_weights.VariableWeightsArray()
     vwa.set_algorithm_weights(
         caldata_obj,
-        weighting_function="constant_weights",
         scaling_factor=1 / (scaling_factor) ** 2,
         sigma_t_0=1 if sigma_t == 0 else sigma_t,
         sigma_m_0=1 if sigma_m == 0 else sigma_m,
-        threshold_length=caldata_obj.threshold_length,
+        threshold_length=threshold_length,
+        weighting_function=weighting_function,
     )
     if sigma_m != 0:
         model_error_real, model_error_imag, _, _ = sim.simulate_model_error(

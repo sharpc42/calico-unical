@@ -13,11 +13,11 @@ class VariableWeightsArray:
     Attributes
     ----------
     uv_norm_array :
-        * Shape (Nbls,)
+        * Shape (Ntimes, Nbls)
         * Array of the norms of vectors in the uv plane per baseline
-          i.e. the baseline length.
+          i.e. the baseline length, in wavelengths.
     threshold_length : float
-        * Baseline length above which all baselines should receive
+        * Baseline length, in wavelengths, above which all baselines should receive
           one form of weighting and below which all baselines should
           receive another per passed weigting function, e.g. lower
           weighting and higher error below the threshold to reflect
@@ -165,7 +165,15 @@ class VariableWeightsArray:
             )
 
             self.threshold_length = threshold_length
-            self.uv_norm_array = np.linalg.norm(caldata_obj.uv_array, axis=1)
+            # baseline lengths in wavelengths at the frequency being weighted
+            self.uv_norm_array = (
+                np.linalg.norm(caldata_obj.uv_array, axis=1)
+                * caldata_obj.freq_array[freq_ind]
+                / 3e8
+            )
+            self.uv_norm_array = np.reshape(
+                self.uv_norm_array, (caldata_obj.Ntimes, caldata_obj.Nbls)
+            )
             self.scaling_factor = scaling_factor
 
             caldata_obj.threshold_mask = self.uv_norm_array < threshold_length
@@ -184,9 +192,11 @@ class VariableWeightsArray:
 
     def hard_cutoff_weights(self, caldata_obj, freq_ind, pol_ind):
         self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
-        self.model_error_weight_array[:, :, freq_ind, pol_ind] = np.heaviside(
-            caldata_obj.uv_norm - self.threshold_length, 1
-        )
+        for time_ind in range(caldata_obj.Ntimes):
+            self.model_error_weight_array[time_ind, :, freq_ind, pol_ind] = (
+                np.heaviside(self.uv_norm_array[time_ind, :] - self.threshold_length, 1)
+                * self.scaling_factor
+            )
 
     def sigmoid_weights(self, caldata_obj, freq_ind, pol_ind):
         self.thermal_noise_weight_array[:, :, freq_ind, pol_ind] += 1
@@ -242,7 +252,13 @@ class VariableWeightsArray:
 
     # basic plot of weights per baseline
     def plot_weights_per_baseline(
-        self, caldata_obj, freq_ind, pol_ind, scaling_factor=None
+        self,
+        caldata_obj,
+        freq_ind,
+        pol_ind,
+        scaling_factor=None,
+        ylim=None,
+        filename_suffix="",
     ):
         if scaling_factor is None:
             scaling_factor = self.scaling_factor
@@ -250,11 +266,12 @@ class VariableWeightsArray:
 
         dev = dev_tools.DevTools()
         dev.plot_weights_per_baseline(
-            caldata_obj.uv_norm,
+            self.uv_norm_array,
             caldata_obj.model_weights[:, :, freq_ind, pol_ind],
             weighting_function=self.weighting_function,
-            scaling_factor=self.scaling_factor,
+            scaling_factor=scaling_factor,
             threshold_length=self.threshold_length,
             sigma="sigma_m",
-            ylim=10 * 1.1,
+            ylim=ylim,
+            filename_suffix=filename_suffix,
         )
