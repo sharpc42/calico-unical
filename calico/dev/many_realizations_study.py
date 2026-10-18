@@ -103,7 +103,7 @@ def prepare_data_files(
     if os.path.isfile(uv_data_path) and not reconstruct_data:
         print("Data uvits file exists - skipping")
     else:
-        print("Data uvfits file not found - creating")
+        print("Creating data uvfits file\n")
         # Set up the files we need
         data_vis_files = os.path.join(
             sav_data_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
@@ -136,9 +136,24 @@ def prepare_data_files(
         # exclude autos (invert select on ant1=ant2)
         uvd_data.select(ant_str="auto", invert=True)
 
+        # keep baseline only if it stays under
+        # FHD uv-plane cutoff at all times
+        print(f"Excluding baselines outside FHD cutoff (data)\n")
+        c = 3e8
+        uv_plane_cutoff = 500
+        uv_len_m = np.linalg.norm(uvd_data.uvw_array[:, :2], axis=1)
+        freq_ref = uvd_data.freq_array.max()
+        uv_len_lam = uv_len_m * freq_ref / c
+        bl_unique, inv = np.unique(uvd_data.baseline_array, return_inverse=True)
+        max_uv_lam = np.zeros(bl_unique.size)
+        np.maximum.at(max_uv_lam, inv, uv_len_lam)
+        keep_bl_nums = bl_unique[max_uv_lam < uv_plane_cutoff]
+        ant1, ant2 = uvd_data.baseline_to_antnums(keep_bl_nums)
+        keep_bls = list(zip(ant1.tolist(), ant2.tolist()))
+        uvd_data.select(bls=keep_bls)
+
         # select on one frequency (for now)
         uvd_data.select(frequencies=[uvd_data.freq_array[freq_ind]])
-
         # keep only one time (for now)
         # uvd_data.select(times=[uvd_data.time_array[uvd_data.Nbls*2]])
         print(
@@ -167,7 +182,7 @@ def prepare_data_files(
     if os.path.isfile(uv_model_path) and not reconstruct_model:
         print("Model uvfits file exists - skipping")
     else:
-        print("Model uvfits file not found - creating")
+        print("Creating model uvfits file\n")
         # Set up the files we need
         model_vis_files = os.path.join(
             sav_model_path, "vis_data", fhd_prefix + "vis_model_XX.sav"
@@ -197,6 +212,22 @@ def prepare_data_files(
 
         # probably full repeat selections from before
         uvd_model.select(ant_str="auto", invert=True)
+
+        # keep baseline only if it stays under
+        # FHD uv-plane cutoff at all times
+        print(f"Excluding baselines outside FHD cutoff (model)\n")
+        uv_len_m = np.linalg.norm(uvd_model.uvw_array[:, :2], axis=1)
+        freq_ref = uvd_model.freq_array.max()
+        uv_len_lam = uv_len_m * freq_ref / c
+        bl_unique, inv = np.unique(uvd_model.baseline_array, return_inverse=True)
+        max_uv_lam = np.zeros(bl_unique.size)
+        np.maximum.at(max_uv_lam, inv, uv_len_lam)
+        keep_bl_nums = bl_unique[max_uv_lam < uv_plane_cutoff]
+        ant1, ant2 = uvd_model.baseline_to_antnums(keep_bl_nums)
+        keep_bls = list(zip(ant1.tolist(), ant2.tolist()))
+        uvd_model.select(bls=keep_bls)
+
+        # select on one frequency (for now)
         uvd_model.select(frequencies=[uvd_model.freq_array[freq_ind]])
         # uvd_model.select(times=[uvd_model.time_array[uvd_model.Nbls*2]])
         flagged_bls_model = np.nonzero(np.squeeze(uvd_model.flag_array))[0]
@@ -392,19 +423,23 @@ def init_many_realizations(
     else:
         print("Problem with data files - exiting")
 
-if __name__ == "main":
-    parser = argparse.ArgumentParser(description="Creating uvfits from FHD files")
-    parser.add_argument(
-        "--suffix", type=str, help="file suffix for FHD files only (the cutoff number)",
+parser = argparse.ArgumentParser(description="Creating uvfits from FHD files")
+parser.add_argument(
+    "--suffix", type=str, help="file suffix for FHD files only (the cutoff number)",
+)
+parser.add_argument(
+    "-r", "--reconstruct",
+    action="store_true",
+    help="Reconstruct both data and model files"
+)
+args = parser.parse_args()
+if args.suffix:
+    prepare_data_files(
+        fhd_prefix="1061316296_",
+        sav_data_filename="fhd_runs/fhd_baseline",  # FHD sav
+        sav_model_filename=f"fhd_runs/fhd_{args.suffix}",  # FHD sav
+        model_data_writeout_filename=f"fhd_model_one_freq_{args.suffix}",  # uvfits
+        vis_data_writeout_filename=f"fhd_data_one_freq_{args.suffix}",  # uvfits
+        reconstruct_data=args.reconstruct,
+        reconstruct_model=args.reconstruct,
     )
-    args = parser.parse_args()
-    if args.suffix:
-        prepare_data_files(
-            fhd_prefix="1061316296_",
-            sav_data_filename="fhd_runs/fhd_baseline",  # FHD sav
-            sav_model_filename=f"fhd_runs/fhd_{args.suffix}",  # FHD sav
-            model_data_writeout_filename=f"fhd_model_one_freq_{args.suffix}",  # uvfits
-            vis_data_writeout_filename=f"fhd_data_one_freq_{args.suffix}",  # uvfits
-            reconstruct_data=False,
-            reconstruct_model=False,
-        )

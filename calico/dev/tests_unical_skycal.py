@@ -674,16 +674,16 @@ class TestStringMethods(unittest.TestCase):
     def compare_unical_skycal_gains_and_us(self):
         seed = 421
         same_sky_all_times = True
-        scaling_factor_skycal = 0.001
+        scaling_factor_skycal = 0.0001
         scaling_factor_unical = 1
-        sigma_m = 10
+        sigma_m = 0.1
         sigma_t = 0.1
-        filename = "tutorial_medium"
-        # filename = "fhd_data_one_freq_015"
+        filename = "tutorial_medium_onetime"
         gaussian_simulation = True
         caldata_obj = caldata.CalData()
         skycal_model_error = dev_tools.prepare_standard_unical_test_run(
-            filename=filename,
+            model_filename=filename,
+            data_filename=filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
             seed=seed,
@@ -705,7 +705,8 @@ class TestStringMethods(unittest.TestCase):
         skycal_e = np.ravel(skycal_model_error[..., 0])
 
         unical_model_error = dev_tools.prepare_standard_unical_test_run(
-            filename=filename,
+            model_filename=filename,
+            data_filename=filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
             seed=seed,
@@ -784,19 +785,171 @@ class TestStringMethods(unittest.TestCase):
         plt.savefig("calico/images/fit_us_convergence_unical.png")
         plt.close()
 
+    def compare_unical_skycal_gains_and_us_fhd(self):
+        seed = 421
+        scaling_factor_skycal = 0.0001
+        scaling_factor_unical = 1
+        sigma_t = 0.1
+        model_filename = "fhd_model_one_freq_05"
+        data_filename = "fhd_data_one_freq_05"
+        print(f"\n{model_filename=}\n{data_filename=}\n")
+        caldata_obj = caldata.CalData()
+        base_path = os.path.join(
+            os.getcwd(),
+            "calico",
+            "data",
+        )
+        model = pyuvdata.UVData()
+        model.read_uvfits(os.path.join(base_path, f"{model_filename}.uvfits"))
+        data = pyuvdata.UVData()
+        data.read_uvfits(os.path.join(base_path, f"{data_filename}.uvfits"))
+        caldata_obj.load_data(
+            data,
+            model,
+            gains_multiply_model=True,
+            weighting_function="constant_weights",
+            sigma_t_0=1,
+            sigma_m_0=1,
+            scaling_factor_cost=1,
+            threshold_length=0,
+            lambda_val=100,
+        )
+        v_T = caldata_obj.data_visibilities.copy()
+        m = caldata_obj.model_visibilities.copy()
+        thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
+            sigma_t_0=sigma_t,
+            n_times=np.size(caldata_obj.data_visibilities, axis=0),
+            n_bls=np.size(caldata_obj.data_visibilities, axis=1),
+            n_freqs=1,
+            seed=seed + 1,
+        )
+        thermal_noise = thermal_noise_real + 1.0j * thermal_noise_imag
+        caldata_obj.data_visibilities[..., 0] += thermal_noise
+        # model error is missing sources so "v_T > m"
+        e = v_T - m
+        sigma_m = np.std(e)
+        vwa = variable_weights.VariableWeightsArray()
+        vwa.set_algorithm_weights(
+            caldata_obj,
+            weighting_function="constant_weights",
+            scaling_factor=1 / (scaling_factor_skycal) ** 2,
+            sigma_t_0=1 if sigma_t == 0 else sigma_t,
+            sigma_m_0=1 if sigma_m == 0 else sigma_m,
+            threshold_length=caldata_obj.threshold_length,
+        )
+        # skycal
+        caldata_obj.unified_calibration(
+            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
+        )
+        skycal_gains = caldata_obj.gains[..., 0, 0]
+        # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
+        skycal_u = np.ravel(caldata_obj.fit_vis[..., 0, 0])
+        skycal_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
+        skycal_e = np.ravel(e[..., 0, 0])
+        # restore quantities for unical
+        caldata_obj.model_visibilities = m
+        caldata_obj.data_visibilities = v_T
+        caldata_obj.data_visibilities[..., 0] += thermal_noise
+        # g and u guesses were originally set in caldata.load_data()
+        caldata_obj.gains = np.ones_like(caldata_obj.gains)
+        caldata_obj.fit_vis = m.copy()
+        # model error is missing sources so "v_T > m"
+        e = v_T - m
+        sigma_m = np.std(e)
+        vwa = variable_weights.VariableWeightsArray()
+        vwa.set_algorithm_weights(
+            caldata_obj,
+            weighting_function="constant_weights",
+            scaling_factor=1 / (scaling_factor_unical) ** 2,
+            sigma_t_0=1 if sigma_t == 0 else sigma_t,
+            sigma_m_0=1 if sigma_m == 0 else sigma_m,
+            threshold_length=caldata_obj.threshold_length,
+        )
+        caldata_obj.unified_calibration(
+            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
+        )
+        unical_gains = caldata_obj.gains[..., 0, 0]
+        # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
+        unical_u = np.ravel(caldata_obj.fit_vis[..., 0, 0])
+        unical_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
+        unical_e = np.ravel(e[..., 0])
+
+        # plotting quantities
+        ants = np.arange(unical_gains.size)
+        skycal_vT_u_diff = np.abs(skycal_m + skycal_e - skycal_u)
+        unical_vT_u_diff = np.abs(unical_m + unical_e - unical_u)
+        skycal_e = np.abs(skycal_e)
+        unical_e = np.abs(unical_e)
+
+        # plotting gains over ants
+        plt.scatter(
+            ants, skycal_gains.real, color="tab:blue", s=25, zorder=3, label="skycal"
+        )
+        plt.scatter(
+            ants, unical_gains.real, color="darkorange", s=25, zorder=3, label="unical"
+        )
+        plt.title(
+            f"\nunical $<Re(g)>$ {np.mean(unical_gains.real):.3f}"
+            f" - $Std(Re(g))$ {np.std(unical_gains.real):.3f}"
+            f"\nskycal $<Re(g)>$ {np.mean(skycal_gains.real):.3f}"
+            f" - $Std(Re(g))$ {np.std(skycal_gains.real):.3f}"
+        )
+        plt.xlabel("Ant #")
+        plt.ylabel("$Re(g)$")
+        plt.ylim(0.88, 1.12)
+        plt.legend()
+        plt.savefig(f"calico/images/gains_avg_unical_vs_skycal_{data_filename}.png")
+        plt.close()
+
+        # plotting u's hist for skycal
+        plt.hist(skycal_vT_u_diff, bins=50, color="red", label="$|vT-u|$")
+        plt.hist(skycal_e, bins=50, color="blue", alpha=0.5, label="$|e|$")
+        plt.xlabel("Jy")
+        plt.title(
+            "Fit model parameter $u$s convergence (skycal)"
+            f"\n$\\sigma_m=${sigma_m:.2f} $\\sigma_t=${sigma_t:.2f}"
+        )
+        plt.xlim(0, 15)
+        plt.legend()
+        plt.savefig(f"calico/images/fit_us_convergence_skycal_{data_filename}.png")
+        plt.close()
+
+        # plotting u's hist for unical
+        plt.hist(unical_vT_u_diff, bins=50, color="red", label="$|vT-u|$")
+        plt.hist(unical_e, bins=50, color="blue", alpha=0.5, label="$|e|$")
+        # plt.hist(
+        #     unical_n,
+        #     bins=50,
+        #     color="pink",
+        #     label="$|n|$",
+        # )
+        plt.xlabel("Jy")
+        plt.title(
+            "Fit model parameter $u$s convergence (unical)"
+            f"\n$\\sigma_m=${sigma_m:.2f} $\\sigma_t=${sigma_t:.2f}"
+        )
+        plt.xlim(0, 15)
+        plt.legend()
+        plt.savefig(f"calico/images/fit_us_convergence_unical_{data_filename}.png")
+        plt.close()
+
     def examine_gains_fit_time_by_time(self):
         seed = 421
         same_sky_all_times = True
         scaling_factor_skycal = 0.0001
         # scaling_factor_unical = 1
-        sigma_m = 0.1
-        sigma_t = 5
+        # sigma_m = 0.1
+        sigma_m = 0
+        sigma_t = 10
         caldata_obj = caldata.CalData()
-        filename = "tutorial_medium"
-        # filename = "fhd_data_one_freq_015"
+        # filename = "tutorial_medium"
+        data_filename = "fhd_data_one_freq_015"
+        model_filename = "fhd_model_one_freq_015"
+        print(f"\n***filenames***\n{data_filename}\t{model_filename}\n")
         gaussian_simulation = False
         dev_tools.prepare_standard_unical_test_run(
-            filename=filename,
+            model_filename=model_filename,
+            data_filename=data_filename,
             caldata_obj=caldata_obj,
             gaussian_simulation=gaussian_simulation,
             seed=seed,
@@ -864,7 +1017,7 @@ class TestStringMethods(unittest.TestCase):
         )
         plt.xlabel("Ant #")
         plt.ylabel("$Re(g)$")
-        plt.ylim(0.7, 1.7)
+        # plt.ylim(0.7, 1.7)
         plt.legend()
         plt.savefig("calico/images/gains_avg_over_time_comp.png")
         plt.close()
@@ -911,6 +1064,6 @@ class TestStringMethods(unittest.TestCase):
 if __name__ == "__main__":
     # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.gain_offset_with_more_times(TestStringMethods)
-    TestStringMethods.compare_unical_skycal_gains_and_us(TestStringMethods)
+    TestStringMethods.compare_unical_skycal_gains_and_us_fhd(TestStringMethods)
     # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
     # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
