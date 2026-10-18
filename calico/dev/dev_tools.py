@@ -2470,11 +2470,7 @@ def prepare_standard_unical_test_run(
 ):
     import pyuvdata
 
-    base_path = os.path.join(
-        os.getcwd(),
-        "calico",
-        "data",
-    )
+    base_path = os.path.join(os.getcwd(), "calico", "data")
     model = pyuvdata.UVData()
     model.read_uvfits(os.path.join(base_path, f"{model_filename}.uvfits"))
     if data_filename:
@@ -2494,7 +2490,7 @@ def prepare_standard_unical_test_run(
         lambda_val=100,
     )
     if gaussian_simulation:
-        if seed==42:
+        if seed == 42:
             seed += 1
         sim.simulate_visibilities(
             caldata_obj=caldata_obj, seed=42, same_sky_all_times=same_sky_all_times

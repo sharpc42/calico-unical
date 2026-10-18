@@ -794,11 +794,7 @@ class TestStringMethods(unittest.TestCase):
         data_filename = "fhd_data_one_freq_05"
         print(f"\n{model_filename=}\n{data_filename=}\n")
         caldata_obj = caldata.CalData()
-        base_path = os.path.join(
-            os.getcwd(),
-            "calico",
-            "data",
-        )
+        base_path = os.path.join(os.getcwd(), "calico", "data")
         model = pyuvdata.UVData()
         model.read_uvfits(os.path.join(base_path, f"{model_filename}.uvfits"))
         data = pyuvdata.UVData()

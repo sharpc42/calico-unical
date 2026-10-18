@@ -5,8 +5,8 @@ import os
 from pyuvdata import UVData
 
 # get v and m arrays back from unical
-data = UVData.from_file('calico/data/fhd_data_one_freq_015.uvfits')
-model = UVData.from_file('calico/data/fhd_model_one_freq_015.uvfits')
+data = UVData.from_file("calico/data/fhd_data_one_freq_015.uvfits")
+model = UVData.from_file("calico/data/fhd_model_one_freq_015.uvfits")
 # data_path = os.path.join("calico", "data", "tutorial_medium.uvfits")
 # data = UVData.from_file(data_path)
 # model = data.copy()

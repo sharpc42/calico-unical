@@ -423,14 +423,16 @@ def init_many_realizations(
     else:
         print("Problem with data files - exiting")
 
+
 parser = argparse.ArgumentParser(description="Creating uvfits from FHD files")
 parser.add_argument(
-    "--suffix", type=str, help="file suffix for FHD files only (the cutoff number)",
+    "--suffix", type=str, help="file suffix for FHD files only (the cutoff number)"
 )
 parser.add_argument(
-    "-r", "--reconstruct",
+    "-r",
+    "--reconstruct",
     action="store_true",
-    help="Reconstruct both data and model files"
+    help="Reconstruct both data and model files",
 )
 args = parser.parse_args()
 if args.suffix:
