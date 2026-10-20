@@ -798,6 +798,8 @@ def unified_calibration_wrapper(
     suffix="",
     metadata=None,
     optimization_scheme="powell",
+    torch_maxiter=1000,
+    allow_large_hessian=False,
     calibration_type="unical",
 ):
     """
@@ -873,9 +875,11 @@ def unified_calibration_wrapper(
         Weight of the phase regularization term; must be positive. Default
         100.
     xtol : float
-        Accuracy tolerance for optimizer. Default 1e-5.
+        Accuracy tolerance for optimizer. For the PyTorch schemes, the relative
+        change in cost over at least 100 iterations counted as converged.
+        Default 1e-5.
     maxiter : int
-        Maximum number of iterations for the optimizer. Default 200.
+        Maximum number of iterations for the SciPy optimizers. Default 200.
     get_crosspol_phase : bool
         If True, crosspol phase is calculated. Default True.
     crosspol_phase_strategy : str
@@ -883,6 +887,11 @@ def unified_calibration_wrapper(
         get_crosspol_phase is True. If "crosspol model", contrains the crosspol
         phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
         crosspol phase by minimizing pseudo Stokes V. Default "crosspol model".
+    torch_maxiter : int
+        Maximum total L-BFGS iterations for the PyTorch schemes. Default 1000.
+    allow_large_hessian : bool
+        Skip the check before Newton-CG builds a large dense Hessian
+        (Ntimes > 1). Default False.
     antenna_flagging_iterations : int
         If >0, pre-calibrate and flag antennas based on the residual per-antenna cost.
     antenna_flagging_threshold : float
@@ -1054,6 +1063,8 @@ def unified_calibration_wrapper(
         verbose=verbose,
         pool=pool,
         optimization_scheme=optimization_scheme,
+        torch_maxiter=torch_maxiter,
+        allow_large_hessian=allow_large_hessian,
     )
     if verbose:
         print(
