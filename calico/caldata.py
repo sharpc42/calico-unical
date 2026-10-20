@@ -1,3 +1,4 @@
+import functools
 import multiprocessing
 import sys
 
@@ -695,6 +696,15 @@ class CalData:
             caldata_per_freq.visibility_weights = self.visibility_weights[
                 :, :, [freq_ind], :
             ]
+            # needed by unified calibration
+            if self.model_weights is not None:
+                caldata_per_freq.model_weights = self.model_weights[
+                    :, :, [freq_ind], :
+                ]
+            if self.fit_vis is not None:
+                caldata_per_freq.fit_vis = self.fit_vis[:, :, [freq_ind], :]
+            caldata_per_freq.sigma_t_0 = self.sigma_t_0
+            caldata_per_freq.sigma_m_0 = self.sigma_m_0
             caldata_per_freq.ant1_inds = self.ant1_inds
             caldata_per_freq.ant2_inds = self.ant2_inds
             caldata_per_freq.gains_multiply_model = self.gains_multiply_model
@@ -1273,103 +1283,6 @@ class CalData:
 
         self.dwcal_inv_covariance = weight_mat
 
-    def pack(self, freq_ind, feed_pol_ind, unical=False):
-        """
-        This function packs the parameters (both gains and fitted visibilities)
-        both real and imaginary parts into a single flattened array for use in
-        the optimizing function.
-        Parameters
-        ----------
-        freq_ind : int
-            Frequency channel index.
-        feed_pol_ind : int
-            Feed polarization index.
-        unical : bool
-            Whether to do unified calibration
-        """
-        self.gains_real = self.gains[self.ant_inds, freq_ind, feed_pol_ind].real
-        self.gains_imag = self.gains[self.ant_inds, freq_ind, feed_pol_ind].imag
-        self.fit_vis_real = self.fit_vis[:, self.bl_inds, freq_ind, feed_pol_ind].real
-        self.fit_vis_imag = self.fit_vis[:, self.bl_inds, freq_ind, feed_pol_ind].imag
-
-        # interweave real and imaginary parts of gains
-        gains_flattened = np.stack((self.gains_real, self.gains_imag), axis=1).flatten()
-        if not unical:
-            return gains_flattened
-        else:
-            # interweave real and imaginary parts of u's
-            fit_vis_flattened = np.stack(
-                (self.fit_vis_real, self.fit_vis_imag), axis=-1
-            ).flatten()
-            params_flattened = np.hstack((gains_flattened, fit_vis_flattened))
-            return params_flattened
-
-    def reshape_data(self, freq_ind, vis_pol_ind, unical=False):
-        """
-        This function reshapes data and model visibilities as well
-        as visibility weights (and in the future, model weights)
-        for use by the cost function, Jacobian, and Hessian
-        wrappers called by the optimizing function.
-        Parameters
-        ----------
-        freq_ind : int
-            Frequency channel index.
-        vis_pol_ind : int
-            Visibility polarization index.
-        """
-        reshaped_shape = (
-            np.size(self.data_visibilities, axis=0),
-            np.size(self.data_visibilities, axis=1),
-        )
-        self.data_vis_reshaped = np.reshape(
-            self.data_visibilities[:, :, freq_ind, vis_pol_ind], reshaped_shape
-        )
-        self.model_vis_reshaped = np.reshape(
-            self.model_visibilities[:, :, freq_ind, vis_pol_ind], reshaped_shape
-        )
-        self.vis_weights_reshaped = np.reshape(
-            self.visibility_weights[:, :, freq_ind, vis_pol_ind], reshaped_shape
-        )
-        if unical:
-            self.model_weights_reshaped = np.reshape(
-                self.model_weights[:, :, freq_ind, vis_pol_ind], reshaped_shape
-            )
-
-    def set_ant_inds(self, freq_ind, feed_pol_ind):
-        """
-        This function sets indices of unflagged antennas
-        to be calibrated by calculating visibility weight
-        per physical antenna and excluding those with zero.
-
-        Parameters
-        ----------
-        freq_ind : int
-            Frequency channel index.
-        feed_pol_ind : int
-            Feed polarization index.
-        """
-
-        # Sum over times per baseline
-        vis_weights_summed = np.sum(
-            self.visibility_weights[:, :, freq_ind, feed_pol_ind], axis=0
-        )
-        weight_per_ant = np.bincount(
-            self.ant1_inds, weights=vis_weights_summed, minlength=self.Nants
-        ) + np.bincount(
-            self.ant2_inds, weights=vis_weights_summed, minlength=self.Nants
-        )
-        self.ant_inds = np.where(weight_per_ant > 0.0)[0]
-
-    def set_bl_inds(self, freq_ind, vis_pol_ind):
-        weights_summed = np.sum(
-            (
-                self.model_weights[:, :, freq_ind, vis_pol_ind]
-                + self.visibility_weights[:, :, freq_ind, vis_pol_ind]
-            ),
-            axis=0,
-        )
-        self.bl_inds = np.where(weights_summed > 0.0)[0]
-
     def write_fit_vis(self):
         if not np.any(self.ant_inds):
             print(
@@ -1392,6 +1305,8 @@ class CalData:
         pool=None,
         verbose=False,
         optimization_scheme="powell",
+        torch_maxiter=1000,
+        allow_large_hessian=False,
     ):
         """
         Run calibration per polarization. Updates the gains attribute and u parameters with
@@ -1402,9 +1317,16 @@ class CalData:
         Parameters
         ----------
         xtol : float
-            Accuracy tolerance for optimizer. Default 1e-5.
+            Accuracy tolerance for optimizer. For the PyTorch schemes, the relative
+            change in cost over at least 100 iterations counted as converged.
+            Default 1e-5.
         maxiter : int
-            Maximum number of iterations for the optimizer. Default 200.
+            Maximum number of iterations for the SciPy optimizers. Default 200.
+        torch_maxiter : int
+            Maximum total L-BFGS iterations for the PyTorch schemes. Default 1000.
+        allow_large_hessian : bool
+            Skip the check before Newton-CG builds a large dense Hessian
+            (Ntimes > 1). Default False.
         get_crosspol_phase : bool
             If True, crosspol phase is calculated. Default True.
         crosspol_phase_strategy : str
@@ -1436,27 +1358,28 @@ class CalData:
                 use_pool = pool
             if parallel:
                 caldata_list = self.expand_in_frequency()
-                args_list = []
-                for freq_ind in range(self.Nfreqs):
-                    args = (
-                        caldata_list[freq_ind],
-                        xtol,
-                        maxiter,
-                        0,
-                        verbose,
-                        get_crosspol_phase,
-                    )
-                    args_list.append(args)
+                # each per-frequency object holds a single channel, so freq_ind=0
+                run_one_freq = functools.partial(
+                    calibration_optimization.run_unical_optimization,
+                    xtol=xtol,
+                    maxiter=maxiter,
+                    freq_ind=0,
+                    verbose=verbose,
+                    get_crosspol_phase=get_crosspol_phase,
+                    crosspol_phase_strategy=crosspol_phase_strategy,
+                    optimization_scheme=optimization_scheme,
+                    torch_maxiter=torch_maxiter,
+                    allow_large_hessian=allow_large_hessian,
+                )
                 if pool is None:
                     if max_processes is None:
                         use_pool = multiprocessing.Pool()
                     else:
                         use_pool = multiprocessing.Pool(processes=max_processes)
-                gains_fit = use_pool.starmap(
-                    calibration_optimization.run_unical_optimization, args_list
-                )
-                for freq_ind in range(self.Nfreqs):
-                    self.gains[:, [freq_ind], :] = gains_fit[freq_ind][:, np.newaxis, :]
+                results = use_pool.map(run_one_freq, caldata_list)
+                for freq_ind, (gains_fit, fit_vis_fit) in enumerate(results):
+                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
+                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
                 if pool is None:  # Leave things how we found them
                     use_pool.terminate()
             else:
@@ -1472,16 +1395,16 @@ class CalData:
                             get_crosspol_phase=get_crosspol_phase,
                             crosspol_phase_strategy=crosspol_phase_strategy,
                             optimization_scheme=optimization_scheme,
+                            torch_maxiter=torch_maxiter,
+                            allow_large_hessian=allow_large_hessian,
                         )
                     )
-                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
                     print(
                         f"\n\n***fit vis shapes (caldata)***"
                         f"\n  fit_vis     {self.fit_vis[:, :, [freq_ind], :].shape}"
                         f"\n  fit_vis_fit {fit_vis_fit[:, :, np.newaxis, :].shape}\n\n"
                     )
-                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[
-                        :, :, np.newaxis, :
-                    ].copy()
+                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
+                    self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
 
                     # self.write_fit_vis()
