@@ -64,6 +64,122 @@ def examine_flags(uvd):
     print("***finished with flag watefall***\n")
 
 
+def baselines_per_antenna_diagnostics(uvd, min_baselines, filename):
+    """
+    Print the antennas with fewer than min_baselines baselines and save a bar plot
+    of the number of baselines per antenna to calico/images, with the antennas
+    below the threshold in red and labeled with their antenna numbers.
+
+    Returns
+    -------
+    ant_nums : array of int
+        Antenna numbers present in the data.
+    n_bls : array of int
+        Number of baselines each antenna takes part in.
+    """
+    ant1, ant2 = uvd.baseline_to_antnums(np.unique(uvd.baseline_array))
+    ant_nums, n_bls = np.unique(np.concatenate((ant1, ant2)), return_counts=True)
+    below = n_bls < min_baselines
+    print(
+        f"\n***baselines per antenna***\n"
+        f"\tantennas {ant_nums.size}\tmin {n_bls.min()}"
+        f"\tmedian {np.median(n_bls):g}\tmax {n_bls.max()}"
+    )
+    print(f"***antennas with fewer than {min_baselines} baselines***")
+    if np.any(below):
+        for ant, n in zip(ant_nums[below], n_bls[below]):
+            print(f"\tantenna {ant}: {n} baselines")
+    else:
+        print("\tnone")
+
+    plt.figure(figsize=(14, 5))
+    plt.bar(ant_nums, n_bls, width=0.8, color=np.where(below, "tab:red", "tab:blue"))
+    for ant, n in zip(ant_nums[below], n_bls[below]):
+        plt.text(
+            ant,
+            max(n, min_baselines) + 1,
+            str(ant),
+            ha="center",
+            va="bottom",
+            rotation=90,
+            fontsize=7,
+            color="tab:red",
+        )
+    plt.axhline(min_baselines, color="tab:red", linestyle="--")
+    plt.xlim(ant_nums.min() - 1, ant_nums.max() + 1)
+    plt.xlabel("Antenna number")
+    plt.ylabel("Number of baselines")
+    plt.title(
+        f"Baselines per antenna ({ant_nums.size} antennas, "
+        f"{np.sum(below)} below the threshold of {min_baselines}, dashed)"
+    )
+    plt.tight_layout()
+    image_path = os.path.join(os.getcwd(), "calico", "images", f"{filename}.png")
+    plt.savefig(image_path)
+    plt.close()
+    return ant_nums, n_bls
+
+
+def remove_fully_flagged_baselines(uvd):
+    """
+    Remove baselines flagged at every time, frequency, and polarization from uvd
+    (in place). Antennas left with no unflagged baselines are removed with them.
+    """
+    bl_unique, inv = np.unique(uvd.baseline_array, return_inverse=True)
+    blt_all_flagged = np.all(uvd.flag_array, axis=tuple(range(1, uvd.flag_array.ndim)))
+    bl_all_flagged = np.ones(bl_unique.size, dtype=bool)
+    np.logical_and.at(bl_all_flagged, inv, blt_all_flagged)
+    print(
+        f"\n***fully flagged baselines***\n\t{np.sum(bl_all_flagged)} of "
+        f"{bl_unique.size}"
+    )
+    if not np.any(bl_all_flagged):
+        return
+    if np.all(bl_all_flagged):
+        raise ValueError("Every baseline is fully flagged")
+    ants_before = uvd.get_ants()
+    ant1, ant2 = uvd.baseline_to_antnums(bl_unique[~bl_all_flagged])
+    uvd.select(bls=list(zip(ant1.tolist(), ant2.tolist())))
+    ants_removed = np.setdiff1d(ants_before, uvd.get_ants())
+    print(
+        f"***antennas with no unflagged baselines (removed)***\n\t"
+        f"{ants_removed.tolist() if ants_removed.size else 'none'}"
+    )
+
+
+def downselect_antennas_by_baselines(uvd, min_baselines, filename):
+    """
+    Remove antennas with fewer than min_baselines baselines from uvd (in place),
+    printing and plotting the baselines-per-antenna diagnostics before and after.
+    Removing antennas also removes baselines from the antennas that remain, so
+    this repeats until no remaining antenna falls below the threshold.
+    """
+    ant_nums, n_bls = baselines_per_antenna_diagnostics(
+        uvd, min_baselines, f"{filename}_before"
+    )
+    n_passes = 0
+    while np.any(n_bls < min_baselines):
+        if np.all(n_bls < min_baselines):
+            raise ValueError(
+                f"Every remaining antenna has fewer than {min_baselines} baselines"
+            )
+        n_passes += 1
+        print(
+            f"\nPass {n_passes}: removing {np.sum(n_bls < min_baselines)} antennas "
+            f"with fewer than {min_baselines} baselines"
+        )
+        uvd.select(antenna_nums=ant_nums[n_bls >= min_baselines])
+        ant1, ant2 = uvd.baseline_to_antnums(np.unique(uvd.baseline_array))
+        ant_nums, n_bls = np.unique(np.concatenate((ant1, ant2)), return_counts=True)
+        for ant, n in zip(
+            ant_nums[n_bls < min_baselines], n_bls[n_bls < min_baselines]
+        ):
+            print(f"\tnow below threshold: antenna {ant}: {n} baselines")
+    if n_passes > 0:
+        print(f"\nDownselect finished after {n_passes} passes")
+        baselines_per_antenna_diagnostics(uvd, min_baselines, f"{filename}_after")
+
+
 def prepare_data_files(
     fhd_prefix=None,
     sav_data_filename=None,
@@ -72,6 +188,7 @@ def prepare_data_files(
     model_data_writeout_filename=None,
     reconstruct_data=False,
     reconstruct_model=False,
+    min_baselines_per_antenna=10,
 ):
     if fhd_prefix is None:
         print("ERROR: FHD prefix is missing")
@@ -152,8 +269,20 @@ def prepare_data_files(
         keep_bls = list(zip(ant1.tolist(), ant2.tolist()))
         uvd_data.select(bls=keep_bls)
 
-        # select on one frequency (for now)
+        # select on one frequency (for now), before the flag-based selections
+        # below so they use this frequency's flags
         uvd_data.select(frequencies=[uvd_data.freq_array[freq_ind]])
+
+        # drop baselines (and so antennas) with no unflagged data
+        remove_fully_flagged_baselines(uvd_data)
+
+        # drop antennas too poorly connected to constrain their gains
+        downselect_antennas_by_baselines(
+            uvd_data,
+            min_baselines_per_antenna,
+            f"baselines_per_antenna_{vis_data_writeout_filename}",
+        )
+
         # keep only one time (for now)
         # uvd_data.select(times=[uvd_data.time_array[uvd_data.Nbls*2]])
         print(
@@ -227,8 +356,20 @@ def prepare_data_files(
         keep_bls = list(zip(ant1.tolist(), ant2.tolist()))
         uvd_model.select(bls=keep_bls)
 
-        # select on one frequency (for now)
+        # select on one frequency (for now), before the flag-based selections
+        # below so they use this frequency's flags
         uvd_model.select(frequencies=[uvd_model.freq_array[freq_ind]])
+
+        # drop baselines (and so antennas) with no unflagged data
+        remove_fully_flagged_baselines(uvd_model)
+
+        # drop antennas too poorly connected to constrain their gains
+        downselect_antennas_by_baselines(
+            uvd_model,
+            min_baselines_per_antenna,
+            f"baselines_per_antenna_{model_data_writeout_filename}",
+        )
+
         # uvd_model.select(times=[uvd_model.time_array[uvd_model.Nbls*2]])
         flagged_bls_model = np.nonzero(np.squeeze(uvd_model.flag_array))[0]
         # uvd_model.select(blt_inds=flagged_bls_model, invert=True)
@@ -413,12 +554,12 @@ def init_many_realizations(
                 same_sky_all_times=same_sky_all_times,
                 gains_real_guess=gains_real_guess,
             )
-        dev.plot_many_realizations(
-            data_filepath=model_path,
-            run_params_filename=run_params_filename,
-            metadata=metadata,
-            suffix=suffix,
-        )
+        # dev.plot_many_realizations(
+        #     data_filepath=model_path,
+        #     run_params_filename=run_params_filename,
+        #     metadata=metadata,
+        #     suffix=suffix,
+        # )
 
     else:
         print("Problem with data files - exiting")
@@ -434,6 +575,12 @@ parser.add_argument(
     action="store_true",
     help="Reconstruct both data and model files",
 )
+parser.add_argument(
+    "--min-baselines",
+    type=int,
+    default=10,
+    help="drop antennas with fewer than this many baselines (default 10)",
+)
 args = parser.parse_args()
 if args.suffix:
     prepare_data_files(
@@ -444,4 +591,5 @@ if args.suffix:
         vis_data_writeout_filename=f"fhd_data_one_freq_{args.suffix}",  # uvfits
         reconstruct_data=args.reconstruct,
         reconstruct_model=args.reconstruct,
+        min_baselines_per_antenna=args.min_baselines,
     )
