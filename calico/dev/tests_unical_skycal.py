@@ -1,6 +1,8 @@
+import argparse
 import copy
 import os
 import subprocess
+import sys
 import time
 import unittest
 from datetime import datetime, timezone
@@ -13,6 +15,37 @@ from calico import caldata, calibration_optimization as calopt
 from calico.dev import dev_tools, noise_and_error_simulation as sim, variable_weights
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def choose_weighting_function(label, default):
+    """
+    Ask in the terminal which VariableWeightsArray weighting function to use,
+    returning default on an empty answer or when stdin isn't a terminal.
+    """
+    # weighting functions are the public *_weights methods, in definition order
+    choices = [
+        name
+        for name in vars(variable_weights.VariableWeightsArray)
+        if name.endswith("_weights") and not name.startswith(("_", "set_"))
+    ]
+    if not sys.stdin.isatty():
+        print(f"{label} weighting function: {default} (no terminal to ask)")
+        return default
+    print(f"\nWeighting function for {label}:")
+    for i, name in enumerate(choices, start=1):
+        print(f"  {i}) {name}{'  [default]' if name == default else ''}")
+    while True:
+        try:
+            answer = input(f"Select 1-{len(choices)} (Enter for {default}): ").strip()
+        except EOFError:
+            answer = ""
+        if not answer:
+            return default
+        if answer.isdigit() and 1 <= int(answer) <= len(choices):
+            return choices[int(answer) - 1]
+        if answer in choices:
+            return answer
+        print(f"  Not a valid choice: {answer!r}")
 
 
 class TestStringMethods(unittest.TestCase):
@@ -145,11 +178,9 @@ class TestStringMethods(unittest.TestCase):
             glim=None,
             ulim=None,
             weighting_function="constant_weights",
-            simulate_visibilities=True,
             sigma_t_0=1,
             sigma_m_0=1,
             scaling_factor_cost=1,
-            threshold_length=0,
         )
         original_model = caldata_obj.model_visibilities[0, :, 0, 0].copy()
         original_data = caldata_obj.data_visibilities[0, :, 0, 0].copy()
@@ -584,15 +615,31 @@ class TestStringMethods(unittest.TestCase):
             sigma_t_0=1,
             sigma_m_0=1,
             scaling_factor_cost=1,
-            threshold_length=0,
             lambda_val=100,
-            simulate_visibilities=True,
         )
-        caldata_obj.set_ant_inds(0, 0)
-        caldata_obj.set_bl_inds(0, 0)
+        vis_weights_summed = np.sum(caldata_obj.visibility_weights[:, :, 0, 0], axis=0)
+        weight_per_ant = np.bincount(
+            caldata_obj.ant1_inds,
+            weights=vis_weights_summed,
+            minlength=caldata_obj.Nants,
+        ) + np.bincount(
+            caldata_obj.ant2_inds,
+            weights=vis_weights_summed,
+            minlength=caldata_obj.Nants,
+        )
+        caldata_obj.ant_inds = np.where(weight_per_ant > 0.0)[0]
+        weights_summed = np.sum(
+            caldata_obj.model_weights[:, :, 0, 0]
+            + caldata_obj.visibility_weights[:, :, 0, 0],
+            axis=0,
+        )
+        caldata_obj.bl_inds = np.where(weights_summed > 0.0)[0]
         known = caldata_obj.model_visibilities[:, :, 0, 0]
-        packed = caldata_obj.pack(0, 0, unical=True)
-        u_part = packed[2 * len(caldata_obj.ant_inds) :]
+        # u parameters packed the way run_unical_optimization packs them
+        fit_vis_init = caldata_obj.fit_vis[:, caldata_obj.bl_inds, 0, 0]
+        u_part = np.stack(
+            (np.real(fit_vis_init), np.imag(fit_vis_init)), axis=-1
+        ).flatten()
 
         # how the cost wrapper reads it
         try:
@@ -625,12 +672,8 @@ class TestStringMethods(unittest.TestCase):
             sigma_t_0=1,
             sigma_m_0=1,
             scaling_factor_cost=1,
-            threshold_length=0,
             lambda_val=100,
-            simulate_visibilities=True,
         )
-        caldata_obj.set_ant_inds(0, 0)
-        caldata_obj.set_bl_inds(0, 0)
         optimizers = ["powell", "pytorch"]
         for optimizer in optimizers:
             caldata_obj.unified_calibration(verbose=True, optimization_scheme=optimizer)
@@ -649,7 +692,6 @@ class TestStringMethods(unittest.TestCase):
             sigma_t_0=1,
             sigma_m_0=1,
             scaling_factor_cost=1,
-            threshold_length=0,
             lambda_val=100,
         )
         starting_gains = caldata_obj.gains.copy()
@@ -785,14 +827,23 @@ class TestStringMethods(unittest.TestCase):
         plt.savefig("calico/images/fit_us_convergence_unical.png")
         plt.close()
 
-    def compare_unical_skycal_gains_and_us_fhd(self):
+    def compare_unical_skycal_gains_and_us_fhd(self, suffix="1"):
         seed = 421
         scaling_factor_skycal = 0.0001
         scaling_factor_unical = 1
         sigma_t = 0.1
-        model_filename = "fhd_model_one_freq_1"
-        data_filename = "fhd_data_one_freq_1"
-        print(f"\n{model_filename=}\n{data_filename=}\n")
+        model_filename = f"fhd_model_one_freq_{suffix}"
+        data_filename = f"fhd_data_one_freq_{suffix}"
+        # ask for both up front so the unical choice doesn't wait on the skycal fit
+        skycal_weighting_function = choose_weighting_function(
+            "skycal", "constant_weights"
+        )
+        unical_weighting_function = choose_weighting_function(
+            "unical", "constant_weights"
+        )
+        weighting_function = skycal_weighting_function
+        print("\nskycal")
+        print(f"{model_filename=}\n{data_filename=}\n{weighting_function=}\n")
         caldata_obj = caldata.CalData()
         base_path = os.path.join(os.getcwd(), "calico", "data")
         model = pyuvdata.UVData()
@@ -825,8 +876,6 @@ class TestStringMethods(unittest.TestCase):
         e = v_T - m
         sigma_m = np.std(e)
         vwa = variable_weights.VariableWeightsArray()
-        # weighting_function = "constant_weights"
-        weighting_function = "hard_cutoff_weights"
         vwa.set_algorithm_weights(
             caldata_obj,
             weighting_function=weighting_function,
@@ -855,6 +904,9 @@ class TestStringMethods(unittest.TestCase):
         # model error is missing sources so "v_T > m"
         e = v_T - m
         sigma_m = np.std(e)
+        weighting_function = unical_weighting_function
+        print("\nunical")
+        print(f"{model_filename=}\n{data_filename=}\n{weighting_function=}\n")
         vwa.set_algorithm_weights(
             caldata_obj,
             weighting_function=weighting_function,
@@ -895,14 +947,26 @@ class TestStringMethods(unittest.TestCase):
         )
         plt.xlabel("Ant #")
         plt.ylabel("$Re(g)$")
-        plt.ylim(0.88, 1.12)
+        # plt.ylim(0.88, 1.12)
         plt.legend()
         plt.savefig(f"calico/images/gains_avg_unical_vs_skycal_{data_filename}.png")
         plt.close()
 
         # plotting u's hist for skycal
-        plt.hist(skycal_vT_u_diff, bins=50, color="red", label="$|vT-u|$")
-        plt.hist(skycal_e, bins=50, color="blue", alpha=0.5, label="$|e|$")
+        # shared bins so identical distributions line up bar for bar
+        bins = np.linspace(0, 15, 51)
+        plt.hist(
+            skycal_vT_u_diff,
+            bins=bins,
+            histtype="step",
+            color="tab:red",
+            linewidth=2,
+            label="$|vT-u|$",
+            zorder=1,
+        )
+        plt.hist(
+            skycal_e, bins=bins, color="tab:blue", alpha=0.35, label="$|e|$", zorder=0
+        )
         plt.xlabel("Jy")
         plt.title(
             "Fit model parameter $u$s convergence (skycal)"
@@ -914,8 +978,20 @@ class TestStringMethods(unittest.TestCase):
         plt.close()
 
         # plotting u's hist for unical
-        plt.hist(unical_vT_u_diff, bins=50, color="red", label="$|vT-u|$")
-        plt.hist(unical_e, bins=50, color="blue", alpha=0.5, label="$|e|$")
+        # shared bins so identical distributions line up bar for bar
+        bins = np.linspace(0, 15, 51)
+        plt.hist(
+            unical_vT_u_diff,
+            bins=bins,
+            histtype="step",
+            color="tab:red",
+            linewidth=2,
+            label="$|vT-u|$",
+            zorder=1,
+        )
+        plt.hist(
+            unical_e, bins=bins, color="tab:blue", alpha=0.35, label="$|e|$", zorder=0
+        )
         # plt.hist(
         #     unical_n,
         #     bins=50,
@@ -1063,8 +1139,18 @@ class TestStringMethods(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Unical vs skycal tests")
+    parser.add_argument(
+        "--suffix",
+        type=str,
+        default="1",
+        help="file suffix for FHD files only (the cutoff number)",
+    )
+    args = parser.parse_args()
     # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.gain_offset_with_more_times(TestStringMethods)
-    TestStringMethods.compare_unical_skycal_gains_and_us_fhd(TestStringMethods)
+    TestStringMethods.compare_unical_skycal_gains_and_us_fhd(
+        TestStringMethods, suffix=args.suffix
+    )
     # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
     # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
