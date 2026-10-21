@@ -694,6 +694,12 @@ class TestStringMethods(unittest.TestCase):
             scaling_factor_cost=1,
             lambda_val=100,
         )
+        # perturb gains
+        gain_init_stddev = 0.02
+        np.random.seed(421)
+        caldata_obj.gains += np.random.normal(
+            0.0, gain_init_stddev, caldata_obj.gains.shape
+        ) + 1.0j * np.random.normal(0.0, gain_init_stddev, caldata_obj.gains.shape)
         starting_gains = caldata_obj.gains.copy()
         ending_gains, _ = calopt.run_unical_optimization(
             caldata_obj=caldata_obj,
@@ -701,9 +707,9 @@ class TestStringMethods(unittest.TestCase):
             maxiter=200,
             optimization_scheme=optimizer,
         )
-        dev_tools.complex_trajectory_plot(
-            starting_complex_point=starting_gains,
-            complex_step=ending_gains,
+        dev_tools.DevTools().complex_trajectory_plot(
+            starting_complex_point=starting_gains[:, 0, 0],
+            complex_step=ending_gains[:, 0],
             n_trajectories=caldata_obj.Nants,
             filename_prefix=f"basic_stability_test_{optimizer}",
             title=f"Stability Test\nOptimizer = {optimizer}",
@@ -738,7 +744,11 @@ class TestStringMethods(unittest.TestCase):
         orig_data = caldata_obj.data_visibilities.copy()
         orig_model = caldata_obj.model_visibilities.copy()
         caldata_obj.unified_calibration(
-            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
+            verbose=True,
+            xtol=1e-5,
+            maxiter=200,
+            optimization_scheme="newton-cg",
+            allow_large_hessian=True,
         )
         skycal_gains = caldata_obj.gains[..., 0, 0]
         # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
@@ -761,7 +771,11 @@ class TestStringMethods(unittest.TestCase):
         caldata_obj.data_visibilities = orig_data
         caldata_obj.model_visibilities = orig_model
         caldata_obj.unified_calibration(
-            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
+            verbose=True,
+            xtol=1e-5,
+            maxiter=200,
+            optimization_scheme="newton-cg",
+            allow_large_hessian=True,
         )
         unical_gains = caldata_obj.gains[..., 0, 0]
         # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
@@ -1149,6 +1163,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.gain_offset_with_more_times(TestStringMethods)
+    TestStringMethods.compare_unical_skycal_gains_and_us(TestStringMethods)
     # TestStringMethods.compare_unical_skycal_gains_and_us_fhd(
     #     TestStringMethods, suffix=args.suffix
     # )
