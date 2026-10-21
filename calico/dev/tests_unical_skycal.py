@@ -604,7 +604,7 @@ class TestStringMethods(unittest.TestCase):
 
     def test_pack_reshape_multiple_times(self):
         model = pyuvdata.UVData()
-        model.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        model.read_uvfits("./calico/data/tutorial_medium_onetime.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
         caldata_obj.load_data(
@@ -661,7 +661,7 @@ class TestStringMethods(unittest.TestCase):
 
     def test_calibration_completes_multiple_times(self):
         data = pyuvdata.UVData()
-        data.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        data.read_uvfits("./calico/data/tutorial_medium_onetime.uvfits")
         model = data.copy()
         caldata_obj = caldata.CalData()
         caldata_obj.load_data(
@@ -681,7 +681,7 @@ class TestStringMethods(unittest.TestCase):
 
     def test_basic_stability(self, optimizer):
         model = pyuvdata.UVData()
-        model.read_uvfits("./calico/data/tutorial_medium.uvfits")
+        model.read_uvfits("./calico/data/tutorial_medium_onetime.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
         caldata_obj.load_data(
@@ -1017,7 +1017,7 @@ class TestStringMethods(unittest.TestCase):
         sigma_m = 0
         sigma_t = 10
         caldata_obj = caldata.CalData()
-        # filename = "tutorial_medium"
+        # filename = "tutorial_medium_onetime"
         data_filename = "fhd_data_one_freq_015"
         model_filename = "fhd_model_one_freq_015"
         print(f"\n***filenames***\n{data_filename}\t{model_filename}\n")
@@ -1107,7 +1107,7 @@ class TestStringMethods(unittest.TestCase):
     def gain_offset_with_more_times(self):
         times = [t for t in range(1, 57)]
         data_files = [f"data_{t}" for t in range(1, 56)]
-        data_files.append("tutorial_medium")
+        data_files.append("tutorial_medium_onetime")
         gain_offsets = []
         seed = 100
         same_sky_all_times = True
@@ -1149,8 +1149,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.gain_offset_with_more_times(TestStringMethods)
-    TestStringMethods.compare_unical_skycal_gains_and_us_fhd(
-        TestStringMethods, suffix=args.suffix
-    )
-    # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
-    # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
+    # TestStringMethods.compare_unical_skycal_gains_and_us_fhd(
+    #     TestStringMethods, suffix=args.suffix
+    # )
+    TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
+    TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
