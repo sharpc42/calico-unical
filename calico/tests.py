@@ -1107,9 +1107,20 @@ class TestStringMethods(unittest.TestCase):
         # hess = calibration_optimization.hessian_skycal_wrapper(
         #     gains_flattened, caldata_obj, np.arange(caldata_obj.Nants), 0, 0
         # )
-        caldata_obj.reshape_data(0,0)
+        reshaped_shape = caldata_obj.data_visibilities.shape[:2]
+        caldata_obj.data_vis_reshaped = np.reshape(
+            caldata_obj.data_visibilities[:, :, 0, 0], reshaped_shape
+        )
+        caldata_obj.model_vis_reshaped = np.reshape(
+            caldata_obj.model_visibilities[:, :, 0, 0], reshaped_shape
+        )
+        caldata_obj.vis_weights_reshaped = np.reshape(
+            caldata_obj.visibility_weights[:, :, 0, 0], reshaped_shape
+        )
         hess = calibration_optimization.hessian_skycal_wrapper(
-            gains_flattened, caldata_obj, np.arange(caldata_obj.Nants),
+            gains_flattened,
+            caldata_obj,
+            np.arange(caldata_obj.Nants),
         )
 
         np.testing.assert_allclose(hess - np.conj(hess.T), 0.0 + 1j * 0.0)
@@ -2576,7 +2587,6 @@ class TestStringMethods(unittest.TestCase):
         np.testing.assert_allclose(np.abs(caldata_obj.gains), np.sqrt(1.2), atol=1e-4)
         np.testing.assert_allclose(np.angle(caldata_obj.gains), 0, atol=1e-6)
 
-
     def test_common_setup_handling(self):
         model = pyuvdata.UVData()
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
@@ -2588,11 +2598,13 @@ class TestStringMethods(unittest.TestCase):
             model,
         )
 
-        gains_skycal = calibration_optimization.run_skycal_optimization_per_pol_single_freq(
-            caldata_obj=caldata_obj,
-            xtol=1e-5,
-            maxiter=200,
-            calibrate=False,
+        gains_skycal = (
+            calibration_optimization.run_skycal_optimization_per_pol_single_freq(
+                caldata_obj=caldata_obj,
+                xtol=1e-5,
+                maxiter=200,
+                calibrate=False,
+            )
         )
         gains_unical = calibration_optimization.run_unical_optimization(
             caldata_obj=caldata_obj,
@@ -2605,6 +2617,7 @@ class TestStringMethods(unittest.TestCase):
             gains_skycal,
             gains_unical,
         )
+
 
 if __name__ == "__main__":
     unittest.main()

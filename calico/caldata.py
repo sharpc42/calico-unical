@@ -655,9 +655,9 @@ class CalData:
         # Initialize unical fitted visibility parameters
         self.fit_vis = self.model_visibilities.copy()
 
-        # Initialize data and model weights
-        self.visibility_weights = np.ones_like(self.data_visibilities)
-        self.model_weights = np.ones_like(self.fit_vis)
+        # Initialize data and model weights (real-valued, unlike the visibilities)
+        self.visibility_weights = np.ones_like(self.data_visibilities, dtype=float)
+        self.model_weights = np.ones_like(self.fit_vis, dtype=float)
 
         self.lambda_val = lambda_val
 
