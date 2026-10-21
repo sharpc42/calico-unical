@@ -112,12 +112,7 @@ def test(path):
     model.phase_to_time(np.mean(data.time_array))
     # create caldata obj and load data
     caldata_obj = caldata.CalData()
-    caldata_obj.load_data(
-        data,
-        model,
-        gain_init_stddev=0.1,
-        fit_vis_init_stddev=0.0,
-    )
+    caldata_obj.load_data(data, model, gain_init_stddev=0.1, fit_vis_init_stddev=0.0)
 
     # calibration per freq (copy/paste from main code)
     for freq_ind in range(caldata_obj.Nfreqs):

@@ -203,7 +203,7 @@ class VariableWeightsArray:
             self.threshold_length = threshold_length
             # baseline lengths in wavelengths at the frequency being weighted
             self.uv_norm_array = (
-                np.linalg.norm(caldata_obj.uv_array, axis=1)
+                np.linalg.norm(caldata_obj.uv_blt_array, axis=1)
                 * caldata_obj.freq_array[freq_ind]
                 / 3e8
             )

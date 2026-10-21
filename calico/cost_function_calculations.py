@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import sys
 from calico import utils
-import time
 
 
 def cost_skycal(
@@ -39,12 +38,15 @@ def cost_skycal(
     cost : float
         Value of the cost function.
     """
+
     gains_expanded = (gains[ant1_inds] * np.conj(gains[ant2_inds]))[np.newaxis, :]
     res_vec = model_visibilities - gains_expanded * data_visibilities
     cost = np.sum(visibility_weights * np.abs(res_vec) ** 2)
+
     if lambda_val > 0:
         regularization_term = lambda_val * np.sum(np.angle(gains)) ** 2.0
         cost += regularization_term
+
     return cost
 
 
@@ -86,12 +88,10 @@ def jacobian_skycal(
         imaginary part of the gains.
     """
 
-    start_jac = time.time()
-
     # Convert gains to visibility space
     # Add time axis
-    gains_expanded_1 = gains[np.newaxis, ant1_inds]  # shape (1,Nbls)
-    gains_expanded_2 = gains[np.newaxis, ant2_inds]  # shape (1,Nbls)
+    gains_expanded_1 = gains[np.newaxis, ant1_inds]
+    gains_expanded_2 = gains[np.newaxis, ant2_inds]
 
     res_vec = (
         gains_expanded_1 * np.conj(gains_expanded_2) * data_visibilities
@@ -123,9 +123,6 @@ def jacobian_skycal(
             lambda_val * 1j * np.sum(np.angle(gains)) * gains / np.abs(gains) ** 2.0
         )
         jac += 2 * regularization_term
-
-    end_jac = time.time()
-    print("***JACOBIAN TIME***", (end_jac - start_jac) / 60.0)
 
     return jac
 
@@ -172,7 +169,9 @@ def reformat_baselines_to_antenna_matrix(
         antenna_matrix[
             ant1_inds[bl_ind],
             ant2_inds[bl_ind],
-        ] = bl_array[bl_ind,]
+        ] = bl_array[
+            bl_ind,
+        ]
     return antenna_matrix
 
 
@@ -224,8 +223,6 @@ def hessian_skycal(
         Imaginary-imaginary derivative components of the Hessian of the cost
         function. Shape (Nants, Nants,).
     """
-
-    start_hess = time.time()
 
     gains_expanded_1 = gains[ant1_inds]
     gains_expanded_2 = gains[ant2_inds]
@@ -311,9 +308,6 @@ def hessian_skycal(
         hess_imag_imag -= np.diag(
             4 * lambda_val * arg_sum * np.imag(gains_weighted) * np.real(gains_weighted)
         )
-
-    end_hess = time.time()
-    print("***HESSIAN TIME***", (end_hess - start_hess) / 60.0)
 
     return hess_real_real, hess_real_imag, hess_imag_imag
 
@@ -422,10 +416,14 @@ def set_crosspol_phase_pseudoV(
     crosspol_data_visibilities_calibrated = crosspol_data_visibilities
     crosspol_data_visibilities_calibrated[:, :, 0] *= gains_expanded_1[
         :, :, 0
-    ] * np.conj(gains_expanded_2[:, :, 1])  # Apply gains to PQ visibilities
+    ] * np.conj(
+        gains_expanded_2[:, :, 1]
+    )  # Apply gains to PQ visibilities
     crosspol_data_visibilities_calibrated[:, :, 1] *= gains_expanded_1[
         :, :, 1
-    ] * np.conj(gains_expanded_2[:, :, 0])  # Apply gains to QP visibilities
+    ] * np.conj(
+        gains_expanded_2[:, :, 0]
+    )  # Apply gains to QP visibilities
     visibility_weights = np.nanmean(
         crosspol_visibility_weights, axis=2
     )  # Doesn't support different weights for PQ and QP

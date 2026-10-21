@@ -50,6 +50,7 @@ def calculate_per_antenna_cost(
         caldata_list = caldata_obj.expand_in_frequency()
 
     for pol_ind in range(caldata_obj.N_feed_pols):
+
         total_visibilities = np.count_nonzero(
             caldata_obj.visibility_weights[:, :, :, pol_ind]
         )
@@ -146,28 +147,28 @@ def calculate_per_antenna_cost(
                 per_ant_cost[ant_ind, pol_ind] = total_cost
                 for freq_ind in range(caldata_obj.Nfreqs):
                     if caldata_obj.gains_multiply_model:
-                        per_ant_cost[ant_ind, pol_ind] -= (
-                            cost_function_calculations.cost_skycal(
-                                caldata_obj.gains[:, freq_ind, pol_ind],
-                                caldata_obj.data_visibilities[:, :, freq_ind, pol_ind],
-                                caldata_obj.model_visibilities[:, :, freq_ind, pol_ind],
-                                ant_excluded_weights[:, :, freq_ind],
-                                caldata_obj.ant1_inds,
-                                caldata_obj.ant2_inds,
-                                0.0,
-                            )
+                        per_ant_cost[
+                            ant_ind, pol_ind
+                        ] -= cost_function_calculations.cost_skycal(
+                            caldata_obj.gains[:, freq_ind, pol_ind],
+                            caldata_obj.data_visibilities[:, :, freq_ind, pol_ind],
+                            caldata_obj.model_visibilities[:, :, freq_ind, pol_ind],
+                            ant_excluded_weights[:, :, freq_ind],
+                            caldata_obj.ant1_inds,
+                            caldata_obj.ant2_inds,
+                            0.0,
                         )
                     else:
-                        per_ant_cost[ant_ind, pol_ind] -= (
-                            cost_function_calculations.cost_skycal(
-                                caldata_obj.gains[:, freq_ind, pol_ind],
-                                caldata_obj.model_visibilities[:, :, freq_ind, pol_ind],
-                                caldata_obj.data_visibilities[:, :, freq_ind, pol_ind],
-                                ant_excluded_weights[:, :, freq_ind],
-                                caldata_obj.ant1_inds,
-                                caldata_obj.ant2_inds,
-                                0.0,
-                            )
+                        per_ant_cost[
+                            ant_ind, pol_ind
+                        ] -= cost_function_calculations.cost_skycal(
+                            caldata_obj.gains[:, freq_ind, pol_ind],
+                            caldata_obj.model_visibilities[:, :, freq_ind, pol_ind],
+                            caldata_obj.data_visibilities[:, :, freq_ind, pol_ind],
+                            ant_excluded_weights[:, :, freq_ind],
+                            caldata_obj.ant1_inds,
+                            caldata_obj.ant2_inds,
+                            0.0,
                         )
 
     # Run parallelized jobs

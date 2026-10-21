@@ -1,12 +1,10 @@
 import functools
-import multiprocessing
-import sys
-
 import numpy as np
+import sys
 import pyuvdata
-
-from calico import calibration_optimization, calibration_qa
-from calico.dev import dev_tools, variable_weights
+from astropy.units import Quantity
+from calico import calibration_qa, calibration_optimization
+import multiprocessing
 
 
 class CalData:
@@ -93,28 +91,29 @@ class CalData:
     telescope_location : array of float
     lambda_val : float
         Weight of the phase regularization term; must be positive. Default 100.
-    gains_real : array of float
-        Shape (Nants,). Real part of gains per frequency and per polarization.
-    gains_imag : array of float
-        Shape (Nants,). Imaginary part of gains per frequency and per polarization.
-    fit_vis_real : array of float
-        Shape (). Real part of fitted visibilities per frequency and per polarization.
-    fit_vis_imag : array of float
-        Shape (). Imaginary part of fitted visibilities per frequency and per polarization.
-    data_vis_reshaped : array of complex
-        Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
-    model_vis_reshaped : array of complex
-        Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
-    vis_weights_reshaped : array of float
-        Shape (Ntimes, Nbls). Reshaped for optimization function linear algebra.
+    uv_blt_array : array of float
+        Shape (Nblts, 2). Baseline u and v coordinates in meters for each
+        baseline-time, from the data's uvw_array. Used by unified calibration.
+    uv_norm : array of float
+        Shape (Nblts,). Baseline lengths in meters, from uv_blt_array.
+    antpos_enu : array of float
+        Shape (Nants, 3). Antenna positions in ENU coordinates.
     ant_inds : array of int
-        Shape (Nants_unflagged). Indices of unflagged antennas to be calibrated.
+        Shape (Nants_unflagged,). Indices of unflagged antennas, set during
+        unified calibration.
+    data_vis_reshaped, model_vis_reshaped : array of complex
+        Shape (Ntimes, Nbls). One frequency and polarization of the data and
+        model visibilities, set during unified calibration.
+    vis_weights_reshaped, model_weights_reshaped : array of float
+        Shape (Ntimes, Nbls). One frequency and polarization of the weights,
+        set during unified calibration.
+    sigma_t_0, sigma_m_0 : float
+        Characteristic thermal noise and model error, set with the weights.
     """
 
     def __init__(self):
         self.gains = None
         self.abscal_params = None
-        self.fit_vis = None
         self.Nants = 0
         self.Nbls = 0
         self.Ntimes = 0
@@ -126,20 +125,15 @@ class CalData:
         self.model_visibilities = None
         self.data_visibilities = None
         self.visibility_weights = None
-        self.model_weights = None
         self.dwcal_inv_covariance = None
         self.dwcal_memory_save_mode = None
         self.ant1_inds = None
         self.ant2_inds = None
-        self.ant1_inds_flat = None
-        self.ant2_inds_flat = None
-        self.bl_inds = None
         self.gains_multiply_model = None
         self.antenna_names = None
         self.antenna_numbers = None
         self.antenna_positions = None
         self.uv_array = None
-        self.uv_norm = None
         self.channel_width = None
         self.freq_array = None
         self.integration_time = None
@@ -148,25 +142,20 @@ class CalData:
         self.lst = None
         self.telescope_location = None
         self.lambda_val = None
-        self.gains_real = None
-        self.gains_imag = None
-        self.fit_vis_real = None
-        self.fit_vis_imag = None
+        # unified calibration
+        self.fit_vis = None
+        self.model_weights = None
+        self.bl_inds = None
+        self.ant_inds = None
+        self.uv_blt_array = None
+        self.uv_norm = None
+        self.antpos_enu = None
         self.data_vis_reshaped = None
         self.model_vis_reshaped = None
         self.vis_weights_reshaped = None
-        self.ant_inds = None
-        self.bl_inds = None
-        self.gain_init_stddev = 0.0
-        # dev
-        self.data_vis_orig = None
-        self.fit_vis_orig = None
-        self.gains_orig = None
-        self.glim = None
-        self.ulim = None
+        self.model_weights_reshaped = None
         self.sigma_t_0 = None
         self.sigma_m_0 = None
-        self.antpos_enu = None
 
     def set_gains_from_calfile(self, calfile):
         """
@@ -225,12 +214,6 @@ class CalData:
         min_cal_baseline_lambda=None,
         max_cal_baseline_lambda=None,
         lambda_val=100,
-        glim=(-1, 1),
-        ulim=(-10, 10),
-        weighting_function="constant_weights",
-        scaling_factor_cost=1,
-        sigma_t_0=0.1,
-        sigma_m_0=0.1,
     ):
         """
         Format CalData object with parameters from data and model UVData
@@ -367,10 +350,10 @@ class CalData:
         data.reorder_blts()
         model.conjugate_bls()
         model.reorder_blts()
-        if (
-            data.Nblts != model.Nblts
-            or (np.max(np.abs(data.ant_1_array - model.ant_1_array)) > 0)
-            or (np.max(np.abs(data.ant_2_array - model.ant_2_array)) > 0)
+        if data.Nblts != model.Nblts:
+            select_baselines = True
+        elif (np.max(np.abs(data.ant_1_array - model.ant_1_array)) > 0) or (
+            np.max(np.abs(data.ant_2_array - model.ant_2_array)) > 0
         ):
             select_baselines = True
         else:
@@ -394,16 +377,28 @@ class CalData:
         self.Nfreqs = data.Nfreqs
         self.N_vis_pols = data.Npols
 
-        uvw_array = data.uvw_array
-        self.uv_array = uvw_array[:, :2]
-        self.uv_norm = np.linalg.norm(self.uv_array, axis=1)
+        # Per baseline-time uv coordinates, used by unified calibration
+        self.uv_blt_array = data.uvw_array[:, :2]
+        self.uv_norm = np.linalg.norm(self.uv_blt_array, axis=1)
 
         # Format visibilities
         self.data_visibilities = np.zeros(
-            (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=complex
+            (
+                self.Ntimes,
+                self.Nbls,
+                self.Nfreqs,
+                self.N_vis_pols,
+            ),
+            dtype=complex,
         )
         self.model_visibilities = np.zeros(
-            (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=complex
+            (
+                self.Ntimes,
+                self.Nbls,
+                self.Nfreqs,
+                self.N_vis_pols,
+            ),
+            dtype=complex,
         )
         flag_array = np.zeros(
             (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=bool
@@ -416,7 +411,9 @@ class CalData:
                     np.where(
                         np.abs(model_times - time_val)
                         == np.min(np.abs(model_times - time_val))
-                    )[0][0]  # Account for times that are close but not exactly equal
+                    )[0][
+                        0
+                    ]  # Account for times that are close but not exactly equal
                 ],
                 inplace=False,
             )
@@ -437,7 +434,6 @@ class CalData:
                 data_copy.data_array,
                 (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
             )
-
             flag_array[time_ind, :, :, :] = np.max(
                 np.stack(
                     [
@@ -454,7 +450,7 @@ class CalData:
                 axis=0,
             )
 
-        self.antenna_positions, _ = data.get_enu_data_ants()
+        self.antpos_enu, _ = data.get_enu_data_ants()
 
         # Free memory
         data = model = data_copy = model_copy = None
@@ -464,13 +460,11 @@ class CalData:
         self.freq_array = np.reshape(metadata_reference.freq_array, (self.Nfreqs))
         self.integration_time = np.mean(metadata_reference.integration_time)
         self.time = np.mean(metadata_reference.time_array)
-        # self.telescope_name = metadata_reference.telescope_name
-        self.telescope_name = "MWA"
+        self.telescope_name = metadata_reference.telescope.name
         self.lst = np.mean(metadata_reference.lst_array)
-        # self.telescope_location = metadata_reference.telescope_location
-        from astropy.coordinates import EarthLocation
-
-        location = EarthLocation.from_geodetic(0, 0, 0)
+        self.telescope_location = Quantity(
+            metadata_reference.telescope.location.geocentric
+        ).to_value("m")
 
         if (min_cal_baseline_lambda is not None) or (
             max_cal_baseline_lambda is not None
@@ -509,35 +503,34 @@ class CalData:
             )[0]
 
         # Get ordered list of antenna names
-        # self.antenna_names = np.array(
-        #     [
-        #         np.array(metadata_reference.antenna_names)[
-        #             np.where(metadata_reference.antenna_numbers == ant_num)[0][0]
-        #         ]
-        #         for ant_num in self.antenna_numbers
-        #     ]
-        # )
-        # self.antenna_positions = np.array(
-        #     [
-        #         np.array(metadata_reference.antenna_positions)[
-        #             np.where(metadata_reference.antenna_numbers == ant_num)[0][0], :
-        #         ]
-        #         for ant_num in self.antenna_numbers
-        #     ]
-        # )
+        self.antenna_names = np.array(
+            [
+                np.array(metadata_reference.telescope.antenna_names)[
+                    np.where(metadata_reference.telescope.antenna_numbers == ant_num)[0][0]
+                ]
+                for ant_num in self.antenna_numbers
+            ]
+        )
+        self.antenna_positions = np.array(
+            [
+                np.array(metadata_reference.telescope.antenna_positions)[
+                    np.where(metadata_reference.telescope.antenna_numbers == ant_num)[0][0], :
+                ]
+                for ant_num in self.antenna_numbers
+            ]
+        )
 
-        # # Get UV locations
-        # antpos_ecef = self.antenna_positions + Quantity(
-        #     metadata_reference.telescope.location.geocentric
-        # ).to_value(
-        #     "m"
-        # )  # Get antennas positions in ECEF
-        # self.antpos_enu = pyuvdata.utils.ENU_from_ECEF(
-        #     antpos_ecef, center_loc=metadata_reference.telescope.location
-        # )  # Convert to topocentric (East, North, Up or ENU) coords.
-        # uvw_array = self.antpos_enu[self.ant1_inds, :] - self.antpos_enu[self.ant2_inds, :]
-        # self.uv_array = uvw_array[:, :2]
-        # self.uv_norm = np.linalg.norm(self.uv_array, axis=1)
+        # Get UV locations
+        antpos_ecef = self.antenna_positions + Quantity(
+            metadata_reference.telescope.location.geocentric
+        ).to_value(
+            "m"
+        )  # Get antennas positions in ECEF
+        antpos_enu = pyuvdata.utils.ENU_from_ECEF(
+            antpos_ecef, center_loc=metadata_reference.telescope.location
+        )  # Convert to topocentric (East, North, Up or ENU) coords.
+        uvw_array = antpos_enu[self.ant1_inds, :] - antpos_enu[self.ant2_inds, :]
+        self.uv_array = uvw_array[:, :2]
 
         # Get polarization ordering
         self.vis_polarization_array = np.array(metadata_reference.polarization_array)
@@ -575,7 +568,12 @@ class CalData:
         self.gains_multiply_model = gains_multiply_model
         if gain_init_calfile is None:
             self.gains = np.ones(
-                (self.Nants, self.Nfreqs, self.N_feed_pols), dtype=complex
+                (
+                    self.Nants,
+                    self.Nfreqs,
+                    self.N_feed_pols,
+                ),
+                dtype=complex,
             )
             if gain_init_to_vis_ratio:  # Use mean ratio of visibility amplitudes
                 vis_amp_ratio = np.abs(self.model_visibilities) / np.abs(
@@ -619,7 +617,12 @@ class CalData:
                         )
                         flag_freq = nan_gains[1][flag_ind]
                         for flag_pol in flag_pols:
-                            flag_array[:, flag_bls, flag_freq, flag_pol] = True
+                            flag_array[
+                                :,
+                                flag_bls,
+                                flag_freq,
+                                flag_pol,
+                            ] = True
                     self.gains[nan_gains, feed_pol_ind] = (
                         0.0  # Nans in the gains produce matrix multiplication errors, set to zero
                     )
@@ -627,42 +630,46 @@ class CalData:
         # Free memory
         metadata_reference = None
 
-        # # Random perturbation of initial gains
-        # self.gain_init_stddev = gain_init_stddev
-        # if gain_init_stddev != 0.0:
-        #     self.gains += np.random.normal(
-        #         0.0,
-        #         gain_init_stddev,
-        #         size=(
-        #             self.Nants,
-        #             self.Nfreqs,
-        #             self.N_feed_pols,
-        #         ),
-        #     ) + 1.0j * np.random.normal(
-        #         0.0,
-        #         gain_init_stddev,
-        #         size=(
-        #             self.Nants,
-        #             self.Nfreqs,
-        #             self.N_feed_pols,
-        #         ),
-        #     )
+        # Random perturbation of initial gains
+        if gain_init_stddev != 0.0:
+            self.gains += np.random.normal(
+                0.0,
+                gain_init_stddev,
+                size=(
+                    self.Nants,
+                    self.Nfreqs,
+                    self.N_feed_pols,
+                ),
+            ) + 1.0j * np.random.normal(
+                0.0,
+                gain_init_stddev,
+                size=(
+                    self.Nants,
+                    self.Nfreqs,
+                    self.N_feed_pols,
+                ),
+            )
 
         # Initialize abscal parameters
         self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
         self.abscal_params[0, :, :] = 1.0
 
-        # Initialize unical fitted visibility parameters
-        self.fit_vis = self.model_visibilities.copy()
+        # Define visibility weights
+        self.visibility_weights = np.ones(
+            (
+                self.Ntimes,
+                self.Nbls,
+                self.Nfreqs,
+                self.N_vis_pols,
+            ),
+            dtype=float,
+        )
 
-        # Initialize data and model weights (real-valued, unlike the visibilities)
-        self.visibility_weights = np.ones_like(self.data_visibilities, dtype=float)
-        self.model_weights = np.ones_like(self.fit_vis, dtype=float)
+        # Initialize unified calibration fitted visibilities and model weights
+        self.fit_vis = self.model_visibilities.copy()
+        self.model_weights = np.ones_like(self.visibility_weights)
 
         self.lambda_val = lambda_val
-
-        self.glim = glim
-        self.ulim = ulim
 
     def expand_in_frequency(self):
         """
@@ -844,7 +851,7 @@ class CalData:
         uvcal.flex_spw_id_array = np.zeros(self.Nfreqs, dtype=int)
 
         # Get flags from nan-ed gains and zeroed weights
-        uvcal.flag_array = (np.isnan(self.gains))[..., np.newaxis, :]
+        uvcal.flag_array = (np.isnan(self.gains))[:, :, np.newaxis, :]
 
         # Get flags from visibility_weights
         antenna_weights = np.zeros(
@@ -870,8 +877,8 @@ class CalData:
                         (self.vis_polarization_array == -6)
                         | (self.vis_polarization_array == -7)
                     )[0]
-                ant1_antenna_weights = np.zeros(self.Nfreqs)
-                ant2_antenna_weights = np.zeros(self.Nfreqs)
+                ant1_antenna_weights = np.zeros((self.Nfreqs))
+                ant2_antenna_weights = np.zeros((self.Nfreqs))
                 for vis_pol_ind in use_vis_pol_inds_ant1:
                     ant1_antenna_weights += np.sum(
                         self.visibility_weights[
@@ -889,7 +896,7 @@ class CalData:
                 antenna_weights[ant_ind, :, pol_ind] = (
                     ant1_antenna_weights + ant2_antenna_weights
                 )
-        uvcal.flag_array[np.where(antenna_weights[..., np.newaxis, :] == 0)] = True
+        uvcal.flag_array[np.where(antenna_weights[:, :, np.newaxis, :] == 0)] = True
 
         try:
             uvcal.check()
@@ -1009,7 +1016,10 @@ class CalData:
         for freq_ind in range(self.Nfreqs):
             abscal_params = (
                 calibration_optimization.run_abscal_optimization_single_freq(
-                    caldata_list[freq_ind], xtol, maxiter, verbose=verbose
+                    caldata_list[freq_ind],
+                    xtol,
+                    maxiter,
+                    verbose=verbose,
                 )
             )
             self.abscal_params[:, [freq_ind], :] = abscal_params[:, [0], :]
@@ -1030,7 +1040,10 @@ class CalData:
         """
 
         self.abscal_params = calibration_optimization.run_dw_abscal_optimization(
-            self, xtol, maxiter, verbose=verbose
+            self,
+            xtol,
+            maxiter,
+            verbose=verbose,
         )
 
     def flag_antennas_from_per_ant_cost(
@@ -1164,7 +1177,11 @@ class CalData:
             self.Nfreqs * int(oversample_factor), d=self.channel_width
         )
         dwcal_variance_use = np.zeros(
-            (self.Nbls, self.Nfreqs * int(oversample_factor)), dtype=float
+            (
+                self.Nbls,
+                self.Nfreqs * int(oversample_factor),
+            ),
+            dtype=float,
         )
         for bl_ind, bl_length in enumerate(bl_lengths):
             bin_ind = np.max(np.where(bl_length_bin_edges <= bl_length)[0])
@@ -1283,17 +1300,6 @@ class CalData:
 
         self.dwcal_inv_covariance = weight_mat
 
-    def write_fit_vis(self):
-        if not np.any(self.ant_inds):
-            print(
-                "WARNING: All data was flagged. No u_cal file could be written."
-            )  # update this later to a proper warning
-            return
-        # fit_vis_uvdata = pyuvdata.UVData()
-        # fit_vis_uvdata.data_array = self.fit_vis
-        # fit_vis_uvdata._Nants_data = len(self.ant_inds)
-        # fit_vis_uvdata.write_uvfits("data/fit_vis_cal_out.uvfits")
-
     def unified_calibration(
         self,
         xtol=1e-5,
@@ -1384,7 +1390,6 @@ class CalData:
                     use_pool.terminate()
             else:
                 for freq_ind in range(self.Nfreqs):
-                    dev = dev_tools.DevTools()
                     gains_fit, fit_vis_fit = (
                         calibration_optimization.run_unical_optimization(
                             self,
@@ -1399,12 +1404,5 @@ class CalData:
                             allow_large_hessian=allow_large_hessian,
                         )
                     )
-                    print(
-                        f"\n\n***fit vis shapes (caldata)***"
-                        f"\n  fit_vis     {self.fit_vis[:, :, [freq_ind], :].shape}"
-                        f"\n  fit_vis_fit {fit_vis_fit[:, :, np.newaxis, :].shape}\n\n"
-                    )
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
                     self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
-
-                    # self.write_fit_vis()

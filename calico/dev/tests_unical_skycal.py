@@ -11,7 +11,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import pyuvdata
-from calico import caldata, calibration_optimization as calopt
+from calico import (
+    caldata,
+    calibration_optimization as calopt,
+    cost_function_calculations,
+)
 from calico.dev import dev_tools, noise_and_error_simulation as sim, variable_weights
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,6 +52,59 @@ def choose_weighting_function(label, default):
         print(f"  Not a valid choice: {answer!r}")
 
 
+def skycal_setup_reference(caldata_obj, dev_type, freq_ind=0):
+    """
+    Reproduce the setup run_skycal_optimization_per_pol_single_freq does for its
+    first polarization before optimizing, returning what its old dev_type hooks
+    returned: the packed gains ("test gains flattened"), those gains unpacked to
+    complex ("test gains rolled"), or one cost evaluation ("test gains one run
+    skycal"). Used to check that unical sets up the same way.
+    """
+    feed_pol_ind = 0
+    feed_pol = caldata_obj.feed_polarization_array[feed_pol_ind]
+    vis_pol_ind = np.where(caldata_obj.vis_polarization_array == feed_pol)[0]
+    vis_weights_summed = np.sum(
+        caldata_obj.visibility_weights[:, :, freq_ind, feed_pol_ind], axis=0
+    )
+    weight_per_ant = np.bincount(
+        caldata_obj.ant1_inds, weights=vis_weights_summed, minlength=caldata_obj.Nants
+    ) + np.bincount(
+        caldata_obj.ant2_inds, weights=vis_weights_summed, minlength=caldata_obj.Nants
+    )
+    ant_inds = np.where(weight_per_ant > 0.0)[0]
+    gains_init_flattened = np.stack(
+        (
+            np.real(caldata_obj.gains[ant_inds, freq_ind, feed_pol_ind]),
+            np.imag(caldata_obj.gains[ant_inds, freq_ind, feed_pol_ind]),
+        ),
+        axis=1,
+    ).flatten()
+    if dev_type == "test gains flattened":
+        return gains_init_flattened
+    gains_reshaped = np.reshape(gains_init_flattened, (len(ant_inds), 2))
+    gains_reshaped = gains_reshaped[:, 0] + 1.0j * gains_reshaped[:, 1]
+    if dev_type == "test gains rolled":
+        return gains_reshaped
+    gains = np.ones(caldata_obj.Nants, dtype=complex)
+    gains[ant_inds] = gains_reshaped
+    reshaped_shape = caldata_obj.data_visibilities.shape[:2]
+    return cost_function_calculations.cost_skycal(
+        gains,
+        np.reshape(
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind], reshaped_shape
+        ),
+        np.reshape(
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind], reshaped_shape
+        ),
+        np.reshape(
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind], reshaped_shape
+        ),
+        caldata_obj.ant1_inds,
+        caldata_obj.ant2_inds,
+        caldata_obj.lambda_val,
+    )
+
+
 class TestStringMethods(unittest.TestCase):
     def test_common_setup_handling(self):
         model = pyuvdata.UVData()
@@ -55,11 +112,8 @@ class TestStringMethods(unittest.TestCase):
         data = model.copy()
         caldata_obj = caldata.CalData()
         caldata_obj.load_data(data, model)
-        gains_flattened_skycal = calopt.run_skycal_optimization_per_pol_single_freq(
-            caldata_obj=caldata_obj,
-            xtol=1e-5,
-            maxiter=200,
-            dev_type="test gains flattened",
+        gains_flattened_skycal = skycal_setup_reference(
+            caldata_obj, "test gains flattened"
         )
         gains_flattened_unical = calopt.run_unical_optimization(
             caldata_obj=caldata_obj,
@@ -70,12 +124,7 @@ class TestStringMethods(unittest.TestCase):
         assert np.any(gains_flattened_skycal)
         assert np.any(gains_flattened_unical)
         np.testing.assert_allclose(gains_flattened_skycal, gains_flattened_unical)
-        gains_rolled_skycal = calopt.run_skycal_optimization_per_pol_single_freq(
-            caldata_obj=caldata_obj,
-            xtol=1e-5,
-            maxiter=200,
-            dev_type="test gains rolled",
-        )
+        gains_rolled_skycal = skycal_setup_reference(caldata_obj, "test gains rolled")
         gains_rolled_unical = calopt.run_unical_optimization(
             caldata_obj=caldata_obj,
             xtol=1e-5,
@@ -145,11 +194,8 @@ class TestStringMethods(unittest.TestCase):
         caldata_obj.data_visibilities[0, :, 0, 0] += n_real + 1j * n_imag
         caldata_obj.model_visibilities[0, :, 0, 0] += e_real + 1j * e_imag
 
-        cost_one_run_skycal = calopt.run_skycal_optimization_per_pol_single_freq(
-            caldata_obj=caldata_obj,
-            xtol=1e-5,
-            maxiter=200,
-            dev_type="test gains one run skycal",
+        cost_one_run_skycal = skycal_setup_reference(
+            caldata_obj, "test gains one run skycal"
         )
         cost_one_run_unical = calopt.run_unical_optimization(
             caldata_obj=caldata_obj,
@@ -175,12 +221,6 @@ class TestStringMethods(unittest.TestCase):
             gain_init_to_vis_ratio=True,
             gains_multiply_model=True,
             gain_init_stddev=0.0,
-            glim=None,
-            ulim=None,
-            weighting_function="constant_weights",
-            sigma_t_0=1,
-            sigma_m_0=1,
-            scaling_factor_cost=1,
         )
         original_model = caldata_obj.model_visibilities[0, :, 0, 0].copy()
         original_data = caldata_obj.data_visibilities[0, :, 0, 0].copy()
@@ -505,7 +545,7 @@ class TestStringMethods(unittest.TestCase):
         plt.savefig(f"calico/images/powell_lbfgs_diff_imag_{plot_time}.png")
         plt.close()
         print("Plotting scatter plot in nsew-plane (abs diff)")
-        en_plane = caldata_obj.antenna_positions[:, :-1]
+        en_plane = caldata_obj.antpos_enu[:, :-1]
         print(f"en-plane shape - {en_plane.shape}")
         max_diff = np.max(
             [np.max(abs_powell_minus_lbfgs), np.abs(np.min(abs_powell_minus_lbfgs))]
@@ -607,16 +647,7 @@ class TestStringMethods(unittest.TestCase):
         model.read_uvfits("./calico/data/tutorial_medium_onetime.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(
-            data,
-            model,
-            gains_multiply_model=True,
-            weighting_function="constant_weights",
-            sigma_t_0=1,
-            sigma_m_0=1,
-            scaling_factor_cost=1,
-            lambda_val=100,
-        )
+        caldata_obj.load_data(data, model, gains_multiply_model=True, lambda_val=100)
         vis_weights_summed = np.sum(caldata_obj.visibility_weights[:, :, 0, 0], axis=0)
         weight_per_ant = np.bincount(
             caldata_obj.ant1_inds,
@@ -664,16 +695,7 @@ class TestStringMethods(unittest.TestCase):
         data.read_uvfits("./calico/data/tutorial_medium_onetime.uvfits")
         model = data.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(
-            data,
-            model,
-            gains_multiply_model=True,
-            weighting_function="constant_weights",
-            sigma_t_0=1,
-            sigma_m_0=1,
-            scaling_factor_cost=1,
-            lambda_val=100,
-        )
+        caldata_obj.load_data(data, model, gains_multiply_model=True, lambda_val=100)
         optimizers = ["powell", "pytorch"]
         for optimizer in optimizers:
             caldata_obj.unified_calibration(verbose=True, optimization_scheme=optimizer)
@@ -684,16 +706,7 @@ class TestStringMethods(unittest.TestCase):
         model.read_uvfits("./calico/data/tutorial_medium_onetime.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(
-            data,
-            model,
-            gains_multiply_model=True,
-            weighting_function="constant_weights",
-            sigma_t_0=1,
-            sigma_m_0=1,
-            scaling_factor_cost=1,
-            lambda_val=100,
-        )
+        caldata_obj.load_data(data, model, gains_multiply_model=True, lambda_val=100)
         # perturb gains
         gain_init_stddev = 0.02
         np.random.seed(421)
@@ -865,16 +878,7 @@ class TestStringMethods(unittest.TestCase):
         data = pyuvdata.UVData()
         data.read_uvfits(os.path.join(base_path, f"{data_filename}.uvfits"))
         threshold_length = 50  # wavelengths
-        caldata_obj.load_data(
-            data,
-            model,
-            gains_multiply_model=True,
-            weighting_function="constant_weights",
-            sigma_t_0=1,
-            sigma_m_0=1,
-            scaling_factor_cost=1,
-            lambda_val=100,
-        )
+        caldata_obj.load_data(data, model, gains_multiply_model=True, lambda_val=100)
         v_T = caldata_obj.data_visibilities.copy()
         m = caldata_obj.model_visibilities.copy()
         thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(

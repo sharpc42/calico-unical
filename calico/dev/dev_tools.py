@@ -755,7 +755,7 @@ class DevTools:
                     full_error_realizations = np.concatenate(
                         (full_error_realizations, model_err_realizations[k])
                     )
-                    uv_array = caldata_obj.uv_array
+                    uv_array = caldata_obj.uv_blt_array
                     # get value of first cost function term g*gv-u
                     gains_expanded = (
                         gains[caldata_obj.ant1_inds]
@@ -2484,16 +2484,7 @@ def prepare_standard_unical_test_run(
         data.read_uvfits(os.path.join(base_path, f"{data_filename}.uvfits"))
     else:
         data = model.copy()
-    caldata_obj.load_data(
-        data,
-        model,
-        gains_multiply_model=True,
-        weighting_function="constant_weights",
-        sigma_t_0=1,
-        sigma_m_0=1,
-        scaling_factor_cost=1,
-        lambda_val=100,
-    )
+    caldata_obj.load_data(data, model, gains_multiply_model=True, lambda_val=100)
     if gaussian_simulation:
         if seed == 42:
             seed += 1

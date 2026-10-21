@@ -464,14 +464,6 @@ def init_many_realizations(
                 gain_init_to_vis_ratio=True,
                 gains_multiply_model=gains_multiply_model,
                 gain_init_stddev=0.0,
-                glim=None,
-                ulim=None,
-                weighting_function="constant_weights",
-                sigma_t_0=1,
-                sigma_m_0=1,
-                scaling_factor_cost=1,
-                threshold_length=0,
-                flatten_blts=flatten_blts,
             )
             print(
                 "\n\n***AFTER LOAD***\n  "
