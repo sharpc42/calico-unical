@@ -1,20 +1,26 @@
-import functools
 import numpy as np
 import sys
 import pyuvdata
+from pyuvdata import UVCal
 from astropy.units import Quantity
+import scipy
+import copy
 from calico import calibration_qa, calibration_optimization
 import multiprocessing
+from numpy.typing import NDArray
+from typing import Self
+import warnings
 
 
 class CalData:
     """
-    Object containing all data and parameters needed for calibration.
+    Container for all data and parameters needed for calibration.
 
     Attributes
     -------
     gains : array of complex
-        Shape (Nants, Nfreqs, N_feed_pols,).
+        If n_directions=1, shape (Nants, Nfreqs, N_feed_pols,). Otherwise shape
+        (Nants, Nfreqs, N_feed_pols, n_directions,).
     fit_vis : array of complex
         Shape (Ntimes, Nbls,  Nfreqs, N_vis_pols).
     abscal_params : array of float
@@ -33,6 +39,8 @@ class CalData:
         Number of gain polarizations.
     N_vis_pols : int
         Number of visibility polarizations.
+    n_directions : int
+        Number of calibration directions.
     feed_polarization_array : array of int
         Shape (N_feed_pols). Array of polarization integers. Indicates the
         ordering of the polarization axis of the gains. X is -5 and Y is -6.
@@ -42,7 +50,8 @@ class CalData:
         data_visibilities, and visibility_weights. XX is -5, YY is -6, XY is -7,
         and YX is -8.
     model_visibilities : array of complex
-        Shape (Ntimes, Nbls, Nfreqs, N_vis_pols,).
+        If n_directions=1, shape (Ntimes, Nbls, Nfreqs, N_vis_pols,). Otherwise shape
+        (Ntimes, Nbls, Nfreqs, N_vis_pols, n_directions,).
     data_visibilities : array of complex
         Shape (Ntimes, Nbls, Nfreqs, N_vis_pols,).
     visibility_weights : array of float
@@ -74,7 +83,10 @@ class CalData:
     antenna_numbers : array of int
         Shape (Nants,). Ordering matches the ordering of the gains attribute.
     antenna_positions : array of float
-        Shape (Nants, 3,). Units meters, relative to telescope location.
+        Shape (Nants, 3,). Units meters, ITRF frame, relative to telescope location.
+    antenna_distances : array of float
+        Shape (Nants,). Units meters. Planar distance of each antenna from the array center.
+        Ignores up-down distances.
     uv_array : array of float
         Shape (Nbls, 2,). Baseline positions in the UV plane, units meters.
     channel_width : float
@@ -85,12 +97,47 @@ class CalData:
         Length of integration in seconds.
     time : float
         Time of observation in Julian Date.
-    telescope_name : str
+    telescope : pyuvdata.Telescope
+        Object containing the telescope metadata.
     lst : str
         Local sidereal time (LST), in radians.
-    telescope_location : array of float
+    xtol : float
+        Accuracy tolerance for optimizer.
+    maxiter : int
+        Maximum number of iterations for the optimizer.
     lambda_val : float
-        Weight of the phase regularization term; must be positive. Default 100.
+        Weight of the phase regularization term; must be positive or zero.
+    get_crosspol_phase : bool
+        If True, calculate crosspol phase in sky-based calibration.
+    crosspol_phase_strategy : str
+        Strategy used to calculate the crosspol phase in sky-based calibration.
+        Options are "crosspol model" or "pseudo Stokes V". Used only if
+        get_crosspol_phase is True. If "crosspol model", contrains the crosspol
+        phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
+        crosspol phase by minimizing pseudo Stokes V.
+    ddcal_max_source_offset_deg : float or None
+        Allowable distance that a source is allowed to drift in direction-dependent
+        calibration.
+    ddcal_source_offset_taper_deg : float or None
+        Taper on the source drift regularization for direction-dependent calibration.
+    ddcal_max_phase_offset_rad : list or None
+        Allowable phase that a gain is allowed to drift in direction-dependent calibration.
+        Length Nfreqs. Each element is an array of float with length N_ants_regularized.
+    ddcal_phase_offset_taper_rad : list or None
+        Taper on the gain drift regularization in direction-dependent calibration.
+        Length Nfreqs. Each element is an array of float with length N_ants_regularized.
+    ddcal_ant_inds_regularized : list or None
+        Indices of regularized antennas for direction-dependent calibration.
+        Length Nfreqs. Each element is an array of int with length N_ants_regularized.
+    cartesian_optimization : bool
+        If True, optimize the real and imaginary components of the gains. If False,
+        optimize the amplitude and complex phase of the gains.
+    parallel : bool
+        If True, calibration is parallelized.
+    n_workers : int
+        Number of workers to use in parallel processing. Used only if parallel=True.
+    verbose : bool
+        Set to True to print optimization outputs.
     uv_blt_array : array of float
         Shape (Nblts, 2). Baseline u and v coordinates in meters for each
         baseline-time, from the data's uvw_array. Used by unified calibration.
@@ -120,6 +167,7 @@ class CalData:
         self.Nfreqs = 0
         self.N_feed_pols = 0
         self.N_vis_pols = 0
+        self.n_directions = 1
         self.feed_polarization_array = None
         self.vis_polarization_array = None
         self.model_visibilities = None
@@ -133,15 +181,28 @@ class CalData:
         self.antenna_names = None
         self.antenna_numbers = None
         self.antenna_positions = None
+        self.antenna_distances = None
         self.uv_array = None
         self.channel_width = None
         self.freq_array = None
         self.integration_time = None
         self.time = None
-        self.telescope_name = None
+        self.telescope = None
         self.lst = None
-        self.telescope_location = None
+        self.xtol = None
+        self.maxiter = None
         self.lambda_val = None
+        self.get_crosspol_phase = None
+        self.crosspol_phase_strategy = None
+        self.ddcal_max_source_offset_deg = None
+        self.ddcal_source_offset_taper_deg = None
+        self.ddcal_max_phase_offset_rad = None
+        self.ddcal_phase_offset_taper_rad = None
+        self.ddcal_ant_inds_regularized = None
+        self.cartesian_optimization = None
+        self.parallel = None
+        self.n_workers = None
+        self.verbose = None
         # unified calibration
         self.fit_vis = None
         self.model_weights = None
@@ -157,7 +218,10 @@ class CalData:
         self.sigma_t_0 = None
         self.sigma_m_0 = None
 
-    def set_gains_from_calfile(self, calfile):
+    def copy(self) -> Self:
+        return copy.deepcopy(self)
+
+    def set_gains_from_calfile(self, calfile: str) -> None:
         """
         Use a pyuvdata-formatted calfits file to set gains.
 
@@ -182,10 +246,18 @@ class CalData:
             uvcal.select(jones=self.feed_polarization_array)
         uvcal.reorder_freqs(channel_order="freq")
         uvcal.reorder_jones()
-        use_gains = np.mean(uvcal.gain_array, axis=2)  # Average over times
+        uvcal.gain_array[np.where(uvcal.flag_array)] = np.nan + 1j * np.nan
+        use_gains = np.nanmean(uvcal.gain_array, axis=2)  # Average over times
 
         # Make antenna ordering match
-        cal_ant_names = np.array([uvcal.antenna_names[ant] for ant in uvcal.ant_array])
+        cal_ant_names = np.array(
+            [
+                uvcal.telescope.antenna_names[
+                    np.where(uvcal.telescope.antenna_numbers == ant_num)
+                ]
+                for ant_num in uvcal.ant_array
+            ]
+        )
         cal_ant_inds = np.array(
             [list(cal_ant_names).index(name) for name in self.antenna_names]
         )
@@ -197,24 +269,236 @@ class CalData:
             if uvcal.gain_convention != "multiply":
                 use_gains = 1 / use_gains
 
-        self.gains = use_gains[cal_ant_inds, :]
+        self.gains = use_gains[cal_ant_inds, :, :]
+
+        if self.n_directions > 1:
+            self.gains = np.repeat(
+                self.gains[:, :, :, np.newaxis], self.n_directions, axis=3
+            )
+
+    def initialize_gains(
+        self,
+        gain_init_calfile: str | None = None,
+        gain_init_to_vis_ratio: bool = True,
+        gain_init_stddev: float = 0.0,
+    ) -> None:
+        """
+        Initialized gains before optimization. Updates self.gains. If gain_init_calfile is not
+        None, self.visibility_weights may also be updated.
+
+        Parameters
+        ----------
+        gain_init_calfile : str
+            Path to a pyuvdata-formatted calfits file or a CASA-formatted .bcal file.
+        gain_init_to_vis_ratio : bool
+            Used only if gain_init_calfile is None. If True, initializes gains
+            to the median ratio between the amplitudes of the model and data
+            visibilities. If False, the gains are initialized to 1. Default
+            True.
+        gain_init_stddev : float
+            Default 0.0. Standard deviation of a random complex Gaussian
+            perturbation to the initial gains.
+        """
+
+        # Initialize gains
+        if gain_init_calfile is None:
+            if self.n_directions == 1:
+                self.gains = np.ones(
+                    (
+                        self.Nants,
+                        self.Nfreqs,
+                        self.N_feed_pols,
+                    ),
+                    dtype=complex,
+                )
+            else:
+                self.gains = np.ones(
+                    (
+                        self.Nants,
+                        self.Nfreqs,
+                        self.N_feed_pols,
+                        self.n_directions,
+                    ),
+                    dtype=complex,
+                )
+            if gain_init_to_vis_ratio:  # Use mean ratio of visibility amplitudes
+                if self.n_directions == 1:
+                    vis_amp_ratio = np.abs(self.model_visibilities) / np.abs(
+                        self.data_visibilities
+                    )
+                    vis_amp_ratio[np.where(self.data_visibilities == 0.0)] = np.nan
+                    for feed_pol_ind, feed_pol in enumerate(
+                        self.feed_polarization_array
+                    ):
+                        vis_pol_ind = np.where(self.vis_polarization_array == feed_pol)[
+                            0
+                        ][0]
+                        if self.gains_multiply_model:
+                            self.gains[:, :, feed_pol_ind] = np.nanmedian(
+                                1 / np.sqrt(vis_amp_ratio[:, :, :, vis_pol_ind])
+                            )
+                        else:
+                            self.gains[:, :, feed_pol_ind] = np.nanmedian(
+                                np.sqrt(vis_amp_ratio[:, :, :, vis_pol_ind])
+                            )
+                else:
+                    for direction_ind in range(self.n_directions):
+                        vis_amp_ratio = np.abs(
+                            self.model_visibilities[:, :, :, :, direction_ind]
+                        ) / np.abs(self.data_visibilities)
+                        vis_amp_ratio[np.where(self.data_visibilities == 0.0)] = np.nan
+                        for feed_pol_ind, feed_pol in enumerate(
+                            self.feed_polarization_array
+                        ):
+                            vis_pol_ind = np.where(
+                                self.vis_polarization_array == feed_pol
+                            )[0][0]
+                            if self.gains_multiply_model:
+                                self.gains[:, :, feed_pol_ind, direction_ind] = (
+                                    np.nanmedian(
+                                        1 / np.sqrt(vis_amp_ratio[:, :, :, vis_pol_ind])
+                                    )
+                                )
+                            else:
+                                self.gains[:, :, feed_pol_ind, direction_ind] = (
+                                    np.nanmedian(
+                                        np.sqrt(vis_amp_ratio[:, :, :, vis_pol_ind])
+                                    )
+                                )
+        else:  # Initialize from file
+            self.set_gains_from_calfile(gain_init_calfile)
+            # Capture nan-ed gains as flags
+            flag_array = np.zeros(
+                (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=bool
+            )
+            for feed_pol_ind, feed_pol in enumerate(self.feed_polarization_array):
+                nan_gains = np.where(~np.isfinite(self.gains[:, :, feed_pol_ind]))
+                if len(nan_gains[0]) > 0:
+                    if feed_pol == -5:
+                        flag_pols = np.where(
+                            (self.vis_polarization_array == -5)
+                            | (self.vis_polarization_array == -7)
+                            | (self.vis_polarization_array == -8)
+                        )[0]
+                    elif feed_pol == -6:
+                        flag_pols = np.where(
+                            (self.vis_polarization_array == -6)
+                            | (self.vis_polarization_array == -7)
+                            | (self.vis_polarization_array == -8)
+                        )[0]
+                    for flag_ind in range(len(nan_gains[0])):
+                        flag_bls = np.unique(
+                            np.concatenate(
+                                (
+                                    np.where(self.ant1_inds == nan_gains[0][flag_ind])[
+                                        0
+                                    ],
+                                    np.where(self.ant2_inds == nan_gains[0][flag_ind])[
+                                        0
+                                    ],
+                                )
+                            )
+                        )
+                        flag_freq = nan_gains[1][flag_ind]
+                        for flag_pol in flag_pols:
+                            flag_array[
+                                :,
+                                flag_bls,
+                                flag_freq,
+                                flag_pol,
+                            ] = True
+            if np.max(flag_array):
+                self.visibility_weights[np.where(flag_array)] = 0.0
+
+        # Random perturbation of initial gains
+        if gain_init_stddev != 0.0:
+            self.gains += np.random.normal(
+                0.0,
+                gain_init_stddev,
+                size=np.shape(self.gains),
+            ) + 1.0j * np.random.normal(
+                0.0,
+                gain_init_stddev,
+                size=np.shape(self.gains),
+            )
+
+    def ddcal_regularization_setup(self) -> None:
+        """
+        Function to assemble the quantities needed for direction-dependent regularization.
+        The regularization prevents peeled sources from drifting too far from their expected
+        position. The function populates ddcal_max_phase_offset_rad, ddcal_phase_offset_taper_rad,
+        and ddcal_ant_inds_regularized. It converts from ddcal_max_source_offset_deg and
+        ddcal_source_offset_taper_deg, which are allowable source position drifts, to the equivalent
+        allowable phase drift for each per-antenna and per-frequency gain. Gains with allowable phase
+        drifts greater than pi are not regularized, because the source drift constraint provides no
+        constraint on the phase of those gains.
+        """
+
+        c = 3e8
+        antenna_distances_rad = (
+            2
+            * np.pi
+            * self.antenna_distances[:, np.newaxis]
+            * self.freq_array[np.newaxis, :]
+            / c
+        )
+        ddcal_max_phase_offset_rad_all = antenna_distances_rad * np.sin(
+            np.deg2rad(self.ddcal_max_source_offset_deg)
+        )
+        ddcal_phase_offset_taper_end_rad_all = antenna_distances_rad * np.sin(
+            np.deg2rad(
+                self.ddcal_max_source_offset_deg + self.ddcal_source_offset_taper_deg
+            )
+        )
+        ddcal_phase_offset_taper_rad_all = (
+            ddcal_phase_offset_taper_end_rad_all - ddcal_max_phase_offset_rad_all
+        )
+
+        self.ddcal_max_phase_offset_rad = []
+        self.ddcal_phase_offset_taper_rad = []
+        self.ddcal_ant_inds_regularized = []
+        for freq_ind in range(self.Nfreqs):
+            use_ant_inds = np.where(
+                ddcal_max_phase_offset_rad_all[:, freq_ind] < np.pi
+            )[0]
+            self.ddcal_ant_inds_regularized.append(use_ant_inds)
+            self.ddcal_max_phase_offset_rad.append(
+                ddcal_max_phase_offset_rad_all[use_ant_inds, freq_ind]
+            )
+            self.ddcal_phase_offset_taper_rad.append(
+                ddcal_phase_offset_taper_rad_all[use_ant_inds, freq_ind]
+            )
 
     def load_data(
         self,
-        data,
-        model,
-        gain_init_calfile=None,
-        gain_init_to_vis_ratio=True,
-        gains_multiply_model=False,
-        gain_init_stddev=0.0,
-        N_feed_pols=None,
-        feed_polarization_array=None,
-        min_cal_baseline_m=None,
-        max_cal_baseline_m=None,
-        min_cal_baseline_lambda=None,
-        max_cal_baseline_lambda=None,
-        lambda_val=100,
-    ):
+        data: pyuvdata.UVData,
+        model: pyuvdata.UVData | None = None,
+        model_list: list[pyuvdata.UVData] | None = None,
+        gain_init_calfile: str | None = None,
+        gain_init_to_vis_ratio: bool = True,
+        gains_multiply_model: bool = False,
+        gain_init_stddev: float = 0.0,
+        check_vis_ordering: bool = True,
+        N_feed_pols: int | None = None,
+        feed_polarization_array: NDArray[int] | None = None,
+        min_cal_baseline_m: float | None = None,
+        max_cal_baseline_m: float | None = None,
+        min_cal_baseline_lambda: float | None = None,
+        max_cal_baseline_lambda: float | None = None,
+        xtol: float = 1e-5,
+        maxiter: int = 200,
+        lambda_val: float = 0.0,
+        get_crosspol_phase: bool = False,
+        crosspol_phase_strategy: str | None = None,
+        ddcal_max_source_offset_deg: float | None = None,
+        ddcal_source_offset_taper_deg: float | None = None,
+        cartesian_optimization: bool | None = None,
+        verbose: bool = False,
+        parallel: bool = False,
+        n_workers: int = 20,
+        time_match_tol: float = 1e-5,
+        freq_match_tol: float = 1e-5,
+    ) -> None:
         """
         Format CalData object with parameters from data and model UVData
         objects.
@@ -223,9 +507,12 @@ class CalData:
         ----------
         data : pyuvdata UVData object
             Data to be calibrated.
-        model : pyuvdata UVData object
+        model : pyuvdata UVData object or None
             Model visibilities to be used in calibration. Must have the same
-            parameters at data.
+            parameters at data. May be None if model_list is provided.
+        model_list : list of pyuvdata UVData objects or None
+            List of model visibilities to be used for direction-dependent calibration.
+            Must have the same parameters at data. May be None if model is provided.
         gain_init_calfile : str or None
             Default None. If not None, provides a path to a pyuvdata-formatted
             calfits file containing gains values for calibration initialization.
@@ -243,6 +530,9 @@ class CalData:
         gain_init_stddev : float
             Default 0.0. Standard deviation of a random complex Gaussian
             perturbation to the initial gains.
+        check_vis_ordering : bool
+            Default True. If False, the ordering of the data and model visibilities are
+            assumed to be identical. This can cause errors if used incorrectly.
         N_feed_pols : int
             Default min(2, N_vis_pols). Number of feed polarizations, equal to
             the number of gain values to be calculated per antenna.
@@ -266,41 +556,77 @@ class CalData:
             Maximum baseline length, in wavelengths, to use in calibration. If
             both max_cal_baseline_m and max_cal_baseline_lambda are None,
             arbitrarily long baselines are used. Default None.
+        xtol : float
+            Accuracy tolerance for optimizer. Default 1e-5.
+        maxiter : int
+            Maximum number of iterations for the optimizer. Default 200.
         lambda_val : float
-            Weight of the phase regularization term; must be positive. Default
-            100.
+            Weight of the phase regularization term; must be positive or zero.
+            Default 0.
+        get_crosspol_phase : bool
+            If True, calculate crosspol phase in sky-based calibration. Default False
+        crosspol_phase_strategy : str or None
+            Strategy used to calculate the crosspol phase in sky-based calibration.
+            Options are "crosspol model" or "pseudo Stokes V". Used only if
+            get_crosspol_phase is True. If "crosspol model", contrains the crosspol
+            phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
+            crosspol phase by minimizing pseudo Stokes V.
+        ddcal_max_source_offset_deg : float or None
+            Allowable source offset for direction-dependent calibration, in degrees,
+        ddcal_source_offset_taper_deg : float or None
+            Taper on the source offset regularization for direction-dependent calibration.
+        verbose : bool
+            Set to True to print outputs in optimization. Default False.
+        parallel : bool
+            If True, calibration is parallelized.
+        n_workers : int
+            Number of workers to use in parallel processing. Used only if parallel=True.
+            Default 20.
+        time_match_tol : float
+            Tolerance threshold for time agreement between data and model. Units
+            Julian Date. Default 1e-5. Used only if check_vis_ordering is True.
+        freq_match_tol : float
+            Tolerance threshold for frequency agreement between data and model. Units
+            Julian Date. Default 1e-5. Used only if check_vis_ordering is True.
         """
+
+        if model_list is not None:
+            self.n_directions = len(model_list)
+        else:
+            self.n_directions = 1
+            model_list = [model]
 
         # Autocorrelations are not currently supported
         data.select(ant_str="cross")
-        model.select(ant_str="cross")
+        for model in model_list:
+            model.select(ant_str="cross")
 
-        # Ensure polarizations match
-        if model.Npols > data.Npols:
-            model.select(polarizations=data.polarization_array)
+        if check_vis_ordering:
+            # Ensure polarizations match
+            for model in model_list:
+                if model.Npols > data.Npols:
+                    model.select(polarizations=data.polarization_array)
 
-        # Ensure times match
-        time_match_tol = 1e-5
-        if (
-            np.max(
-                np.abs(
-                    np.sort(list(set(data.time_array)))
-                    - np.sort(list(set(model.time_array)))
-                )
-            )
-            > time_match_tol
-        ):
-            print("ERROR: Data and model times do not match. Exiting.")
-            sys.exit(1)
+                # Ensure times match
+                if (
+                    np.max(
+                        np.abs(
+                            np.sort(list(set(data.time_array)))
+                            - np.sort(list(set(model.time_array)))
+                        )
+                    )
+                    > time_match_tol
+                ):
+                    print("ERROR: Data and model times do not match. Exiting.")
+                    sys.exit(1)
 
-        # Ensure frequencies match
-        freq_match_tol = 1e-5
-        if (
-            np.max(np.abs(np.sort(data.freq_array) - np.sort(model.freq_array)))
-            > freq_match_tol
-        ):
-            print("ERROR: Data and model frequencies do not match. Exiting.")
-            sys.exit(1)
+                # Ensure frequencies match
+                if (
+                    np.max(np.abs(np.sort(data.freq_array) - np.sort(model.freq_array)))
+                    > freq_match_tol
+                ):
+                    print("ERROR: Data and model frequencies do not match. Exiting.")
+                    sys.exit(1)
 
         # Downselect baselines
         if (
@@ -338,38 +664,48 @@ class CalData:
             )
             data.select(blt_inds=data_use_baselines)
 
-            model_baseline_lengths_m = np.sqrt(np.sum(model.uvw_array**2.0, axis=1))
-            model_use_baselines = np.where(
-                (model_baseline_lengths_m >= min_cal_baseline_m)
-                & (model_baseline_lengths_m <= max_cal_baseline_m)
-            )
-            model.select(blt_inds=model_use_baselines)
-
-        # Ensure baselines match
-        data.conjugate_bls()
-        data.reorder_blts()
-        model.conjugate_bls()
-        model.reorder_blts()
-        if data.Nblts != model.Nblts:
-            select_baselines = True
-        elif (np.max(np.abs(data.ant_1_array - model.ant_1_array)) > 0) or (
-            np.max(np.abs(data.ant_2_array - model.ant_2_array)) > 0
-        ):
-            select_baselines = True
-        else:
-            select_baselines = False
-        if select_baselines:
-            data_baselines = list(set(zip(data.ant_1_array, data.ant_2_array)))
-            model_baselines = list(set(zip(model.ant_1_array, model.ant_2_array)))
-            use_baselines = [
-                baseline for baseline in data_baselines if baseline in model_baselines
-            ]
-            if len(use_baselines) < data.Nbls:
-                print(
-                    f"WARNING: Model does not contain all baselines. Downselecting from {data.Nbls} to {len(use_baselines)}."
+            for model in model_list:
+                model_baseline_lengths_m = np.sqrt(np.sum(model.uvw_array**2.0, axis=1))
+                model_use_baselines = np.where(
+                    (model_baseline_lengths_m >= min_cal_baseline_m)
+                    & (model_baseline_lengths_m <= max_cal_baseline_m)
                 )
-            data.select(bls=use_baselines)
-            model.select(bls=use_baselines)
+                model.select(blt_inds=model_use_baselines)
+
+        if check_vis_ordering:  # Ensure baselines match
+            data.conjugate_bls()
+            data.reorder_blts()
+            for model in model_list:
+                model.conjugate_bls()
+                model.reorder_blts()
+
+            n_blts_list = [model.Nblts for model in model_list]
+            n_blts_list.append(data.Nblts)
+            if len(set(n_blts_list)) > 1:
+                select_baselines = True
+            else:
+                select_baselines = False
+                for model in model_list:
+                    if (np.max(np.abs(data.ant_1_array - model.ant_1_array)) > 0) or (
+                        np.max(np.abs(data.ant_2_array - model.ant_2_array)) > 0
+                    ):
+                        select_baselines = True
+                        break
+
+            if select_baselines:
+                baselines = [
+                    list(set(zip(model.ant_1_array, model.ant_2_array)))
+                    for model in model_list
+                ]
+                baselines.append(list(set(zip(data.ant_1_array, data.ant_2_array))))
+                use_baselines = set(baselines[0]).intersection(*baselines[1:])
+                if len(use_baselines) < data.Nbls:
+                    print(
+                        f"WARNING: Model does not contain all baselines. Downselecting from {data.Nbls} to {len(use_baselines)}."
+                    )
+                data.select(bls=use_baselines)
+                for model in model_list:
+                    model.select(bls=use_baselines)
 
         self.Nants = data.Nants_data
         self.Nbls = data.Nbls
@@ -391,80 +727,104 @@ class CalData:
             ),
             dtype=complex,
         )
-        self.model_visibilities = np.zeros(
-            (
-                self.Ntimes,
-                self.Nbls,
-                self.Nfreqs,
-                self.N_vis_pols,
-            ),
-            dtype=complex,
-        )
+        if self.n_directions == 1:
+            self.model_visibilities = np.zeros(
+                (
+                    self.Ntimes,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
+                dtype=complex,
+            )
+        else:
+            self.model_visibilities = np.zeros(
+                (
+                    self.Ntimes,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                    self.n_directions,
+                ),
+                dtype=complex,
+            )
         flag_array = np.zeros(
             (self.Ntimes, self.Nbls, self.Nfreqs, self.N_vis_pols), dtype=bool
         )
+
         for time_ind, time_val in enumerate(np.unique(data.time_array)):
             data_copy = data.select(times=time_val, inplace=False)
-            model_times = list(set(model.time_array))
-            model_copy = model.select(
-                times=model_times[
-                    np.where(
-                        np.abs(model_times - time_val)
-                        == np.min(np.abs(model_times - time_val))
-                    )[0][
-                        0
-                    ]  # Account for times that are close but not exactly equal
-                ],
-                inplace=False,
-            )
             data_copy.reorder_blts()
-            model_copy.reorder_blts()
             data_copy.reorder_pols(order="AIPS")
-            model_copy.reorder_pols(order="AIPS")
             data_copy.reorder_freqs(channel_order="freq")
-            model_copy.reorder_freqs(channel_order="freq")
-
             if time_ind == 0:
                 metadata_reference = data_copy.copy(metadata_only=True)
-            self.model_visibilities[time_ind, :, :, :] = np.reshape(
-                model_copy.data_array,
-                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-            )
             self.data_visibilities[time_ind, :, :, :] = np.reshape(
                 data_copy.data_array,
                 (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
             )
-            flag_array[time_ind, :, :, :] = np.max(
-                np.stack(
-                    [
-                        np.reshape(
-                            model_copy.flag_array,
-                            (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
-                        ),
-                        np.reshape(
-                            data_copy.flag_array,
-                            (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
-                        ),
-                    ]
-                ),
-                axis=0,
+            flag_array[time_ind, :, :, :] = np.reshape(
+                data_copy.flag_array,
+                (data_copy.Nblts, data_copy.Nfreqs, data_copy.Npols),
             )
+
+            for model_ind, model in enumerate(model_list):
+                model_times = list(set(model.time_array))
+                model_copy = model.select(
+                    times=model_times[
+                        np.where(
+                            np.abs(model_times - time_val)
+                            == np.min(np.abs(model_times - time_val))
+                        )[0][
+                            0
+                        ]  # Account for times that are close but not exactly equal
+                    ],
+                    inplace=False,
+                )
+                model_copy.reorder_blts()
+                model_copy.reorder_pols(order="AIPS")
+                model_copy.reorder_freqs(channel_order="freq")
+
+                if self.n_directions == 1:
+                    self.model_visibilities[time_ind, :, :, :] = np.reshape(
+                        model_copy.data_array,
+                        (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+                    )
+                else:
+                    self.model_visibilities[time_ind, :, :, :, model_ind] = np.reshape(
+                        model_copy.data_array,
+                        (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+                    )
+
+                # Update flag_array if the model contains flags
+                flag_array[time_ind, :, :, :] = np.max(
+                    np.stack(
+                        [
+                            np.reshape(
+                                model_copy.flag_array,
+                                (model_copy.Nblts, model_copy.Nfreqs, model_copy.Npols),
+                            ),
+                            flag_array[time_ind, :, :, :],
+                        ]
+                    ),
+                    axis=0,
+                )
 
         self.antpos_enu, _ = data.get_enu_data_ants()
 
         # Free memory
-        data = model = data_copy = model_copy = None
+        data.__init__()
+        for model in model_list:
+            model.__init__()
+        data_copy = model_copy = None
 
         # Grab other metadata from uvfits
         self.channel_width = np.mean(metadata_reference.channel_width)
         self.freq_array = np.reshape(metadata_reference.freq_array, (self.Nfreqs))
         self.integration_time = np.mean(metadata_reference.integration_time)
         self.time = np.mean(metadata_reference.time_array)
-        self.telescope_name = metadata_reference.telescope.name
+        self.telescope = metadata_reference.telescope
         self.lst = np.mean(metadata_reference.lst_array)
-        self.telescope_location = Quantity(
-            metadata_reference.telescope.location.geocentric
-        ).to_value("m")
 
         if (min_cal_baseline_lambda is not None) or (
             max_cal_baseline_lambda is not None
@@ -488,7 +848,7 @@ class CalData:
                 :,
             ] = True
 
-        # Create gains expand matrices
+        # Define antenna to baseline mapping
         self.ant1_inds = np.zeros(self.Nbls, dtype=int)
         self.ant2_inds = np.zeros(self.Nbls, dtype=int)
         self.antenna_numbers = np.unique(
@@ -506,7 +866,9 @@ class CalData:
         self.antenna_names = np.array(
             [
                 np.array(metadata_reference.telescope.antenna_names)[
-                    np.where(metadata_reference.telescope.antenna_numbers == ant_num)[0][0]
+                    np.where(metadata_reference.telescope.antenna_numbers == ant_num)[
+                        0
+                    ][0]
                 ]
                 for ant_num in self.antenna_numbers
             ]
@@ -514,7 +876,10 @@ class CalData:
         self.antenna_positions = np.array(
             [
                 np.array(metadata_reference.telescope.antenna_positions)[
-                    np.where(metadata_reference.telescope.antenna_numbers == ant_num)[0][0], :
+                    np.where(metadata_reference.telescope.antenna_numbers == ant_num)[
+                        0
+                    ][0],
+                    :,
                 ]
                 for ant_num in self.antenna_numbers
             ]
@@ -526,10 +891,18 @@ class CalData:
         ).to_value(
             "m"
         )  # Get antennas positions in ECEF
-        antpos_enu = pyuvdata.utils.ENU_from_ECEF(
+        antenna_positions_topocentric = pyuvdata.utils.ENU_from_ECEF(
             antpos_ecef, center_loc=metadata_reference.telescope.location
         )  # Convert to topocentric (East, North, Up or ENU) coords.
-        uvw_array = antpos_enu[self.ant1_inds, :] - antpos_enu[self.ant2_inds, :]
+        self.antenna_distances = np.sqrt(
+            antenna_positions_topocentric[:, 0] ** 2.0
+            + antenna_positions_topocentric[:, 1] ** 2.0
+        )
+
+        uvw_array = (
+            antenna_positions_topocentric[self.ant1_inds, :]
+            - antenna_positions_topocentric[self.ant2_inds, :]
+        )
         self.uv_array = uvw_array[:, :2]
 
         # Get polarization ordering
@@ -564,96 +937,6 @@ class CalData:
         else:
             self.feed_polarization_array = feed_polarization_array
 
-        # Initialize gains
-        self.gains_multiply_model = gains_multiply_model
-        if gain_init_calfile is None:
-            self.gains = np.ones(
-                (
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-                dtype=complex,
-            )
-            if gain_init_to_vis_ratio:  # Use mean ratio of visibility amplitudes
-                vis_amp_ratio = np.abs(self.model_visibilities) / np.abs(
-                    self.data_visibilities
-                )
-                vis_amp_ratio[np.where(self.data_visibilities == 0.0)] = np.nan
-                if self.gains_multiply_model:
-                    self.gains[:, :, :] = 1 / np.sqrt(np.nanmedian(vis_amp_ratio))
-                else:
-                    self.gains[:, :, :] = np.sqrt(np.nanmedian(vis_amp_ratio))
-        else:  # Initialize from file
-            self.set_gains_from_calfile(gain_init_calfile)
-            # Capture nan-ed gains as flags
-            for feed_pol_ind, feed_pol in enumerate(self.feed_polarization_array):
-                nan_gains = np.where(~np.isfinite(self.gains[:, :, feed_pol_ind]))
-                if len(nan_gains[0]) > 0:
-                    if feed_pol == -5:
-                        flag_pols = np.where(
-                            (metadata_reference.polarization_array == -5)
-                            | (metadata_reference.polarization_array == -7)
-                            | (metadata_reference.polarization_array == -8)
-                        )[0]
-                    elif feed_pol == -6:
-                        flag_pols = np.where(
-                            (metadata_reference.polarization_array == -6)
-                            | (metadata_reference.polarization_array == -7)
-                            | (metadata_reference.polarization_array == -8)
-                        )[0]
-                    for flag_ind in range(len(nan_gains[0])):
-                        flag_bls = np.unique(
-                            np.concatenate(
-                                (
-                                    np.where(self.ant1_inds == nan_gains[0][flag_ind])[
-                                        0
-                                    ],
-                                    np.where(self.ant2_inds == nan_gains[0][flag_ind])[
-                                        0
-                                    ],
-                                )
-                            )
-                        )
-                        flag_freq = nan_gains[1][flag_ind]
-                        for flag_pol in flag_pols:
-                            flag_array[
-                                :,
-                                flag_bls,
-                                flag_freq,
-                                flag_pol,
-                            ] = True
-                    self.gains[nan_gains, feed_pol_ind] = (
-                        0.0  # Nans in the gains produce matrix multiplication errors, set to zero
-                    )
-
-        # Free memory
-        metadata_reference = None
-
-        # Random perturbation of initial gains
-        if gain_init_stddev != 0.0:
-            self.gains += np.random.normal(
-                0.0,
-                gain_init_stddev,
-                size=(
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            ) + 1.0j * np.random.normal(
-                0.0,
-                gain_init_stddev,
-                size=(
-                    self.Nants,
-                    self.Nfreqs,
-                    self.N_feed_pols,
-                ),
-            )
-
-        # Initialize abscal parameters
-        self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
-        self.abscal_params[0, :, :] = 1.0
-
         # Define visibility weights
         self.visibility_weights = np.ones(
             (
@@ -669,154 +952,168 @@ class CalData:
         self.fit_vis = self.model_visibilities.copy()
         self.model_weights = np.ones_like(self.visibility_weights)
 
+        # Initialize gains
+        self.gains_multiply_model = gains_multiply_model
+        self.initialize_gains(
+            gain_init_calfile=gain_init_calfile,
+            gain_init_to_vis_ratio=gain_init_to_vis_ratio,
+            gain_init_stddev=gain_init_stddev,
+        )
+
+        # Free memory
+        metadata_reference = None
+
+        # Initialize abscal parameters
+        self.abscal_params = np.zeros((3, self.Nfreqs, self.N_feed_pols), dtype=float)
+        self.abscal_params[0, :, :] = 1.0
+
+        # Regularization terms
         self.lambda_val = lambda_val
+        self.ddcal_max_source_offset_deg = ddcal_max_source_offset_deg
+        self.ddcal_source_offset_taper_deg = ddcal_source_offset_taper_deg
+        if self.ddcal_max_source_offset_deg is not None:
+            self.ddcal_regularization_setup()
+        self.get_crosspol_phase = get_crosspol_phase
+        self.crosspol_phase_strategy = crosspol_phase_strategy
+        if cartesian_optimization is None:
+            self.cartesian_optimization = True
+        else:
+            self.cartesian_optimization = cartesian_optimization
 
-    def expand_in_frequency(self):
-        """
-        Converts a caldata object into a list of caldata objects each
-        corresponding to one frequency.
+        # Optimizer options
+        self.xtol = xtol
+        self.maxiter = maxiter
+        self.verbose = verbose
+        self.parallel = parallel
+        self.n_workers = n_workers
 
-        Returns
-        -------
-        caldata_list : list of caldata objects
-        """
+    def get_caldata_subset(
+        self, freq_ind: int | None, feed_pol_ind: int | None
+    ) -> Self:
 
-        caldata_list = []
-        for freq_ind in range(self.Nfreqs):
-            caldata_per_freq = CalData()
-            caldata_per_freq.gains = self.gains[:, [freq_ind], :]
-            caldata_per_freq.abscal_params = self.abscal_params[:, [freq_ind], :]
-            caldata_per_freq.Nants = self.Nants
-            caldata_per_freq.Nbls = self.Nbls
-            caldata_per_freq.Ntimes = self.Ntimes
-            caldata_per_freq.Nfreqs = 1
-            caldata_per_freq.N_feed_pols = self.N_feed_pols
-            caldata_per_freq.N_vis_pols = self.N_vis_pols
-            caldata_per_freq.feed_polarization_array = self.feed_polarization_array
-            caldata_per_freq.vis_polarization_array = self.vis_polarization_array
-            caldata_per_freq.model_visibilities = self.model_visibilities[
-                :, :, [freq_ind], :
-            ]
-            caldata_per_freq.data_visibilities = self.data_visibilities[
-                :, :, [freq_ind], :
-            ]
-            caldata_per_freq.visibility_weights = self.visibility_weights[
-                :, :, [freq_ind], :
-            ]
-            # needed by unified calibration
-            if self.model_weights is not None:
-                caldata_per_freq.model_weights = self.model_weights[
-                    :, :, [freq_ind], :
-                ]
-            if self.fit_vis is not None:
-                caldata_per_freq.fit_vis = self.fit_vis[:, :, [freq_ind], :]
-            caldata_per_freq.sigma_t_0 = self.sigma_t_0
-            caldata_per_freq.sigma_m_0 = self.sigma_m_0
-            caldata_per_freq.ant1_inds = self.ant1_inds
-            caldata_per_freq.ant2_inds = self.ant2_inds
-            caldata_per_freq.gains_multiply_model = self.gains_multiply_model
-            caldata_per_freq.antenna_names = self.antenna_names
-            caldata_per_freq.antenna_numbers = self.antenna_numbers
-            caldata_per_freq.antenna_positions = self.antenna_positions
-            caldata_per_freq.uv_array = self.uv_array
-            caldata_per_freq.channel_width = self.channel_width
-            caldata_per_freq.freq_array = self.freq_array[[freq_ind]]
-            caldata_per_freq.integration_time = self.integration_time
-            caldata_per_freq.time = self.time
-            caldata_per_freq.telescope_name = self.telescope_name
-            caldata_per_freq.lst = self.lst
-            caldata_per_freq.telescope_location = self.telescope_location
-            caldata_per_freq.lambda_val = self.lambda_val
-            if self.dwcal_inv_covariance is not None:
-                print(
-                    "WARNING: Discarding dwcal_inv_covariance in frequency expansion."
+        if freq_ind is None:
+            freq_slice = slice(0, self.Nfreqs + 1)
+            Nfreqs = self.Nfreqs
+        else:
+            freq_slice = slice(freq_ind, freq_ind + 1)
+            Nfreqs = 1
+
+        if feed_pol_ind is None:
+            feed_pol_slice = slice(0, self.N_feed_pols + 1)
+            vis_pol_slice = slice(0, self.N_vis_pols + 1)
+            N_feed_pols = self.N_feed_pols
+            N_vis_pols = self.N_vis_pols
+        else:
+            feed_pol_slice = slice(feed_pol_ind, feed_pol_ind + 1)
+            if self.N_vis_pols > self.N_feed_pols:
+                warnings.warn(
+                    "WARNING: Discarding cross-polarization data.", stacklevel=2
                 )
-            caldata_per_freq.dwcal_inv_covariance = None
-            caldata_per_freq.dwcal_memory_save_mode = None
-            caldata_list.append(caldata_per_freq)
+            vis_pol_ind = np.where(
+                self.vis_polarization_array
+                == self.feed_polarization_array[feed_pol_ind]
+            )[0][0]
+            vis_pol_slice = slice(vis_pol_ind, vis_pol_ind + 1)
+            N_feed_pols = 1
+            N_vis_pols = 1
 
-        return caldata_list
+        caldata_subset = CalData()
+        caldata_subset.gains = self.gains[:, freq_slice, feed_pol_slice, ...]
+        caldata_subset.abscal_params = self.abscal_params[:, freq_slice, feed_pol_slice]
+        caldata_subset.Nants = self.Nants
+        caldata_subset.Nbls = self.Nbls
+        caldata_subset.Ntimes = self.Ntimes
+        caldata_subset.Nfreqs = Nfreqs
+        caldata_subset.N_feed_pols = N_feed_pols
+        caldata_subset.N_vis_pols = N_vis_pols
+        caldata_subset.n_directions = self.n_directions
+        caldata_subset.feed_polarization_array = self.feed_polarization_array[
+            feed_pol_slice
+        ]
+        caldata_subset.vis_polarization_array = self.vis_polarization_array[
+            vis_pol_slice
+        ]
+        caldata_subset.model_visibilities = self.model_visibilities[
+            :, :, freq_slice, vis_pol_slice, ...
+        ]
+        caldata_subset.data_visibilities = self.data_visibilities[
+            :, :, freq_slice, vis_pol_slice
+        ]
+        caldata_subset.visibility_weights = self.visibility_weights[
+            :, :, freq_slice, vis_pol_slice
+        ]
 
-    def expand_in_polarization(self):
-        """
-        Converts a caldata object into a list of caldata objects each
-        corresponding to one feed polarization. List does not include
-        cross-polarization visibilities.
-
-        Returns
-        -------
-        caldata_list : list of caldata objects
-        """
-
-        caldata_list = []
-        for feed_pol_ind, pol in enumerate(self.feed_polarization_array):
-            caldata_per_pol = CalData()
-            sky_pol_ind = np.where(self.vis_polarization_array == pol)[0][0]
-            caldata_per_pol.gains = self.gains[:, :, [feed_pol_ind]]
-            caldata_per_pol.abscal_params = self.abscal_params[:, :, [feed_pol_ind]]
-            caldata_per_pol.Nants = self.Nants
-            caldata_per_pol.Nbls = self.Nbls
-            caldata_per_pol.Ntimes = self.Ntimes
-            caldata_per_pol.Nfreqs = self.Nfreqs
-            caldata_per_pol.N_feed_pols = 1
-            caldata_per_pol.N_vis_pols = 1
-            caldata_per_pol.feed_polarization_array = self.feed_polarization_array[
-                [feed_pol_ind]
+        caldata_subset.ant1_inds = self.ant1_inds
+        caldata_subset.ant2_inds = self.ant2_inds
+        caldata_subset.gains_multiply_model = self.gains_multiply_model
+        caldata_subset.antenna_names = self.antenna_names
+        caldata_subset.antenna_numbers = self.antenna_numbers
+        caldata_subset.antenna_positions = self.antenna_positions
+        caldata_subset.antenna_distances = self.antenna_distances
+        caldata_subset.uv_array = self.uv_array
+        caldata_subset.channel_width = self.channel_width
+        caldata_subset.freq_array = self.freq_array[freq_slice]
+        caldata_subset.integration_time = self.integration_time
+        caldata_subset.time = self.time
+        caldata_subset.telescope = self.telescope
+        caldata_subset.lst = self.lst
+        caldata_subset.xtol = self.xtol
+        caldata_subset.maxiter = self.maxiter
+        caldata_subset.lambda_val = self.lambda_val
+        caldata_subset.get_crosspol_phase = self.get_crosspol_phase
+        caldata_subset.crosspol_phase_strategy = self.crosspol_phase_strategy
+        caldata_subset.ddcal_max_source_offset_deg = self.ddcal_max_source_offset_deg
+        caldata_subset.ddcal_source_offset_taper_deg = (
+            self.ddcal_source_offset_taper_deg
+        )
+        if self.ddcal_max_phase_offset_rad is not None:
+            caldata_subset.ddcal_max_phase_offset_rad = self.ddcal_max_phase_offset_rad[
+                freq_slice
             ]
-            caldata_per_pol.vis_polarization_array = self.vis_polarization_array[
-                [sky_pol_ind]
+            caldata_subset.ddcal_phase_offset_taper_rad = (
+                self.ddcal_phase_offset_taper_rad[freq_slice]
+            )
+            caldata_subset.ddcal_ant_inds_regularized = self.ddcal_ant_inds_regularized[
+                freq_slice
             ]
-            caldata_per_pol.model_visibilities = self.model_visibilities[
-                :, :, :, [sky_pol_ind]
-            ]
-            caldata_per_pol.data_visibilities = self.data_visibilities[
-                :, :, :, [sky_pol_ind]
-            ]
-            caldata_per_pol.visibility_weights = self.visibility_weights[
-                :, :, :, [sky_pol_ind]
-            ]
-            caldata_per_pol.ant1_inds = self.ant1_inds
-            caldata_per_pol.ant2_inds = self.ant2_inds
-            caldata_per_pol.gains_multiply_model = self.gains_multiply_model
-            caldata_per_pol.antenna_names = self.antenna_names
-            caldata_per_pol.antenna_numbers = self.antenna_numbers
-            caldata_per_pol.antenna_positions = self.antenna_positions
-            caldata_per_pol.uv_array = self.uv_array
-            caldata_per_pol.channel_width = self.channel_width
-            caldata_per_pol.freq_array = self.freq_array
-            caldata_per_pol.integration_time = self.integration_time
-            caldata_per_pol.time = self.time
-            caldata_per_pol.telescope_name = self.telescope_name
-            caldata_per_pol.lst = self.lst
-            caldata_per_pol.telescope_location = self.telescope_location
-            caldata_per_pol.lambda_val = self.lambda_val
-            if self.dwcal_inv_covariance is not None:
-                if np.shape(self.dwcal_inv_covariance)[-1] == 1:
-                    caldata_per_pol.dwcal_inv_covariance = self.dwcal_inv_covariance
-                else:
-                    if self.dwcal_memory_save_mode:
-                        caldata_per_pol.dwcal_inv_covariance = (
-                            self.dwcal_inv_covariance[:, :, :, [sky_pol_ind]]
-                        )
-                    else:
-                        caldata_per_pol.dwcal_inv_covariance = (
-                            self.dwcal_inv_covariance[:, :, :, :, [sky_pol_ind]]
-                        )
-            caldata_per_pol.dwcal_memory_save_mode = self.dwcal_memory_save_mode
-            caldata_list.append(caldata_per_pol)
+        caldata_subset.verbose = self.verbose
+        caldata_subset.parallel = self.parallel
+        caldata_subset.n_workers = self.n_workers
 
-        return caldata_list
+        if self.dwcal_inv_covariance is not None:
+            warnings.warn(
+                "WARNING: Discarding dwcal_inv_covariance due to frequency selection.",
+                stacklevel=2,
+            )
+        caldata_subset.dwcal_inv_covariance = None
+        caldata_subset.dwcal_memory_save_mode = None
 
-    def convert_to_uvcal(self):
+        # unified calibration
+        if self.fit_vis is not None:
+            caldata_subset.fit_vis = self.fit_vis[:, :, freq_slice, vis_pol_slice]
+        if self.model_weights is not None:
+            caldata_subset.model_weights = self.model_weights[
+                :, :, freq_slice, vis_pol_slice
+            ]
+        caldata_subset.uv_blt_array = self.uv_blt_array
+        caldata_subset.uv_norm = self.uv_norm
+        caldata_subset.antpos_enu = self.antpos_enu
+        caldata_subset.sigma_t_0 = self.sigma_t_0
+        caldata_subset.sigma_m_0 = self.sigma_m_0
+
+        return caldata_subset
+
+    def convert_to_uvcal(self) -> UVCal | list[UVCal]:
         """
         Generate a pyuvdata UVCal object.
 
         Returns
         -------
-        uvcal : pyuvdata UVCal object
+        uvcal | list(uvcal) : pyuvdata UVCal object. If n_directions > 1, returns a list of UVCal objects.
         """
 
         uvcal = pyuvdata.UVCal()
+        uvcal.Nants = self.Nants
         uvcal.Nants_data = self.Nants
         uvcal.Nants_telescope = self.Nants
         uvcal.Nfreqs = self.Nfreqs
@@ -839,19 +1136,28 @@ class CalData:
         uvcal.integration_time = np.array([self.integration_time])
         uvcal.jones_array = self.feed_polarization_array
         uvcal.spw_array = np.array([0])
-        uvcal.telescope_name = self.telescope_name
+        uvcal.telescope = self.telescope
         uvcal.lst_array = np.array([self.lst])
-        uvcal.telescope_location = self.telescope_location
         uvcal.time_array = np.array([self.time])
         uvcal.x_orientation = "east"
-        uvcal.gain_array = self.gains[:, :, np.newaxis, :]
+        if self.n_directions == 1:
+            uvcal.gain_array = self.gains[:, :, np.newaxis, :]
+        else:
+            uvcal.gain_array = self.gains[
+                :, :, np.newaxis, :, 0
+            ]  # Initialize with the first direction
         uvcal.ref_antenna_name = "none"
         uvcal.sky_catalog = ""
         uvcal.wide_band = False
         uvcal.flex_spw_id_array = np.zeros(self.Nfreqs, dtype=int)
 
-        # Get flags from nan-ed gains and zeroed weights
-        uvcal.flag_array = (np.isnan(self.gains))[:, :, np.newaxis, :]
+        # Get flags from nan-ed gains
+        if self.n_directions == 1:
+            uvcal.flag_array = np.isnan(self.gains[:, :, np.newaxis, :])
+        else:
+            uvcal.flag_array = np.isnan(
+                self.gains[:, :, np.newaxis, :, 0]
+            )  # Initialize with the first direction
 
         # Get flags from visibility_weights
         antenna_weights = np.zeros(
@@ -877,6 +1183,10 @@ class CalData:
                         (self.vis_polarization_array == -6)
                         | (self.vis_polarization_array == -7)
                     )[0]
+                else:
+                    raise ValueError(
+                        f"Unknown option for feed_polarization_array {self.feed_polarization_array[pol_ind]}."
+                    )
                 ant1_antenna_weights = np.zeros((self.Nfreqs))
                 ant2_antenna_weights = np.zeros((self.Nfreqs))
                 for vis_pol_ind in use_vis_pol_inds_ant1:
@@ -903,158 +1213,290 @@ class CalData:
         except:
             print("ERROR: UVCal check failed.")
 
-        return uvcal
+        if self.n_directions == 1:
+            return uvcal
+        else:
+            uvcal_list = [uvcal]
+            for direction_ind in range(1, self.n_directions):
+                uvcal_new = uvcal.copy()
+                uvcal_new.gain_array = self.gains[:, :, np.newaxis, :, direction_ind]
+                uvcal_new.flag_array = np.isnan(
+                    self.gains[:, :, np.newaxis, :, direction_ind]
+                )
+                # Apply flags from visibility weights
+                uvcal_new.flag_array[
+                    np.where(antenna_weights[:, :, np.newaxis, :] == 0)
+                ] = True
+                uvcal_list.append(uvcal_new)
+            return uvcal_list
 
-    def sky_based_calibration(
-        self,
-        xtol=1e-5,
-        maxiter=200,
-        get_crosspol_phase=True,
-        crosspol_phase_strategy="crosspol model",
-        parallel=False,
-        max_processes=40,
-        pool=None,
-        verbose=False,
-    ):
+    def _sky_based_calibration_task_generator(self):
+        """
+        Generator that assembles arugments for running sky_based_calibration in parallel.
+        """
+        for freq_ind in range(self.Nfreqs):
+            caldata_subset = self.get_caldata_subset(freq_ind, None)
+            yield (caldata_subset, freq_ind)
+
+    def sky_based_calibration(self) -> None:
         """
         Run calibration per polarization. Updates the gains attribute with calibrated values.
         Here the XX and YY visibilities are calibrated individually and the cross-polarization
         phase is applied from the XY and YX visibilities after the fact. Option to parallelize
         calibration across frequency.
 
-        Parameters
-        ----------
-        xtol : float
-            Accuracy tolerance for optimizer. Default 1e-5.
-        maxiter : int
-            Maximum number of iterations for the optimizer. Default 200.
-        get_crosspol_phase : bool
-            If True, crosspol phase is calculated. Default True.
-        crosspol_phase_strategy : str
-            Options are "crosspol model" or "pseudo Stokes V". Used only if
-            get_crosspol_phase is True. If "crosspol model", contrains the crosspol
-            phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
-            crosspol phase by minimizing pseudo Stokes V. Default "crosspol model".
-        parallel : bool
-            Set to True to parallelize across frequency with multiprocessing.
-            Default False if pool is None.
-        max_processes : int
-            Maximum number of multithreaded processes to use. Applicable only if
-            parallel is True and pool is None. If None, uses the multiprocessing
-            default. Default 40.
-        pool : multiprocessing.pool.Pool or None
-            Pool for multiprocessing. If None and parallel is True, a new pool will be
-            created. Default None.
-        verbose : bool
-            Set to True to print optimization outputs. Default False.
+        Raises
+        ------
+        ValueError
+            If inputs are invalid (n_directions>1, non-positive xtol or maxiter, invalid
+            crosspol_phase_strategy, or n_workers < 1).
         """
+
+        if self.n_directions > 1:
+            raise ValueError(
+                "sky_based_calibration does not support multiple directions. "
+                "Use direction_dependent_calibration instead."
+            )
+        if self.xtol <= 0:
+            raise ValueError(f"xtol must be positive, got {xtol}.")
+        if self.maxiter <= 0:
+            raise ValueError(f"maxiter must be a positive integer, got {maxiter}.")
+        if self.get_crosspol_phase and self.crosspol_phase_strategy not in [
+            "crosspol model",
+            "pseudo Stokes V",
+        ]:
+            raise ValueError(
+                f"crosspol_phase_strategy must be one of "
+                f"['crosspol model', 'pseudo Stokes V'], got {crosspol_phase_strategy!r}."
+            )
+        if self.parallel and self.n_workers is not None and self.n_workers < 1:
+            raise ValueError(
+                f"n_workers must be a positive integer or None, got {self.n_workers}."
+            )
+        if self.Nfreqs < 1:
+            raise ValueError(f"self.Nfreqs must be positive, got {self.Nfreqs}.")
+        if not self.cartesian_optimization:
+            raise ValueError(
+                f"sky_based_calibration supports Cartesian optimization only, but cartesian_optimization is {self.cartesian_optimization}."
+            )
 
         if np.max(self.visibility_weights) == 0.0:
-            print("ERROR: All data flagged.")
-            sys.stdout.flush()
+            warnings.warn(
+                "All data flagged; setting all gains to NaN and skipping calibration.",
+                stacklevel=2,
+            )
             self.gains[:, :, :] = np.nan + 1j * np.nan
+            return
+
+        if self.parallel:
+            n_workers = min(self.Nfreqs, self.n_workers)
+            ctx = multiprocessing.get_context("forkserver")
+
+            with ctx.Pool(processes=n_workers, maxtasksperchild=10) as pool:
+                for freq_ind, gains_fit in pool.imap_unordered(
+                    calibration_optimization.run_skycal_optimization_per_pol_single_freq_parallel,
+                    self._sky_based_calibration_task_generator(),
+                ):
+                    self.gains[:, freq_ind, :] = gains_fit
         else:
-            if pool is not None:
-                parallel = True
-                use_pool = pool
-            if parallel:
-                caldata_list = self.expand_in_frequency()
-                args_list = []
-                for freq_ind in range(self.Nfreqs):
-                    args = (
-                        caldata_list[freq_ind],
-                        xtol,
-                        maxiter,
-                        0,
-                        verbose,
-                        get_crosspol_phase,
-                    )
-                    args_list.append(args)
-                if pool is None:
-                    if max_processes is None:
-                        use_pool = multiprocessing.Pool()
-                    else:
-                        use_pool = multiprocessing.Pool(processes=max_processes)
-                gains_fit = use_pool.starmap(
-                    calibration_optimization.run_skycal_optimization_per_pol_single_freq,
-                    args_list,
+            for freq_ind in range(self.Nfreqs):
+                gains_fit = calibration_optimization.run_skycal_optimization_per_pol_single_freq(
+                    self,
+                    freq_ind=freq_ind,
                 )
-                for freq_ind in range(self.Nfreqs):
-                    self.gains[:, [freq_ind], :] = gains_fit[freq_ind][:, np.newaxis, :]
-                if pool is None:  # Leave things how we found them
-                    use_pool.terminate()
-            else:
-                for freq_ind in range(self.Nfreqs):
-                    gains_fit = calibration_optimization.run_skycal_optimization_per_pol_single_freq(
-                        self,
-                        xtol,
-                        maxiter,
-                        freq_ind=freq_ind,
-                        verbose=verbose,
-                        get_crosspol_phase=get_crosspol_phase,
-                        crosspol_phase_strategy=crosspol_phase_strategy,
-                    )
-                    self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :]
+                self.gains[:, freq_ind, :] = gains_fit
 
-    def abscal(self, xtol=1e-5, maxiter=200, verbose=False):
+    def _direction_dependent_calibration_task_generator(self):
         """
-        Run absolute calibration ("abscal"). Updates the abscal_params attribute with calibrated values.
-
-        Parameters
-        ----------
-        xtol : float
-            Accuracy tolerance for optimizer. Default 1e-5.
-        maxiter : int
-            Maximum number of iterations for the optimizer. Default 200.
-        verbose : bool
-            Set to True to print optimization outputs. Default False.
+        Generator that assembles arugments for running sky_based_calibration in parallel.
         """
-
-        # Expand CalData object into per-frequency objects
-        caldata_list = self.expand_in_frequency()
-
         for freq_ind in range(self.Nfreqs):
-            abscal_params = (
-                calibration_optimization.run_abscal_optimization_single_freq(
-                    caldata_list[freq_ind],
-                    xtol,
-                    maxiter,
-                    verbose=verbose,
+            for pol_ind in range(self.N_feed_pols):
+                caldata_subset = self.get_caldata_subset(freq_ind, pol_ind)
+                yield (caldata_subset, freq_ind, pol_ind)
+
+    def direction_dependent_calibration(self) -> None:
+        """
+        Run direction-dependent calibration for each polarization and frequency. Updates the
+        gains attribute with calibrated values.
+        """
+
+        if not self.gains_multiply_model:
+            raise ValueError(
+                "gains_multiply_model is False. Direction-dependent calibration requires that gains_multiply_model=True."
+            )
+        if self.get_crosspol_phase:
+            raise ValueError(
+                "get_crosspol_phase is True, but direction_dependent_calibration does not support crosspol phase evaluation."
+            )
+
+        if self.Nfreqs == 1:
+            self.parallel = False
+
+        if self.parallel:
+            n_workers = min(self.Nfreqs, self.n_workers)
+            ctx = multiprocessing.get_context("forkserver")
+
+            with ctx.Pool(processes=n_workers, maxtasksperchild=10) as pool:
+                for freq_ind, pol_ind, gains_fit in pool.imap_unordered(
+                    calibration_optimization.run_ddcal_optimization_parallel,
+                    self._direction_dependent_calibration_task_generator(),
+                ):
+                    if self.n_directions == 1:
+                        self.gains[:, [freq_ind], [pol_ind]] = gains_fit[
+                            :, np.newaxis, 0
+                        ]
+                    else:
+                        self.gains[:, [freq_ind], [pol_ind], :] = gains_fit[
+                            :, np.newaxis, :
+                        ]
+        else:
+            for pol_ind in range(self.N_feed_pols):
+                for freq_ind in range(self.Nfreqs):
+                    gains_fit = calibration_optimization.run_ddcal_optimization(
+                        self,
+                        freq_ind=freq_ind,
+                        pol_ind=pol_ind,
+                    )
+                    if self.n_directions == 1:
+                        self.gains[:, [freq_ind], [pol_ind]] = gains_fit[
+                            :, np.newaxis, 0
+                        ]
+                    else:
+                        self.gains[:, [freq_ind], [pol_ind], :] = gains_fit[
+                            :, np.newaxis, :
+                        ]
+
+    def delay_weighted_calibration(self) -> None:
+        """
+        Run delay-weighted calibration (DWCal). Updates attribute gains with calibrated values.
+        """
+
+        if self.gains_multiply_model:
+            raise ValueError(
+                "gains_multiply_model is True. delay_weighted_calibration requires that gains_multiply_model=False."
+            )
+        if not self.cartesian_optimization:
+            raise ValueError(
+                f"delay_weighted_calibration supports Cartesian optimization only, but cartesian_optimization is {self.cartesian_optimization}."
+            )
+        if self.parallel:
+            warnings.warn(
+                "delay_weighted_calibration does not support parallel processing. Proceeding with non-parallel optimization."
+            )
+
+        for feed_pol_ind in range(self.N_feed_pols):
+            self.gains[:, :, feed_pol_ind] = (
+                calibration_optimization.run_dwcal_optimization_per_pol(
+                    self,
+                    feed_pol_ind,
                 )
             )
-            self.abscal_params[:, [freq_ind], :] = abscal_params[:, [0], :]
 
-    def dw_abscal(self, xtol=1e-5, maxiter=200, verbose=False):
+    def convert_to_dwcal_memory_save_mode(self, check=True):
+
+        if not self.dwcal_memory_save_mode:
+            if check:
+                check_passed = True
+
+                # Check if Hermitian
+                if not np.allclose(
+                    self.dwcal_inv_covariance,
+                    np.conj(
+                        np.transpose(self.dwcal_inv_covariance, axes=(0, 1, 3, 2, 4))
+                    ),
+                ):
+                    print("ERROR: dwcal_inv_covariance is not Hermitian.")
+                    sys.exit(1)
+
+                # Check if Toeplitz
+                for ind1 in range(1, self.Nfreqs):
+                    for ind2 in range(1, self.Nfreqs):
+                        if not np.allclose(
+                            self.dwcal_inv_covariance[:, :, ind1, ind2, :],
+                            self.dwcal_inv_covariance[:, :, ind1 - 1, ind2 - 1, :],
+                        ):
+                            check_passed = False
+                            break
+                    if not check_passed:
+                        break
+                if not check_passed:
+                    print("ERROR: dwcal_inv_covariance is not Toeplitz.")
+                    sys.exit(1)
+
+            self.dwcal_memory_save_mode = True
+            self.dwcal_inv_covariance = self.dwcal_inv_covariance[:, :, :, 0, :]
+
+    def convert_from_dwcal_memory_save_mode(self):
+
+        if self.dwcal_memory_save_mode:
+            self.dwcal_memory_save_mode = False
+            dwcal_inv_covariance_new = np.zeros(
+                (
+                    self.Ntimes,
+                    self.Nbls,
+                    self.Nfreqs,
+                    self.Nfreqs,
+                    self.N_vis_pols,
+                ),
+                dtype=complex,
+            )
+            for time_ind in range(self.Ntimes):
+                for bl_ind in range(self.Nbls):
+                    for pol_ind in range(self.N_vis_pols):
+                        dwcal_inv_covariance_new[time_ind, bl_ind, :, :, pol_ind] = (
+                            scipy.linalg.toeplitz(
+                                self.dwcal_inv_covariance[time_ind, bl_ind, :, pol_ind]
+                            )
+                        )
+            self.dwcal_inv_covariance = dwcal_inv_covariance_new
+
+    def abscal(self) -> None:
+        """
+        Run absolute calibration ("abscal"). Updates the abscal_params attribute with calibrated values.
+        """
+
+        if self.parallel:
+            warnings.warn(
+                "abscal does not yet support parallel processing. Proceeding with non-parallel optimization."
+            )
+            self.parallel = False
+
+        for feed_pol_ind in range(self.N_feed_pols):
+            for freq_ind in range(self.Nfreqs):
+                abscal_params = (
+                    calibration_optimization.run_abscal_optimization_single_freq(
+                        self,
+                        freq_ind=freq_ind,
+                        feed_pol_ind=feed_pol_ind,
+                    )
+                )
+                self.abscal_params[:, freq_ind, feed_pol_ind] = abscal_params
+
+    def dw_abscal(self) -> None:
         """
         Run absolute calibration ("abscal") with delay weighting. Updates the
         abscal_params attribute with calibrated values.
-
-        Parameters
-        ----------
-        xtol : float
-            Accuracy tolerance for optimizer. Default 1e-5.
-        maxiter : int
-            Maximum number of iterations for the optimizer. Default 200.
-        verbose : bool
-            Set to True to print optimization outputs. Default False.
         """
 
-        self.abscal_params = calibration_optimization.run_dw_abscal_optimization(
-            self,
-            xtol,
-            maxiter,
-            verbose=verbose,
-        )
+        if self.parallel:
+            warnings.warn(
+                "dw_abscal does not support parallel processing. Proceeding with non-parallel optimization."
+            )
+
+        for feed_pol_ind in range(self.N_feed_pols):
+            self.abscal_params[:, :, feed_pol_ind] = (
+                calibration_optimization.run_dw_abscal_optimization(
+                    self,
+                    feed_pol_ind=feed_pol_ind,
+                )
+            )
 
     def flag_antennas_from_per_ant_cost(
         self,
-        flagging_threshold=2.5,
-        parallel=False,
-        max_processes=40,
-        pool=None,
-        return_antenna_flag_list=False,
-        verbose=True,
-    ):
+        flagging_threshold: float = 2.5,
+        return_antenna_flag_list: bool = False,
+    ) -> list | None:
         """
         Flags antennas based on the per-antenna cost function. Updates
         visibility_weights according to the flags. The cost function used is the
@@ -1067,19 +1509,8 @@ class CalData:
         flagging_threshold : float
             Flagging threshold. Per antenna cost values equal to flagging_threshold
             times the mean value will be flagged. Default 2.5.
-        parallel : bool
-            Set to True to parallelize cost evaluation with multiprocessing. Default
-            False if pool is None.
-        max_processes : int
-            Maximum number of multithreaded processes to use. Applicable only if
-            parallel is True and pool is None. If None, uses the multiprocessing
-            default. Default 40.
-        pool : multiprocessing.pool.Pool or None
-            Pool for multiprocessing. If None and parallel is True, a new pool will be
-            created for this process and terminated.
         return_antenna_flag_list : bool
             If True, returns list of flagged antennas.
-        verbose : bool
 
         Returns
         -------
@@ -1087,9 +1518,9 @@ class CalData:
             If return_antenna_flag_list is True, returns a list of flagged antenna names.
         """
 
-        per_ant_cost = calibration_qa.calculate_per_antenna_cost(
-            self, parallel=parallel, max_processes=max_processes, pool=pool
-        )
+        # TODO: Allow this function to be run in parallel
+
+        per_ant_cost = calibration_qa.calculate_per_antenna_cost(self)
 
         where_finite = np.isfinite(per_ant_cost)
         if np.sum(where_finite) > 0:
@@ -1137,7 +1568,7 @@ class CalData:
                 flag_antenna_list.append(self.antenna_names)
             self.visibility_weights[:, :, :, :] = 0
 
-        if verbose:
+        if self.verbose:
             print("Completed antenna flagging based on per-antenna cost function.")
             print(f"Flagged antennas: {flag_antenna_list}")
             sys.stdout.flush()
@@ -1147,11 +1578,11 @@ class CalData:
 
     def get_dwcal_weights_from_delay_spectra(
         self,
-        delay_spectrum_variance,
-        bl_length_bin_edges,
-        delay_axis,
-        oversample_factor=128,
-    ):
+        delay_spectrum_variance: NDArray[np.floating],
+        bl_length_bin_edges: NDArray[np.floating],
+        delay_axis: NDArray[np.floating],
+        oversample_factor: int = 128,
+    ) -> None:
         """
         This function calculates the matrix that captures delay weighting (or frequency
         covariance). The input is an array of expected variances as a function of baseline
@@ -1300,6 +1731,14 @@ class CalData:
 
         self.dwcal_inv_covariance = weight_mat
 
+    def _unified_calibration_task_generator(self, unical_kwargs):
+        """
+        Generator that assembles arguments for running unified_calibration in parallel.
+        """
+        for freq_ind in range(self.Nfreqs):
+            caldata_subset = self.get_caldata_subset(freq_ind, None)
+            yield (caldata_subset, freq_ind, unical_kwargs)
+
     def unified_calibration(
         self,
         xtol=1e-5,
@@ -1359,35 +1798,39 @@ class CalData:
             sys.stdout.flush()
             self.gains[:, :, :] = np.nan + 1j * np.nan
         else:
+            unical_kwargs = dict(
+                xtol=xtol,
+                maxiter=maxiter,
+                verbose=verbose,
+                get_crosspol_phase=get_crosspol_phase,
+                crosspol_phase_strategy=crosspol_phase_strategy,
+                optimization_scheme=optimization_scheme,
+                torch_maxiter=torch_maxiter,
+                allow_large_hessian=allow_large_hessian,
+            )
             if pool is not None:
                 parallel = True
-                use_pool = pool
             if parallel:
-                caldata_list = self.expand_in_frequency()
-                # each per-frequency object holds a single channel, so freq_ind=0
-                run_one_freq = functools.partial(
-                    calibration_optimization.run_unical_optimization,
-                    xtol=xtol,
-                    maxiter=maxiter,
-                    freq_ind=0,
-                    verbose=verbose,
-                    get_crosspol_phase=get_crosspol_phase,
-                    crosspol_phase_strategy=crosspol_phase_strategy,
-                    optimization_scheme=optimization_scheme,
-                    torch_maxiter=torch_maxiter,
-                    allow_large_hessian=allow_large_hessian,
-                )
+                tasks = self._unified_calibration_task_generator(unical_kwargs)
                 if pool is None:
-                    if max_processes is None:
-                        use_pool = multiprocessing.Pool()
-                    else:
-                        use_pool = multiprocessing.Pool(processes=max_processes)
-                results = use_pool.map(run_one_freq, caldata_list)
-                for freq_ind, (gains_fit, fit_vis_fit) in enumerate(results):
+                    n_workers = self.Nfreqs
+                    if max_processes is not None:
+                        n_workers = min(self.Nfreqs, max_processes)
+                    ctx = multiprocessing.get_context("forkserver")
+                    with ctx.Pool(processes=n_workers, maxtasksperchild=10) as new_pool:
+                        results = list(
+                            new_pool.imap_unordered(
+                                calibration_optimization.run_unical_optimization_parallel,
+                                tasks,
+                            )
+                        )
+                else:
+                    results = pool.imap_unordered(
+                        calibration_optimization.run_unical_optimization_parallel, tasks
+                    )
+                for freq_ind, gains_fit, fit_vis_fit in results:
                     self.gains[:, [freq_ind], :] = gains_fit[:, np.newaxis, :].copy()
                     self.fit_vis[:, :, [freq_ind], :] = fit_vis_fit[:, :, np.newaxis, :].copy()
-                if pool is None:  # Leave things how we found them
-                    use_pool.terminate()
             else:
                 for freq_ind in range(self.Nfreqs):
                     gains_fit, fit_vis_fit = (

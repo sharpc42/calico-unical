@@ -5,15 +5,18 @@ import scipy.optimize
 import time
 import torch
 from calico import cost_function_calculations
+from numpy.typing import NDArray
+import jax
+import jax.numpy as jnp
 
 
 def cost_skycal_wrapper(
-    gains_flattened,
+    gains_flattened: NDArray[np.floating],
     caldata_obj,
-    ant_inds,
-    freq_ind,
-    vis_pol_ind,
-):
+    ant_inds: NDArray[int],
+    freq_ind: int,
+    vis_pol_ind: int,
+) -> float:
     """
     Wrapper for function cost_skycal. Reformats the input gains to be compatible
     with the scipy.optimize.minimize function.
@@ -44,18 +47,18 @@ def cost_skycal_wrapper(
     gains[ant_inds] = gains_reshaped
     if caldata_obj.gains_multiply_model:
         cost = cost_function_calculations.cost_skycal(
-            gains,
+            gains[:, np.newaxis, np.newaxis],
             np.reshape(
                 caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
@@ -63,18 +66,18 @@ def cost_skycal_wrapper(
         )
     else:
         cost = cost_function_calculations.cost_skycal(
-            gains,
+            gains[:, np.newaxis, np.newaxis],
             np.reshape(
                 caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
@@ -84,12 +87,12 @@ def cost_skycal_wrapper(
 
 
 def jacobian_skycal_wrapper(
-    gains_flattened,
+    gains_flattened: NDArray[np.floating],
     caldata_obj,
-    ant_inds,
-    freq_ind,
-    vis_pol_ind,
-):
+    ant_inds: NDArray[int],
+    freq_ind: int,
+    vis_pol_ind: int,
+) -> NDArray[np.floating]:
     """
     Wrapper for function jacobian_skycal. Reformats the input gains and
     output Jacobian to be compatible with the scipy.optimize.minimize function.
@@ -123,18 +126,18 @@ def jacobian_skycal_wrapper(
     gains[ant_inds] = gains_reshaped
     if caldata_obj.gains_multiply_model:
         jac = cost_function_calculations.jacobian_skycal(
-            gains,
+            gains[:, np.newaxis, np.newaxis],
             np.reshape(
                 caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
@@ -142,36 +145,36 @@ def jacobian_skycal_wrapper(
         )
     else:
         jac = cost_function_calculations.jacobian_skycal(
-            gains,
+            gains[:, np.newaxis, np.newaxis],
             np.reshape(
                 caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
             caldata_obj.lambda_val,
         )
     jac_flattened = np.stack(
-        (np.real(jac[ant_inds]), np.imag(jac[ant_inds])), axis=1
+        (np.real(jac[ant_inds, 0, 0]), np.imag(jac[ant_inds, 0, 0])), axis=1
     ).flatten()
     return jac_flattened
 
 
 def hessian_skycal_wrapper(
-    gains_flattened,
+    gains_flattened: NDArray[np.floating],
     caldata_obj,
-    ant_inds,
-    freq_ind,
-    vis_pol_ind,
-):
+    ant_inds: NDArray[int],
+    freq_ind: int,
+    vis_pol_ind: int,
+) -> NDArray[np.floating]:
     """
     Wrapper for function hessian_skycal. Reformats the input gains and
     output Hessian to be compatible with the scipy.optimize.minimize function.
@@ -207,20 +210,20 @@ def hessian_skycal_wrapper(
             hess_real_imag,
             hess_imag_imag,
         ) = cost_function_calculations.hessian_skycal(
-            gains,
+            gains[:, np.newaxis, np.newaxis],
             caldata_obj.Nants,
             caldata_obj.Nbls,
             np.reshape(
                 caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
@@ -232,20 +235,20 @@ def hessian_skycal_wrapper(
             hess_real_imag,
             hess_imag_imag,
         ) = cost_function_calculations.hessian_skycal(
-            gains,
+            gains[:, np.newaxis, np.newaxis],
             caldata_obj.Nants,
             caldata_obj.Nbls,
             np.reshape(
                 caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             np.reshape(
                 caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
-                (caldata_obj.Ntimes, caldata_obj.Nbls),
+                (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
             ),
             caldata_obj.ant1_inds,
             caldata_obj.ant2_inds,
@@ -254,24 +257,175 @@ def hessian_skycal_wrapper(
     hess_flattened = np.full(
         (2 * Nants_unflagged, 2 * Nants_unflagged), np.nan, dtype=float
     )
-    for ant_ind_1 in range(Nants_unflagged):
-        for ant_ind_2 in range(Nants_unflagged):
-            hess_flattened[2 * ant_ind_1, 2 * ant_ind_2] = hess_real_real[
-                ant_ind_1, ant_ind_2
-            ]
-            hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2] = hess_real_imag[
-                ant_ind_1, ant_ind_2
-            ]
-            hess_flattened[2 * ant_ind_1, 2 * ant_ind_2 + 1] = np.conj(
-                hess_real_imag[ant_ind_2, ant_ind_1]
+    for unflagged_ant_ind1, ant_ind_1 in enumerate(ant_inds):
+        for unflagged_ant_ind2, ant_ind_2 in enumerate(ant_inds):
+            hess_flattened[2 * unflagged_ant_ind1, 2 * unflagged_ant_ind2] = (
+                hess_real_real[ant_ind_1, ant_ind_2, 0, 0]
             )
-            hess_flattened[2 * ant_ind_1 + 1, 2 * ant_ind_2 + 1] = hess_imag_imag[
-                ant_ind_1, ant_ind_2
-            ]
+            hess_flattened[2 * unflagged_ant_ind1, 2 * unflagged_ant_ind2 + 1] = (
+                hess_real_imag[ant_ind_1, ant_ind_2, 0, 0]
+            )
+            hess_flattened[2 * unflagged_ant_ind1 + 1, 2 * unflagged_ant_ind2] = (
+                np.conj(
+                    hess_real_imag[ant_ind_2, ant_ind_1, 0, 0]
+                )  # I believe this should be real-valued, so does the conjugation make sense?
+            )
+            hess_flattened[2 * unflagged_ant_ind1 + 1, 2 * unflagged_ant_ind2 + 1] = (
+                hess_imag_imag[ant_ind_1, ant_ind_2, 0, 0]
+            )
     return hess_flattened
 
 
-def cost_abscal_wrapper(abscal_parameters, caldata_obj):
+def cost_ddcal_wrapper(
+    gains_flattened: NDArray[np.floating],
+    caldata_obj,
+    ant_inds: NDArray[int],
+    freq_ind: int,
+    vis_pol_ind: int,
+) -> float:
+    """
+    Direction-dependent calibration cost function. Uses the function cost_ddcal.
+    Reformats the input gains to be compatible with the scipy.optimize.minimize function.
+
+    Parameters
+    ----------
+    gains_flattened : array of float
+        Array of gain values. Even indices correspond to the real components of the
+        gains and odd indices correspond to the imaginary components. Shape
+        (2*Nants_unflagged*n_directions,).
+    caldata_obj : CalData
+    ant_inds : array of int
+        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+    freq_ind : int
+        Frequency channel index.
+    vis_pol_ind : int
+        Index of the visibility polarization.
+
+    Returns
+    -------
+    cost : float
+        Value of the cost function.
+    """
+
+    gains_reshaped = jnp.reshape(
+        gains_flattened, (len(ant_inds), caldata_obj.n_directions, 2)
+    )
+    if caldata_obj.cartesian_optimization:
+        gains_reshaped = gains_reshaped[:, :, 0] + 1.0j * gains_reshaped[:, :, 1]
+    else:
+        gains_reshaped = gains_reshaped[:, :, 0] * jnp.exp(
+            2 * jnp.pi * 1j * gains_reshaped[:, :, 1]
+        )
+
+    gains = jnp.ones((caldata_obj.Nants, caldata_obj.n_directions), dtype=complex)
+    gains = gains.at[jnp.ix_(ant_inds, jnp.arange(caldata_obj.n_directions))].set(
+        gains_reshaped
+    )
+
+    if caldata_obj.ddcal_max_phase_offset_rad is None:
+        use_ddcal_max_phase_offset_rad = None
+        use_ddcal_phase_offset_taper_rad = None
+        use_ddcal_ant_inds_regularized = None
+    else:
+        use_ddcal_max_phase_offset_rad = [
+            caldata_obj.ddcal_max_phase_offset_rad[freq_ind]
+        ]
+        use_ddcal_phase_offset_taper_rad = [
+            caldata_obj.ddcal_phase_offset_taper_rad[freq_ind]
+        ]
+        use_ddcal_ant_inds_regularized = [
+            caldata_obj.ddcal_ant_inds_regularized[freq_ind]
+        ]
+
+    cost = cost_function_calculations.cost_ddcal(
+        gains[:, jnp.newaxis, jnp.newaxis, :],
+        jnp.reshape(
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind, ...],
+            (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1, caldata_obj.n_directions),
+        ),
+        jnp.reshape(
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
+            (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
+        ),
+        jnp.reshape(
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
+            (caldata_obj.Ntimes, caldata_obj.Nbls, 1, 1),
+        ),
+        caldata_obj.ant1_inds,
+        caldata_obj.ant2_inds,
+        caldata_obj.lambda_val,
+        use_ddcal_max_phase_offset_rad,
+        use_ddcal_phase_offset_taper_rad,
+        use_ddcal_ant_inds_regularized,
+    )
+    return cost
+
+
+def cost_dwcal_wrapper(
+    gains_flattened: NDArray[np.floating],
+    caldata_obj,
+    ant_inds: NDArray[int],
+    freq_inds: NDArray[int],
+    vis_pol_ind: int,
+) -> float:
+    """
+    Wrapper for function cost_dwcal. Reformats the input gains to be compatible
+    with the scipy.optimize.minimize function.
+
+    Parameters
+    ----------
+    gains_flattened : array of float
+        Array of gain values. Even indices correspond to the real components of the
+        gains and odd indices correspond to the imaginary components. Shape
+        (2*Nants_unflagged*Nfreqs_unflagged,).
+    caldata_obj : CalData
+    ant_inds : array of int
+        Indices of unflagged antennas to be calibrated. Shape (Nants_unflagged,).
+    freq_inds : int
+        Indices of unflagged frequency channels to be calibrated. Shape (Nfreqs_unflagged,).
+    vis_pol_ind : int
+        Index of the visibility polarization.
+
+    Returns
+    -------
+    cost : float
+        Value of the cost function.
+    """
+
+    gains_reshaped = jnp.reshape(gains_flattened, (len(ant_inds), len(freq_inds), 2))
+    gains_reshaped = gains_reshaped[:, :, [0]] + 1.0j * gains_reshaped[:, :, [1]]
+    gains = jnp.ones((caldata_obj.Nants, caldata_obj.Nfreqs, 1), dtype=complex)
+    gains = gains.at[jnp.ix_(ant_inds, freq_inds, jnp.array([0]))].set(gains_reshaped)
+
+    if caldata_obj.dwcal_memory_save_mode:
+        cost = cost_function_calculations.cost_dwcal_toeplitz(
+            gains,
+            caldata_obj.data_visibilities[:, :, :, [vis_pol_ind]],
+            caldata_obj.model_visibilities[:, :, :, [vis_pol_ind]],
+            caldata_obj.visibility_weights[:, :, :, [vis_pol_ind]],
+            caldata_obj.dwcal_inv_covariance[:, :, :, [vis_pol_ind]],
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+    else:
+        cost = cost_function_calculations.cost_dwcal(
+            gains,
+            caldata_obj.data_visibilities[:, :, :, [vis_pol_ind]],
+            caldata_obj.model_visibilities[:, :, :, [vis_pol_ind]],
+            caldata_obj.visibility_weights[:, :, :, [vis_pol_ind]],
+            caldata_obj.dwcal_inv_covariance[:, :, :, :, [vis_pol_ind]],
+            caldata_obj.ant1_inds,
+            caldata_obj.ant2_inds,
+            caldata_obj.lambda_val,
+        )
+
+    return cost
+
+
+def cost_abscal_wrapper(
+    abscal_parameters: NDArray[np.floating], caldata_obj, freq_ind, vis_pol_ind
+) -> float:
     """
     Wrapper for function cost_function_abs_cal.
 
@@ -280,6 +434,8 @@ def cost_abscal_wrapper(abscal_parameters, caldata_obj):
     abscal_parameters : array of float
         Shape (3,).
     caldata_obj : CalData
+    freq_ind : int
+    vis_pol_ind : int
 
     Returns
     -------
@@ -291,24 +447,26 @@ def cost_abscal_wrapper(abscal_parameters, caldata_obj):
         cost = cost_function_calculations.cost_function_abs_cal(
             abscal_parameters[0],
             abscal_parameters[1:],
-            caldata_obj.data_visibilities[:, :, 0, 0],
-            caldata_obj.model_visibilities[:, :, 0, 0],
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, 0, 0],
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
         )
     else:
         cost = cost_function_calculations.cost_function_abs_cal(
             abscal_parameters[0],
             abscal_parameters[1:],
-            caldata_obj.model_visibilities[:, :, 0, 0],
-            caldata_obj.data_visibilities[:, :, 0, 0],
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, 0, 0],
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
         )
     return cost
 
 
-def jacobian_abscal_wrapper(abscal_parameters, caldata_obj):
+def jacobian_abscal_wrapper(
+    abscal_parameters: NDArray[np.floating], caldata_obj, freq_ind, vis_pol_ind
+) -> NDArray[np.floating]:
     """
     Wrapper for function jacobian_abs_cal.
 
@@ -317,6 +475,8 @@ def jacobian_abscal_wrapper(abscal_parameters, caldata_obj):
     abscal_parameters : array of float
         Shape (3,).
     caldata_obj : CalData
+    freq_ind : int
+    vis_pol_ind : int
 
     Returns
     -------
@@ -329,26 +489,28 @@ def jacobian_abscal_wrapper(abscal_parameters, caldata_obj):
         amp_jac, phase_jac = cost_function_calculations.jacobian_abs_cal(
             abscal_parameters[0],
             abscal_parameters[1:],
-            caldata_obj.data_visibilities[:, :, 0, 0],
-            caldata_obj.model_visibilities[:, :, 0, 0],
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, 0, 0],
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
         )
     else:
         amp_jac, phase_jac = cost_function_calculations.jacobian_abs_cal(
             abscal_parameters[0],
             abscal_parameters[1:],
-            caldata_obj.model_visibilities[:, :, 0, 0],
-            caldata_obj.data_visibilities[:, :, 0, 0],
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, 0, 0],
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
         )
     jac[0] = amp_jac
     jac[1:] = phase_jac
     return jac
 
 
-def hessian_abscal_wrapper(abscal_parameters, caldata_obj):
+def hessian_abscal_wrapper(
+    abscal_parameters: NDArray[np.floating], caldata_obj, freq_ind, vis_pol_ind
+) -> NDArray[np.floating]:
     """
     Wrapper for function hess_abs_cal.
 
@@ -357,6 +519,8 @@ def hessian_abscal_wrapper(abscal_parameters, caldata_obj):
     abscal_parameters : array of float
         Shape (3,).
     caldata_obj : CalData
+    freq_ind : int
+    vis_pol_ind : int
 
     Returns
     -------
@@ -376,10 +540,10 @@ def hessian_abscal_wrapper(abscal_parameters, caldata_obj):
         ) = cost_function_calculations.hess_abs_cal(
             abscal_parameters[0],
             abscal_parameters[1:],
-            caldata_obj.data_visibilities[:, :, 0, 0],
-            caldata_obj.model_visibilities[:, :, 0, 0],
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, 0, 0],
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
         )
     else:
         (
@@ -392,10 +556,10 @@ def hessian_abscal_wrapper(abscal_parameters, caldata_obj):
         ) = cost_function_calculations.hess_abs_cal(
             abscal_parameters[0],
             abscal_parameters[1:],
-            caldata_obj.model_visibilities[:, :, 0, 0],
-            caldata_obj.data_visibilities[:, :, 0, 0],
+            caldata_obj.model_visibilities[:, :, freq_ind, vis_pol_ind],
+            caldata_obj.data_visibilities[:, :, freq_ind, vis_pol_ind],
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, 0, 0],
+            caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind],
         )
     hess[0, 0] = hess_amp_amp
     hess[0, 1] = hess[1, 0] = hess_amp_phasex
@@ -407,8 +571,11 @@ def hessian_abscal_wrapper(abscal_parameters, caldata_obj):
 
 
 def cost_dw_abscal_wrapper(
-    abscal_parameters_flattened, unflagged_freq_inds, caldata_obj
-):
+    abscal_parameters_flattened: NDArray[np.floating],
+    unflagged_freq_inds: NDArray[int],
+    caldata_obj,
+    vis_pol_ind: int,
+) -> float:
     """
     Wrapper for function cost_function_dw_abscal.
 
@@ -419,6 +586,7 @@ def cost_dw_abscal_wrapper(
     unflagged_freq_inds : array of int
         Array of indices of frequency channels that are not fully flagged. Shape (Nfreqs_unflagged,).
     caldata_obj : CalData
+    vis_pol_ind : int
 
     Returns
     -------
@@ -431,11 +599,11 @@ def cost_dw_abscal_wrapper(
         abscal_parameters_flattened, (3, len(unflagged_freq_inds))
     )
     if caldata_obj.gains_multiply_model:
-        visibility_values_1 = caldata_obj.data_visibilities[:, :, :, 0]
-        visibility_values_2 = caldata_obj.model_visibilities[:, :, :, 0]
+        visibility_values_1 = caldata_obj.data_visibilities[:, :, :, vis_pol_ind]
+        visibility_values_2 = caldata_obj.model_visibilities[:, :, :, vis_pol_ind]
     else:
-        visibility_values_1 = caldata_obj.model_visibilities[:, :, :, 0]
-        visibility_values_2 = caldata_obj.data_visibilities[:, :, :, 0]
+        visibility_values_1 = caldata_obj.model_visibilities[:, :, :, vis_pol_ind]
+        visibility_values_2 = caldata_obj.data_visibilities[:, :, :, vis_pol_ind]
     if caldata_obj.dwcal_memory_save_mode:
         cost = cost_function_calculations.cost_function_dw_abscal_toeplitz(
             abscal_parameters[0, :],
@@ -443,8 +611,8 @@ def cost_dw_abscal_wrapper(
             visibility_values_1,
             visibility_values_2,
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, :, 0],
-            caldata_obj.dwcal_inv_covariance[:, :, :, 0],
+            caldata_obj.visibility_weights[:, :, :, vis_pol_ind],
+            caldata_obj.dwcal_inv_covariance[:, :, :, vis_pol_ind],
         )
     else:
         cost = cost_function_calculations.cost_function_dw_abscal(
@@ -453,15 +621,18 @@ def cost_dw_abscal_wrapper(
             visibility_values_1,
             visibility_values_2,
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, :, 0],
-            caldata_obj.dwcal_inv_covariance[:, :, :, :, 0],
+            caldata_obj.visibility_weights[:, :, :, vis_pol_ind],
+            caldata_obj.dwcal_inv_covariance[:, :, :, :, vis_pol_ind],
         )
     return cost
 
 
 def jacobian_dw_abscal_wrapper(
-    abscal_parameters_flattened, unflagged_freq_inds, caldata_obj
-):
+    abscal_parameters_flattened: NDArray[np.floating],
+    unflagged_freq_inds: NDArray[int],
+    caldata_obj,
+    vis_pol_ind: int,
+) -> NDArray[np.floating]:
     """
     Wrapper for function jacobian_dw_abscal.
 
@@ -472,6 +643,7 @@ def jacobian_dw_abscal_wrapper(
     unflagged_freq_inds : array of int
         Array of indices of frequency channels that are not fully flagged. Shape (Nfreqs_unflagged,).
     caldata_obj : CalData
+    vis_pol_ind : int
 
     Returns
     -------
@@ -485,11 +657,11 @@ def jacobian_dw_abscal_wrapper(
         abscal_parameters_flattened, (3, len(unflagged_freq_inds))
     )
     if caldata_obj.gains_multiply_model:
-        visibility_values_1 = caldata_obj.data_visibilities[:, :, :, 0]
-        visibility_values_2 = caldata_obj.model_visibilities[:, :, :, 0]
+        visibility_values_1 = caldata_obj.data_visibilities[:, :, :, vis_pol_ind]
+        visibility_values_2 = caldata_obj.model_visibilities[:, :, :, vis_pol_ind]
     else:
-        visibility_values_1 = caldata_obj.model_visibilities[:, :, :, 0]
-        visibility_values_2 = caldata_obj.data_visibilities[:, :, :, 0]
+        visibility_values_1 = caldata_obj.model_visibilities[:, :, :, vis_pol_ind]
+        visibility_values_2 = caldata_obj.data_visibilities[:, :, :, vis_pol_ind]
     if caldata_obj.dwcal_memory_save_mode:
         amp_jac, phase_jac = cost_function_calculations.jacobian_dw_abscal_toeplitz(
             abscal_parameters[0, :],
@@ -497,8 +669,8 @@ def jacobian_dw_abscal_wrapper(
             visibility_values_1,
             visibility_values_2,
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, :, 0],
-            caldata_obj.dwcal_inv_covariance[:, :, :, 0],
+            caldata_obj.visibility_weights[:, :, :, vis_pol_ind],
+            caldata_obj.dwcal_inv_covariance[:, :, :, vis_pol_ind],
         )
     else:
         amp_jac, phase_jac = cost_function_calculations.jacobian_dw_abscal(
@@ -507,8 +679,8 @@ def jacobian_dw_abscal_wrapper(
             visibility_values_1,
             visibility_values_2,
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, :, 0],
-            caldata_obj.dwcal_inv_covariance[:, :, :, :, 0],
+            caldata_obj.visibility_weights[:, :, :, vis_pol_ind],
+            caldata_obj.dwcal_inv_covariance[:, :, :, :, vis_pol_ind],
         )
     jac_array = np.zeros((3, caldata_obj.Nfreqs), dtype=float)
     jac_array[0, :] = amp_jac
@@ -518,8 +690,11 @@ def jacobian_dw_abscal_wrapper(
 
 
 def hessian_dw_abscal_wrapper(
-    abscal_parameters_flattened, unflagged_freq_inds, caldata_obj
-):
+    abscal_parameters_flattened: NDArray[np.floating],
+    unflagged_freq_inds: NDArray[int],
+    caldata_obj,
+    vis_pol_ind: int,
+) -> NDArray[np.floating]:
     """
     Wrapper for function hess_dw_abscal.
 
@@ -530,6 +705,7 @@ def hessian_dw_abscal_wrapper(
     unflagged_freq_inds : array of int
         Array of indices of frequency channels that are not fully flagged. Shape (Nfreqs_unflagged,).
     caldata_obj : CalData
+    vis_pol_ind : int
 
     Returns
     -------
@@ -543,11 +719,11 @@ def hessian_dw_abscal_wrapper(
         abscal_parameters_flattened, (3, len(unflagged_freq_inds))
     )
     if caldata_obj.gains_multiply_model:
-        visibility_values_1 = caldata_obj.data_visibilities[:, :, :, 0]
-        visibility_values_2 = caldata_obj.model_visibilities[:, :, :, 0]
+        visibility_values_1 = caldata_obj.data_visibilities[:, :, :, vis_pol_ind]
+        visibility_values_2 = caldata_obj.model_visibilities[:, :, :, vis_pol_ind]
     else:
-        visibility_values_1 = caldata_obj.model_visibilities[:, :, :, 0]
-        visibility_values_2 = caldata_obj.data_visibilities[:, :, :, 0]
+        visibility_values_1 = caldata_obj.model_visibilities[:, :, :, vis_pol_ind]
+        visibility_values_2 = caldata_obj.data_visibilities[:, :, :, vis_pol_ind]
     if caldata_obj.dwcal_memory_save_mode:
         (
             hess_amp_amp,
@@ -562,8 +738,8 @@ def hessian_dw_abscal_wrapper(
             visibility_values_1,
             visibility_values_2,
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, :, 0],
-            caldata_obj.dwcal_inv_covariance[:, :, :, 0],
+            caldata_obj.visibility_weights[:, :, :, vis_pol_ind],
+            caldata_obj.dwcal_inv_covariance[:, :, :, vis_pol_ind],
         )
     else:
         (
@@ -579,8 +755,8 @@ def hessian_dw_abscal_wrapper(
             visibility_values_1,
             visibility_values_2,
             caldata_obj.uv_array,
-            caldata_obj.visibility_weights[:, :, :, 0],
-            caldata_obj.dwcal_inv_covariance[:, :, :, :, 0],
+            caldata_obj.visibility_weights[:, :, :, vis_pol_ind],
+            caldata_obj.dwcal_inv_covariance[:, :, :, :, vis_pol_ind],
         )
     hess = np.zeros((3, caldata_obj.Nfreqs, 3, caldata_obj.Nfreqs), dtype=float)
     hess[0, :, 0, :] = hess_amp_amp
@@ -860,13 +1036,11 @@ def hessian_unical_wrapper(
 
 def run_skycal_optimization_per_pol_single_freq(
     caldata_obj,
-    xtol,
-    maxiter,
-    freq_ind=0,
-    verbose=True,
-    get_crosspol_phase=True,
-    crosspol_phase_strategy="crosspol model",
-):
+    freq_ind: int = 0,
+    verbose: bool = True,
+    get_crosspol_phase: bool = True,
+    crosspol_phase_strategy: str = "crosspol model",
+) -> NDArray[np.complexfloating]:
     """
     Run calibration per polarization. Here the XX and YY visibilities are
     calibrated individually. If get_crosspol_phase is set, the cross-
@@ -876,22 +1050,8 @@ def run_skycal_optimization_per_pol_single_freq(
     Parameters
     ----------
     caldata_obj : CalData
-    xtol : float
-        Accuracy tolerance for optimizer.
-    maxiter : int
-        Maximum number of iterations for the optimizer.
     freq_ind : int
         Frequency channel to process. Default 0.
-    verbose : bool
-        Set to True to print optimization outputs. Default True.
-    get_crosspol_phase : bool
-        Set to True to constrain the cross-polarizaton phase from the XY and YX
-        visibilities. Default True.
-    crosspol_phase_strategy : str
-        Options are "crosspol model" or "pseudo Stokes V". Used only if
-        get_crosspol_phase is True. If "crosspol model", contrains the crosspol
-        phase using the crosspol model visibilities. If "pseudo Stokes V", constrains
-        crosspol phase by minimizing pseudo Stokes V. Default "crosspol model".
 
     Returns
     -------
@@ -905,7 +1065,9 @@ def run_skycal_optimization_per_pol_single_freq(
         dtype=complex,
     )
     if np.max(caldata_obj.visibility_weights[:, :, freq_ind, :]) == 0.0:
-        print("ERROR: All data flagged.")
+        if caldata_obj.verbose:
+            print("WARNING: All data flagged.")
+            sys.stdout.flush()
         gains_fit[:, :] = np.nan + 1j * np.nan
         return gains_fit
 
@@ -945,23 +1107,29 @@ def run_skycal_optimization_per_pol_single_freq(
                 cost_skycal_wrapper,
                 gains_init_flattened,
                 args=(caldata_obj, ant_inds, freq_ind, vis_pol_ind),
-                method="Powell",
-                options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
+                method="Newton-CG",
+                jac=jacobian_skycal_wrapper,
+                hess=hessian_skycal_wrapper,
+                options={
+                    "disp": caldata_obj.verbose,
+                    "xtol": caldata_obj.xtol,
+                    "maxiter": caldata_obj.maxiter,
+                },
             )
             end_optimize = time.time()
-            if verbose:
+            if caldata_obj.verbose and not caldata_obj.parallel:
                 print(result.message)
                 print(
-                    f"Optimization time: {(end_optimize - start_optimize)/60.} minutes"
+                    f"Freq. {freq_ind} Pol. {feed_pol_ind}, optimization time: {(end_optimize - start_optimize)/60.} minutes"
                 )
-            sys.stdout.flush()
+                sys.stdout.flush()
             gains_fit_single_pol = np.reshape(result.x, (len(ant_inds), 2))
             gains_fit[ant_inds, feed_pol_ind] = (
                 gains_fit_single_pol[:, 0] + 1j * gains_fit_single_pol[:, 1]
             )
 
             # Ensure that the phase of the gains is mean-zero
-            # This adds should be handled by the phase regularization term, but
+            # If lambda_val != 0, this should be handled by the phase regularization term, but
             # this step removes any optimizer precision effects.
             avg_angle = np.arctan2(
                 np.nanmean(np.sin(np.angle(gains_fit[:, feed_pol_ind]))),
@@ -971,7 +1139,7 @@ def run_skycal_optimization_per_pol_single_freq(
 
     # Constrain crosspol phase
     if (
-        get_crosspol_phase
+        caldata_obj.get_crosspol_phase
         and caldata_obj.N_feed_pols == 2
         and caldata_obj.N_vis_pols == 4
     ):
@@ -991,7 +1159,7 @@ def run_skycal_optimization_per_pol_single_freq(
                 for pol in crosspol_polarizations
             ]
         )
-        if crosspol_phase_strategy.lower() == "pseudo stokes v":
+        if caldata_obj.crosspol_phase_strategy.lower() == "pseudo stokes v":
             crosspol_phase = cost_function_calculations.set_crosspol_phase_pseudoV(
                 gains_fit,
                 caldata_obj.data_visibilities[:, :, freq_ind, crosspol_indices],
@@ -999,7 +1167,7 @@ def run_skycal_optimization_per_pol_single_freq(
                 caldata_obj.ant1_inds,
                 caldata_obj.ant2_inds,
             )
-        elif crosspol_phase_strategy.lower() == "crosspol model":
+        elif caldata_obj.crosspol_phase_strategy.lower() == "crosspol model":
             crosspol_phase = cost_function_calculations.set_crosspol_phase(
                 gains_fit,
                 caldata_obj.model_visibilities[:, :, freq_ind, crosspol_indices],
@@ -1024,24 +1192,280 @@ def run_skycal_optimization_per_pol_single_freq(
     return gains_fit
 
 
+def run_skycal_optimization_per_pol_single_freq_parallel(args):
+    """
+    Wrapper for run_skycal_optimization_per_pol_single_freq that makes the function compatible with
+    multiprocessing by unpacking a tuple or arguments.
+    """
+    (caldata_subset, freq_ind) = args
+    start_optimize = time.time()
+    gains_fit = run_skycal_optimization_per_pol_single_freq(
+        caldata_subset,
+        freq_ind=0,
+    )
+    end_optimize = time.time()
+    if caldata_subset.verbose:
+        print(
+            f"Freq. {freq_ind}, optimization time: {(end_optimize - start_optimize)/60.} minutes"
+        )
+        sys.stdout.flush()
+    return freq_ind, gains_fit
+
+
+def run_ddcal_optimization(
+    caldata_obj,
+    freq_ind: int = 0,
+    pol_ind: int = 0,
+) -> NDArray[np.complexfloating]:
+    """
+    Run direction-dependent calibration per frequency and polarization.
+
+    Parameters
+    ----------
+    caldata_obj : CalData
+    freq_ind : int
+        Frequency channel to process. Default 0.
+    pol_ind : int
+        Feed polarization index to process. Default 0.
+
+    Returns
+    -------
+    gains_fit : array of complex
+        Fit gain values. Shape (Nants, n_directions,).
+    """
+
+    gains_fit = np.full(
+        (caldata_obj.Nants, caldata_obj.n_directions),
+        np.nan + 1j * np.nan,
+        dtype=complex,
+    )
+
+    vis_pol_ind = np.where(
+        caldata_obj.vis_polarization_array
+        == caldata_obj.feed_polarization_array[pol_ind]
+    )[0]
+
+    if (
+        np.max(caldata_obj.visibility_weights[:, :, freq_ind, vis_pol_ind]) == 0.0
+    ):  # All flagged
+        if caldata_obj.verbose:
+            print("WARNING: All data flagged.")
+            sys.stdout.flush()
+        gains_fit[...] = np.nan + 1j * np.nan
+        return gains_fit
+
+    vis_weights_summed = np.sum(
+        caldata_obj.visibility_weights[:, :, freq_ind, pol_ind], axis=0
+    )  # Sum over times
+    weight_per_ant = np.bincount(
+        caldata_obj.ant1_inds,
+        weights=vis_weights_summed,
+        minlength=caldata_obj.Nants,
+    ) + np.bincount(
+        caldata_obj.ant2_inds,
+        weights=vis_weights_summed,
+        minlength=caldata_obj.Nants,
+    )
+    ant_inds = np.where(weight_per_ant > 0.0)[0]
+
+    if caldata_obj.n_directions == 1:
+        gains_init = caldata_obj.gains[ant_inds, freq_ind, pol_ind, np.newaxis]
+    else:
+        gains_init = caldata_obj.gains[ant_inds, freq_ind, pol_ind, :]
+
+    if caldata_obj.cartesian_optimization:
+        gains_init_flattened = np.stack(
+            (
+                np.real(gains_init),
+                np.imag(gains_init),
+            ),
+            axis=2,
+        ).flatten()
+    else:
+        gains_init_flattened = np.stack(
+            (np.abs(gains_init), np.angle(gains_init)), axis=2
+        ).flatten()
+
+    # Minimize the cost function
+    start_optimize = time.time()
+    result = scipy.optimize.minimize(
+        cost_ddcal_wrapper,
+        gains_init_flattened,
+        args=(caldata_obj, ant_inds, freq_ind, vis_pol_ind),
+        method="Newton-CG",
+        jac=jax.jacrev(cost_ddcal_wrapper),
+        hess=jax.jacrev(jax.jacrev(cost_ddcal_wrapper)),
+        options={
+            "disp": caldata_obj.verbose,
+            "xtol": caldata_obj.xtol,
+            "maxiter": caldata_obj.maxiter,
+        },
+    )
+    end_optimize = time.time()
+    if caldata_obj.verbose and not caldata_obj.parallel:
+        print(result.message)
+        print(
+            f"Freq. {freq_ind} Pol. {pol_ind}, optimization time: {(end_optimize - start_optimize)/60.} minutes"
+        )
+        sys.stdout.flush()
+    gains_fit_single_pol = np.reshape(
+        result.x, (len(ant_inds), caldata_obj.n_directions, 2)
+    )
+
+    if caldata_obj.cartesian_optimization:
+        gains_fit[ant_inds, :] = (
+            gains_fit_single_pol[:, :, 0] + 1j * gains_fit_single_pol[:, :, 1]
+        )
+    else:
+        gains_fit[ant_inds, :] = gains_fit_single_pol[:, :, 0] * np.exp(
+            2 * np.pi * 1j * gains_fit_single_pol[:, :, 1]
+        )
+
+    # Ensure that the phase of the gains is mean-zero
+    # If lambda_val != 0, this should be handled by the phase regularization term, but
+    # this step removes any optimizer precision effects.
+    for direction_ind in range(caldata_obj.n_directions):
+        avg_angle = np.arctan2(
+            np.nanmean(np.sin(np.angle(gains_fit[:, direction_ind]))),
+            np.nanmean(np.cos(np.angle(gains_fit[:, direction_ind]))),
+        )
+        gains_fit[:, direction_ind] *= np.cos(avg_angle) - 1j * np.sin(avg_angle)
+
+    return gains_fit
+
+
+def run_ddcal_optimization_parallel(args):
+    """
+    Wrapper for run_ddcal_optimization that makes the function compatible with
+    multiprocessing by unpacking a tuple or arguments.
+    """
+    (caldata_subset, freq_ind, pol_ind) = args
+    start_optimize = time.time()
+    gains_fit = run_ddcal_optimization(
+        caldata_subset,
+        freq_ind=0,
+        pol_ind=0,
+    )
+    end_optimize = time.time()
+    if caldata_subset.verbose:
+        print(
+            f"Freq. {freq_ind} Pol. {pol_ind}, optimization time: {(end_optimize - start_optimize)/60.} minutes"
+        )
+        sys.stdout.flush()
+    return freq_ind, pol_ind, gains_fit
+
+
+def run_dwcal_optimization_per_pol(
+    caldata_obj,
+    pol_ind: int = 0,
+) -> NDArray[np.complexfloating]:
+    """
+    Run delay-weighted calibration for a single polarization. Uses automatic
+    differentiation with jax to compute first and second derivatives for
+    optimization with Newton's Method.
+
+    Parameters
+    ----------
+    caldata_obj : CalData
+    pol_ind : int
+        Feed polarization index to process. Default 0.
+
+    Returns
+    -------
+    gains_fit : array of complex
+        Fit gain values. Shape (Nants, Nfreqs, 1,).
+    """
+
+    gains_fit = np.full(
+        (caldata_obj.Nants, caldata_obj.Nfreqs),
+        np.nan + 1j * np.nan,
+        dtype=complex,
+    )
+
+    vis_pol_ind = np.where(
+        caldata_obj.vis_polarization_array
+        == caldata_obj.feed_polarization_array[pol_ind]
+    )[0][0]
+    unflagged_freq_inds = np.where(
+        np.sum(caldata_obj.visibility_weights[:, :, :, vis_pol_ind], axis=(0, 1)) > 0
+    )[0]
+    if len(unflagged_freq_inds) == 0:
+        print(f"ERROR: Data all flagged.")
+        sys.stdout.flush()
+        return gains_fit
+
+    vis_weights_summed = np.sum(
+        caldata_obj.visibility_weights[:, :, :, vis_pol_ind], axis=(0, 2)
+    )  # Sum over times and frequencies
+    weight_per_ant = np.bincount(
+        caldata_obj.ant1_inds,
+        weights=vis_weights_summed,
+        minlength=caldata_obj.Nants,
+    ) + np.bincount(
+        caldata_obj.ant2_inds,
+        weights=vis_weights_summed,
+        minlength=caldata_obj.Nants,
+    )
+    ant_inds = np.where(weight_per_ant > 0.0)[0]
+
+    gains_init_flattened = np.stack(
+        (
+            np.real(
+                caldata_obj.gains[:, :, pol_ind][np.ix_(ant_inds, unflagged_freq_inds)]
+            ),
+            np.imag(
+                caldata_obj.gains[:, :, pol_ind][np.ix_(ant_inds, unflagged_freq_inds)]
+            ),
+        ),
+        axis=1,
+    ).flatten()
+
+    # Minimize the cost function
+    start_optimize = time.time()
+    result = scipy.optimize.minimize(
+        cost_dwcal_wrapper,
+        gains_init_flattened,
+        args=(caldata_obj, ant_inds, unflagged_freq_inds, vis_pol_ind),
+        method="Newton-CG",
+        jac=jax.jacrev(cost_dwcal_wrapper),
+        hess=jax.jacrev(jax.jacrev(cost_dwcal_wrapper)),
+        options={
+            "disp": caldata_obj.verbose,
+            "xtol": caldata_obj.xtol,
+            "maxiter": caldata_obj.maxiter,
+        },
+    )
+    end_optimize = time.time()
+    if caldata_obj.verbose:
+        print(result.message)
+        print(
+            f"Pol. {pol_ind}, optimization time: {(end_optimize - start_optimize)/60.} minutes"
+        )
+        sys.stdout.flush()
+    gains_fit_unflagged = np.reshape(
+        result.x, (len(ant_inds), len(unflagged_freq_inds), 2)
+    )
+    gains_fit[np.ix_(ant_inds, unflagged_freq_inds)] = (
+        gains_fit_unflagged[:, :, 0] + 1j * gains_fit_unflagged[:, :, 1]
+    )
+    return gains_fit
+
+
 def run_abscal_optimization_single_freq(
     caldata_obj,
-    xtol,
-    maxiter,
-    verbose=True,
-):
+    freq_ind: int = 0,
+    feed_pol_ind: int = 0,
+) -> NDArray[np.complexfloating]:
     """
     Run absolute calibration ("abscal").
 
     Parameters
     ----------
     caldata_obj : CalData
-    xtol : float
-        Accuracy tolerance for optimizer.
-    maxiter : int
-        Maximum number of iterations for the optimizer.
-    verbose : bool
-        Set to True to print optimization outputs. Default True.
+    freq_ind : int
+        Frequency channel to process. Default 0.
+    feed_pol_ind : int
+        Feed polarization index to process. Default 0.
 
     Returns
     -------
@@ -1049,86 +1473,91 @@ def run_abscal_optimization_single_freq(
         Fit abscal parameter values. Shape (3, 1, N_feed_pols,).
     """
 
-    abscal_params = np.zeros((3, 1, caldata_obj.N_feed_pols), dtype=float)
-    caldata_list = caldata_obj.expand_in_polarization()
-    for feed_pol_ind, caldata_per_pol in enumerate(caldata_list):
-        # Minimize the cost function
-        start_optimize = time.time()
-        result = scipy.optimize.minimize(
-            cost_abscal_wrapper,
-            caldata_per_pol.abscal_params[:, 0, 0],
-            args=(caldata_per_pol),
-            method="Newton-CG",
-            jac=jacobian_abscal_wrapper,
-            hess=hessian_abscal_wrapper,
-            options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
-        )
-        abscal_params[:, 0, feed_pol_ind] = result.x
-        end_optimize = time.time()
-        if verbose:
-            print(result.message)
-            print(f"Optimization time: {(end_optimize - start_optimize)/60.} minutes")
-        sys.stdout.flush()
+    start_optimize = time.time()
+    vis_pol_ind = np.where(
+        caldata_obj.vis_polarization_array
+        == caldata_obj.feed_polarization_array[feed_pol_ind]
+    )[0][0]
+    result = scipy.optimize.minimize(
+        cost_abscal_wrapper,
+        caldata_obj.abscal_params[:, freq_ind, feed_pol_ind],
+        args=(caldata_obj, freq_ind, vis_pol_ind),
+        method="Newton-CG",
+        jac=jacobian_abscal_wrapper,
+        hess=hessian_abscal_wrapper,
+        options={
+            "disp": caldata_obj.verbose,
+            "xtol": caldata_obj.xtol,
+            "maxiter": caldata_obj.maxiter,
+        },
+    )
+    abscal_params = result.x
+    end_optimize = time.time()
+    if caldata_obj.verbose:
+        print(result.message)
+        print(f"Optimization time: {(end_optimize - start_optimize)/60.} minutes")
+    sys.stdout.flush()
 
     return abscal_params
 
 
 def run_dw_abscal_optimization(
     caldata_obj,
-    xtol,
-    maxiter,
-    verbose=True,
-):
+    feed_pol_ind: int = 0,
+) -> NDArray[np.complexfloating]:
     """
     Run absolute calibration with delay weighting.
 
     Parameters
     ----------
     caldata_obj : CalData
-    xtol : float
-        Accuracy tolerance for optimizer.
-    maxiter : int
-        Maximum number of iterations for the optimizer.
-    verbose : bool
-        Set to True to print optimization outputs. Default True.
+    feed_pol_ind : int
+        Feed polarization index to process. Default 0.
 
     Returns
     -------
     abscal_params : array of complex
-        Fit abscal parameter values. Shape (3, Nfreqs, N_feed_pols,).
+        Fit abscal parameter values. Shape (3, Nfreqs,).
     """
 
-    abscal_params = np.zeros_like(caldata_obj.abscal_params)
-    caldata_list = caldata_obj.expand_in_polarization()
-    for feed_pol_ind, caldata_per_pol in enumerate(caldata_list):
-        unflagged_freq_inds = np.where(
-            np.sum(caldata_per_pol.visibility_weights, axis=(0, 1, 3)) > 0
-        )[0]
-        if len(unflagged_freq_inds) == 0:
-            print(f"ERROR: Data all flagged.")
-            sys.stdout.flush()
-            continue
-        abscal_params_flattened = caldata_per_pol.abscal_params[
-            :, unflagged_freq_inds, 0
-        ].flatten()
-        # Minimize the cost function
-        start_optimize = time.time()
-        result = scipy.optimize.minimize(
-            cost_dw_abscal_wrapper,
-            abscal_params_flattened,
-            args=(unflagged_freq_inds, caldata_per_pol),
-            method="Newton-CG",
-            jac=jacobian_dw_abscal_wrapper,
-            hess=hessian_dw_abscal_wrapper,
-            options={"disp": verbose, "xtol": xtol, "maxiter": maxiter},
-        )
-        abscal_params[:, unflagged_freq_inds, feed_pol_ind] = np.reshape(
-            result.x, (3, len(unflagged_freq_inds))
-        )
-        if verbose:
-            print(result.message)
-            print(f"Optimization time: {(time.time() - start_optimize)/60.} minutes")
+    vis_pol_ind = np.where(
+        caldata_obj.vis_polarization_array
+        == caldata_obj.feed_polarization_array[feed_pol_ind]
+    )[0][0]
+    abscal_params = np.zeros_like(caldata_obj.abscal_params[:, :, feed_pol_ind])
+
+    unflagged_freq_inds = np.where(
+        np.sum(caldata_obj.visibility_weights, axis=(0, 1, 3)) > 0
+    )[0]
+    if len(unflagged_freq_inds) == 0:
+        print(f"ERROR: Data all flagged.")
         sys.stdout.flush()
+        return
+    abscal_params_flattened = caldata_obj.abscal_params[
+        :, unflagged_freq_inds, feed_pol_ind
+    ].flatten()
+    # Minimize the cost function
+    start_optimize = time.time()
+    result = scipy.optimize.minimize(
+        cost_dw_abscal_wrapper,
+        abscal_params_flattened,
+        args=(unflagged_freq_inds, caldata_obj, vis_pol_ind),
+        method="Newton-CG",
+        jac=jacobian_dw_abscal_wrapper,
+        hess=hessian_dw_abscal_wrapper,
+        options={
+            "disp": caldata_obj.verbose,
+            "xtol": caldata_obj.xtol,
+            "maxiter": caldata_obj.maxiter,
+        },
+    )
+    abscal_params[:, unflagged_freq_inds] = np.reshape(
+        result.x, (3, len(unflagged_freq_inds))
+    )
+    if caldata_objverbose:
+        print(result.message)
+        print(f"Optimization time: {(time.time() - start_optimize)/60.} minutes")
+    sys.stdout.flush()
 
     return abscal_params
 
@@ -1788,3 +2217,16 @@ def run_unical_optimization(
             gains_fit[:, 1] *= np.exp(1j * crosspol_phase / 2)
 
     return gains_fit, fit_vis_fit
+
+
+def run_unical_optimization_parallel(args):
+    """
+    Wrapper for run_unical_optimization that makes the function compatible with
+    multiprocessing by unpacking a tuple of arguments. The caldata subset holds a
+    single frequency, so it is calibrated at freq_ind=0.
+    """
+    (caldata_subset, freq_ind, unical_kwargs) = args
+    gains_fit, fit_vis_fit = run_unical_optimization(
+        caldata_subset, freq_ind=0, **unical_kwargs
+    )
+    return freq_ind, gains_fit, fit_vis_fit

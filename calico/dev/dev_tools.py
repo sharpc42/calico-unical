@@ -721,9 +721,13 @@ class DevTools:
                             optimization_scheme=optimization_scheme,
                         )
                     elif calibration_type == "skycal":
-                        caldata_obj.sky_based_calibration(
-                            verbose=verbose, maxiter=maxiter, xtol=xtol
-                        )
+                        # settings are attributes; crosspol on as in the old defaults
+                        caldata_obj.verbose = verbose
+                        caldata_obj.maxiter = maxiter
+                        caldata_obj.xtol = xtol
+                        caldata_obj.get_crosspol_phase = True
+                        caldata_obj.crosspol_phase_strategy = "crosspol model"
+                        caldata_obj.sky_based_calibration()
                     else:
                         raise ValueError(
                             "Unknown calibration type -- "

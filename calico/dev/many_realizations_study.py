@@ -464,6 +464,7 @@ def init_many_realizations(
                 gain_init_to_vis_ratio=True,
                 gains_multiply_model=gains_multiply_model,
                 gain_init_stddev=0.0,
+                lambda_val=100,
             )
             print(
                 "\n\n***AFTER LOAD***\n  "
@@ -510,14 +511,12 @@ def init_many_realizations(
             if calibration_type == "skycal":
                 for ant_flag_iter in range(antenna_flagging_iterations):
                     # lower xtol/maxiter and no crosspol for ant flagging
-                    caldata_obj.sky_based_calibration(
-                        xtol=xtol / 10,
-                        maxiter=int(maxiter / 2),
-                        get_crosspol_phase=False,
-                        parallel=False,
-                        verbose=verbose,
-                        pool=None,
-                    )
+                    caldata_obj.xtol = xtol / 10
+                    caldata_obj.maxiter = int(maxiter / 2)
+                    caldata_obj.get_crosspol_phase = False
+                    caldata_obj.parallel = False
+                    caldata_obj.verbose = verbose
+                    caldata_obj.sky_based_calibration()
                     if verbose:
                         print(f"Initial calibration optimization done.", end="")
                         print(
@@ -525,9 +524,7 @@ def init_many_realizations(
                             f"of {antenna_flagging_iterations}."
                         )
                         sys.stdout.flush()
-            caldata_obj.flag_antennas_from_per_ant_cost(
-                flagging_threshold=2.5, parallel=False, pool=None, verbose=verbose
-            )
+            caldata_obj.flag_antennas_from_per_ant_cost(flagging_threshold=2.5)
             dev.calculate_many_realizations(
                 caldata_obj=caldata_obj,
                 example_data=data,

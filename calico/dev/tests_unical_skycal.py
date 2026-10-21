@@ -111,7 +111,7 @@ class TestStringMethods(unittest.TestCase):
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(data, model)
+        caldata_obj.load_data(data, model, lambda_val=100)
         gains_flattened_skycal = skycal_setup_reference(
             caldata_obj, "test gains flattened"
         )
@@ -140,7 +140,7 @@ class TestStringMethods(unittest.TestCase):
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(data, model)
+        caldata_obj.load_data(data, model, lambda_val=100)
         gains_rolled_unical = calopt.run_unical_optimization(
             caldata_obj=caldata_obj,
             xtol=1e-5,
@@ -157,7 +157,7 @@ class TestStringMethods(unittest.TestCase):
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(data, model)
+        caldata_obj.load_data(data, model, lambda_val=100)
         fit_vis_rolled = calopt.run_unical_optimization(
             caldata_obj=caldata_obj,
             xtol=1e-5,
@@ -174,7 +174,7 @@ class TestStringMethods(unittest.TestCase):
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(data, model)
+        caldata_obj.load_data(data, model, lambda_val=100)
         n_real, n_imag = sim.simulate_thermal_noise(
             sigma_t_0=3,
             n_bls=caldata_obj.Nbls,
@@ -221,6 +221,7 @@ class TestStringMethods(unittest.TestCase):
             gain_init_to_vis_ratio=True,
             gains_multiply_model=True,
             gain_init_stddev=0.0,
+            lambda_val=100,
         )
         original_model = caldata_obj.model_visibilities[0, :, 0, 0].copy()
         original_data = caldata_obj.data_visibilities[0, :, 0, 0].copy()
@@ -397,7 +398,7 @@ class TestStringMethods(unittest.TestCase):
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(data, model)
+        caldata_obj.load_data(data, model, lambda_val=100)
         n_real, n_imag = sim.simulate_thermal_noise(
             sigma_t_0=3,
             n_bls=caldata_obj.Nbls,
@@ -461,7 +462,7 @@ class TestStringMethods(unittest.TestCase):
         model.read(f"{THIS_DIR}/data/tutorial_full_onetime_unflagged.uvfits")
         data = model.copy()
         caldata_obj = caldata.CalData()
-        caldata_obj.load_data(data, model)
+        caldata_obj.load_data(data, model, lambda_val=100)
         org_gains = copy.deepcopy(caldata_obj.gains[:, 0, 0])
         org_fit_vis = copy.deepcopy(caldata_obj.fit_vis[0, :, 0, 0])
         n_real, n_imag = sim.simulate_thermal_noise(
@@ -916,7 +917,7 @@ class TestStringMethods(unittest.TestCase):
         caldata_obj.model_visibilities = m
         caldata_obj.data_visibilities = v_T
         caldata_obj.data_visibilities[..., 0] += thermal_noise
-        # g and u guesses were originally set in caldata.load_data()
+        # g and u guesses were originally set in caldata.load_data(, lambda_val=100)
         caldata_obj.gains = np.ones_like(caldata_obj.gains)
         caldata_obj.fit_vis = m.copy()
         # model error is missing sources so "v_T > m"
