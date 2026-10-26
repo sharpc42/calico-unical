@@ -3,13 +3,14 @@ import os
 import os.path
 import sys
 import time
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from calico import caldata
 from calico.dev import dev_tools, make_run_params
-from pyuvdata import UVData, UVFlag
+from pyuvdata import UVCal, UVData, UVFlag
 
 # def update_calico()
 
@@ -384,6 +385,307 @@ def prepare_data_files(
     return 1
 
 
+def prepare_cal_file(
+    fhd_prefix=None,
+    sav_cal_filename=None,
+    vis_data_writeout_filename=None,
+    model_data_writeout_filename=None,
+    cal_writeout_filename=None,
+    reconstruct_cal=False,
+):
+    """
+    Read FHD file, downselect to frequencies, polarizations and antennas of the
+    data/model uvfits files written by prepare_data_files (so those must exist first),
+    and write them out as a calh5 file. The FHD run is assumed to come from the same
+    underlying data as the uvfits files; a warning is raised for anything suggesting
+    otherwise.
+    """
+    if fhd_prefix is None:
+        print("Error: FHD prefix is missing")
+        return -1
+    if sav_cal_filename is None:
+        print("Error: sav cal filename is missing")
+        return -1
+    if vis_data_writeout_filename is None:
+        print("Error: uvfits data filename is missing")
+        return -1
+    if model_data_writeout_filename is None:
+        print("Error: uvfits model filename is missing")
+        return -1
+    if cal_writeout_filename is None:
+        print("Error: calh5 cal filename is missing")
+        return -1
+    cwd = os.getcwd()
+    cal_path = os.path.join(cwd, "calico", "data", f"{cal_writeout_filename}.calh5")
+
+    print(f"\n***cal path {cal_path}***\n")
+
+    if os.path.isfile(cal_path) and not reconstruct_cal:
+        print("\nCal calh5 file exists - skipping\n")
+        return 1
+    uv_data_path = os.path.join(
+        cwd, "calico", "data", f"{vis_data_writeout_filename}.uvfits"
+    )
+    uv_model_path = os.path.join(
+        cwd, "calico", "data", f"{model_data_writeout_filename}.uvfits"
+    )
+    for path in (uv_data_path, uv_model_path):
+        if not os.path.isfile(path):
+            print(f"Error: {path} not found - run prepare_data_files first")
+            return -1
+    if fhd_prefix[-1] != "_":
+        fhd_prefix += "_"
+
+    print("Creating cal calh5 file\n")
+    sav_cal_path = os.path.join(cwd, "calico", "data", sav_cal_filename)
+    uvc = UVCal.from_file(
+        os.path.join(sav_cal_path, "calibration", fhd_prefix + "cal.sav"),
+        obs_file=os.path.join(sav_cal_path, "metadata", fhd_prefix + "obs.sav"),
+        layout_file=os.path.join(sav_cal_path, "metadata", fhd_prefix + "layout.sav"),
+        settings_file=os.path.join(
+            sav_cal_path, "metadata", fhd_prefix + "settings.txt"
+        ),
+    )
+    print(
+        f"\n***FHD cal***\n\tfreqs {uvc.Nfreqs}\tants {uvc.Nants_data}"
+        f"\tjones {uvc.jones_array}\tgain shape {uvc.gain_array.shape}"
+    )
+
+    # data flags needed for time check, model metadata only
+    uvd_data = UVData.from_file(uv_data_path)
+    uvd_model = UVData.from_file(uv_model_path, read_data=False)
+
+    mismatches = []
+    if not np.allclose(uvd_data.freq_array, uvd_model.freq_array):
+        mismatches.append(
+            f"data freqs {uvd_data.freq_array} and model freqs "
+            f"{uvd_model.freq_array} differ"
+        )
+
+    # match each data frequency to an FHD channel
+    freq_tol = 1e-3 * np.min(uvc.channel_width)
+    freq_inds = []
+    for freq in uvd_data.freq_array:
+        ind = np.argmin(np.abs(uvc.freq_array - freq))
+        if np.abs(uvc.freq_array[ind] - freq) > freq_tol:
+            mismatches.append(
+                f"data freq {freq} Hz has no FHD cal channel (closest "
+                f"{uvc.freq_array[ind]} Hz)"
+            )
+        else:
+            freq_inds.append(ind)
+    if not np.allclose(
+        uvc.channel_width[freq_inds],
+        np.broadcast_to(uvd_data.channel_width, (uvd_data.Nfreqs,))[: len(freq_inds)],
+    ):
+        mismatches.append("FHD cal and data channel widths don't match")
+
+    jones = [j for j in uvc.jones_array if j in uvd_data.polarization_array]
+    if len(jones) == 0:
+        mismatches.append(
+            f"no FHD cal jones {uvc.jones_array} match the data polarizations "
+            f"{uvd_data.polarization_array}"
+        )
+
+    # keep antennas left in either file after prepare data files cuts
+    ants = np.union1d(uvd_data.get_ants(), uvd_model.get_ants())
+    missing_ants = np.setdiff1d(ants, uvc.ant_array)
+    if missing_ants.size:
+        mismatches.append(f"antennas {missing_ants.tolist()} have no FHD gains")
+    ants = np.intersect1d(ants, uvc.ant_array)
+
+    # the same antenna numbers should name the same tiles
+    cal_names = dict(zip(uvc.telescope.antenna_numbers, uvc.telescope.antenna_names))
+    renamed = [
+        num
+        for num, name in zip(
+            uvd_data.telescope.antenna_numbers, uvd_data.telescope.antenna_names
+        )
+        if num in cal_names and cal_names[num] != name
+    ]
+    if renamed:
+        mismatches.append(
+            f"antenna numbers {renamed} have different names in the FHD cal"
+        )
+
+    # FHD gives one solution over a time range, which should cover the data
+    if uvc.time_range is not None:
+        t_min, t_max = uvc.time_range.min(), uvc.time_range.max()
+        # allow half an integration either side for time stamps at bin centers
+        t_pad = np.max(uvd_data.integration_time) / 2 / 86400
+        # FHD's range starts at the first unflagged time, so skip fully flagged
+        # times (e.g. the quack time at the start of MWA observations)
+        blt_unflagged = ~np.all(
+            uvd_data.flag_array, axis=tuple(range(1, uvd_data.flag_array.ndim))
+        )
+        data_times = np.unique(uvd_data.time_array[blt_unflagged])
+        if data_times.min() < t_min - t_pad or data_times.max() > t_max + t_pad:
+            mismatches.append(
+                f"data times [{data_times.min()}, {data_times.max()}] fall outside "
+                f"the FHD cal time range [{t_min}, {t_max}]"
+            )
+
+    if mismatches:
+        warnings.warn(
+            "FHD cal may not match the data/model files:\n\t" + "\n\t".join(mismatches),
+            stacklevel=2,
+        )
+    if len(freq_inds) == 0 or len(jones) == 0 or ants.size == 0:
+        print("Error: nothing left in FHD cal after matching to data/model files")
+        return -1
+
+    uvc.select(freq_chans=freq_inds, jones=jones, antenna_nums=ants)
+    print(
+        f"\n***cal after downselect***\n\tfreqs {uvc.freq_array}\tants "
+        f"{uvc.Nants_data}\tjones {uvc.jones_array}\tgain shape "
+        f"{uvc.gain_array.shape}"
+    )
+    uvc.write_calh5(cal_path, clobber=True)
+    return 1
+
+
+def prepare_matched_data_file(
+    raw_data_filename=None,
+    reference_filename=None,
+    writeout_filename=None,
+    reconstruct=False,
+):
+    """
+    Downselect raw uvfits file to frequencies, polarizations, baselines and
+    times of reference uvfits file, and write it out as a uvfits file. A
+    warning is raised for anything in the raw file that doesn't line up with
+    the reference.
+    """
+    if raw_data_filename is None:
+        print("Error: raw uvfits data filename is missing")
+        return -1
+    if reference_filename is None:
+        print("Error: reference uvfits filename is missing")
+        return -1
+    if writeout_filename is None:
+        print("Error: uvfits writeout filename is missing")
+        return -1
+    cwd = os.getcwd()
+    out_path = os.path.join(cwd, "calico", "data", f"{writeout_filename}.uvfits")
+    print("matched data path", out_path)
+    if os.path.isfile(out_path) and not reconstruct:
+        print("Matched data uvfits file exists - skipping")
+        return 1
+    raw_path = os.path.join(cwd, "calico", "data", f"{raw_data_filename}.uvfits")
+    ref_path = os.path.join(cwd, "calico", "data", f"{reference_filename}.uvfits")
+    for path in (raw_path, ref_path):
+        if not os.path.isfile(path):
+            print(f"ERROR: {path} not found")
+            return -1
+
+    print("Creating matched data uvfits file\n")
+    uvd_ref = UVData.from_file(ref_path)
+    uvd_raw_meta = UVData.from_file(raw_path, read_data=False)
+
+    mismatches = []
+    # match each reference frequency to raw channel within tolerance
+    freq_tol = 1e-3 * np.min(uvd_raw_meta.channel_width)
+    freq_chans = []
+    for freq in uvd_ref.freq_array:
+        ind = np.argmin(np.abs(uvd_raw_meta.freq_array - freq))
+        if np.abs(uvd_raw_meta.freq_array[ind] - freq) > freq_tol:
+            mismatches.append(
+                f"reference freq {freq} Hz has no raw channel (closest "
+                f"{uvd_raw_meta.freq_array[ind]} Hz)"
+            )
+        else:
+            freq_chans.append(ind)
+
+    pols = [
+        p for p in uvd_ref.polarization_array if p in uvd_raw_meta.polarization_array
+    ]
+    if len(pols) < uvd_ref.Npols:
+        mismatches.append(
+            f"reference pols {uvd_ref.polarization_array} not all in the raw pols "
+            f"{uvd_raw_meta.polarization_array}"
+        )
+
+    # match times to raw file's own values
+    time_tol = 1e-2 / 86400  # 0.01 s, in days (86400 seconds in a day)
+    raw_times = np.unique(uvd_raw_meta.time_array)
+    times = []
+    for t in np.unique(uvd_ref.time_array):
+        ind = np.argmin(np.abs(raw_times - t))
+        if np.abs(raw_times[ind] - t) > time_tol:
+            mismatches.append(f"reference time {t} has no raw time")
+        else:
+            times.append(raw_times[ind])
+
+    ref_bls = np.unique(uvd_ref.baseline_array)
+    missing_bls = np.setdiff1d(ref_bls, uvd_raw_meta.baseline_array)
+    if missing_bls.size:
+        mismatches.append(f"{missing_bls.size} reference baselines not in the raw file")
+    ant1, ant2 = uvd_ref.baseline_to_antnums(
+        np.intersect1d(ref_bls, uvd_raw_meta.baseline_array)
+    )
+    bls = list(zip(ant1.tolist(), ant2.tolist()))
+
+    if len(freq_chans) == 0 or len(pols) == 0 or len(times) == 0 or len(bls) == 0:
+        warnings.warn(
+            "Raw data may not match the reference file:\n\t" + "\n\t".join(mismatches),
+            stacklevel=2,
+        )
+        print("ERROR: nothing left in raw data after matching to reference file")
+        return -1
+
+    uvd_raw = UVData.from_file(
+        raw_path, freq_chans=freq_chans, polarizations=pols, bls=bls, times=times
+    )
+
+    # check they describe same visibilities
+    uvd_raw.reorder_blts(order="time", minor_order="baseline")
+    uvd_ref.reorder_blts(order="time", minor_order="baseline")
+    if uvd_raw.Nblts != uvd_ref.Nblts:
+        mismatches.append(f"raw Nblts {uvd_raw.Nblts} != reference {uvd_ref.Nblts}")
+    else:
+        if not np.array_equal(uvd_raw.baseline_array, uvd_ref.baseline_array):
+            mismatches.append("raw and reference baseline orders differ")
+        if not np.allclose(
+            uvd_raw.time_array, uvd_ref.time_array, rtol=0, atol=time_tol
+        ):
+            mismatches.append("raw and reference times differ")
+        if not np.allclose(uvd_raw.uvw_array, uvd_ref.uvw_array, rtol=0, atol=1e-3):
+            mismatches.append(
+                "raw and reference uvws differ (max "
+                f"{np.max(np.abs(uvd_raw.uvw_array - uvd_ref.uvw_array)):.3g} m)"
+            )
+        if uvd_raw.flag_array.shape == uvd_ref.flag_array.shape and not np.array_equal(
+            uvd_raw.flag_array, uvd_ref.flag_array
+        ):
+            print(
+                "Note: raw and reference flags differ "
+                f"(raw {uvd_raw.flag_array.mean():.3f}, "
+                f"reference {uvd_ref.flag_array.mean():.3f} flagged)"
+            )
+    raw_cat = list(uvd_raw.phase_center_catalog.values())
+    ref_cat = list(uvd_ref.phase_center_catalog.values())
+    if len(raw_cat) == 1 and len(ref_cat) == 1:
+        d_lon = raw_cat[0]["cat_lon"] - ref_cat[0]["cat_lon"]
+        d_lat = raw_cat[0]["cat_lat"] - ref_cat[0]["cat_lat"]
+        if np.hypot(d_lon * np.cos(ref_cat[0]["cat_lat"]), d_lat) > 1e-5:
+            mismatches.append(
+                f"phase centers differ by {np.hypot(d_lon, d_lat):.3g} rad"
+            )
+
+    if mismatches:
+        warnings.warn(
+            "Raw data may not match the reference file:\n\t" + "\n\t".join(mismatches),
+            stacklevel=2,
+        )
+    print(
+        f"\n***matched raw data***\n\tfreqs {uvd_raw.freq_array}\tpols "
+        f"{uvd_raw.get_pols()}\tbls {uvd_raw.Nbls}\ttimes {uvd_raw.Ntimes}"
+        f"\tvis_units {uvd_raw.vis_units}"
+    )
+    uvd_raw.write_uvfits(out_path)
+    return 1
+
+
 def init_many_realizations(
     fhd_prefix="1061316296_",
     sav_data_filename="tutorial_full_onetime_unflagged",  # sav
@@ -562,13 +864,19 @@ parser.add_argument(
     "-r",
     "--reconstruct",
     action="store_true",
-    help="Reconstruct both data and model files",
+    help="reconstruct data, model and cal files",
 )
 parser.add_argument(
     "--min-baselines",
     type=int,
     default=10,
     help="drop antennas with fewer than this many baselines (default 10)",
+)
+parser.add_argument(
+    "--raw-data",
+    type=str,
+    default=None,
+    help="raw uvfits file in calico/data, selected down to match FHD model",
 )
 args = parser.parse_args()
 if args.suffix:
@@ -582,3 +890,18 @@ if args.suffix:
         reconstruct_model=args.reconstruct,
         min_baselines_per_antenna=args.min_baselines,
     )
+    prepare_cal_file(
+        fhd_prefix="1061316296_",
+        sav_cal_filename=f"fhd_runs/fhd_{args.suffix}",  # FHD sav
+        vis_data_writeout_filename=f"fhd_data_one_freq_{args.suffix}",  # uvfits
+        model_data_writeout_filename=f"fhd_model_one_freq_{args.suffix}",  # uvfits
+        cal_writeout_filename=f"fhd_cal_one_freq_{args.suffix}",  # calh5
+        reconstruct_cal=args.reconstruct,
+    )
+    if args.raw_data:
+        prepare_matched_data_file(
+            raw_data_filename=args.raw_data,  # uvfits
+            reference_filename=f"fhd_model_one_freq_{args.suffix}",  # uvfits
+            writeout_filename=f"obs_data_one_freq_{args.suffix}",  # uvfits
+            reconstruct=args.reconstruct,
+        )

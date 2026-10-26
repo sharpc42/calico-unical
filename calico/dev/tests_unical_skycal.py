@@ -855,14 +855,24 @@ class TestStringMethods(unittest.TestCase):
         plt.savefig("calico/images/fit_us_convergence_unical.png")
         plt.close()
 
-    def compare_unical_skycal_gains_and_us_fhd(self, suffix="1"):
+    def compare_unical_skycal_gains_and_us_fhd(
+        self, suffix="1", data_source="fhd", simulate_noise=None, optimizer="pytorch"
+    ):
         seed = 421
         scaling_factor_skycal = 0.0001
         scaling_factor_unical = 1
         sigma_t = 0.1
         model_filename = f"fhd_model_one_freq_{suffix}"
-        data_filename = f"fhd_data_one_freq_{suffix}"
-        # ask for both up front so the unical choice doesn't wait on the skycal fit
+        if data_source == "observed":
+            # original data matched to the model
+            data_filename = f"obs_data_one_freq_{suffix}"
+        else:
+            # data simulated with FHD
+            data_filename = f"fhd_data_one_freq_{suffix}"
+        # observed data already has real thermal noise
+        if simulate_noise is None:
+            simulate_noise = data_source != "observed"
+        print(f"\n{data_source=}\n{simulate_noise=}\n{optimizer=}")
         skycal_weighting_function = choose_weighting_function(
             "skycal", "constant_weights"
         )
@@ -882,15 +892,16 @@ class TestStringMethods(unittest.TestCase):
         caldata_obj.load_data(data, model, gains_multiply_model=True, lambda_val=100)
         v_T = caldata_obj.data_visibilities.copy()
         m = caldata_obj.model_visibilities.copy()
-        thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
-            sigma_t_0=sigma_t,
-            n_times=np.size(caldata_obj.data_visibilities, axis=0),
-            n_bls=np.size(caldata_obj.data_visibilities, axis=1),
-            n_freqs=1,
-            seed=seed + 1,
-        )
-        thermal_noise = thermal_noise_real + 1.0j * thermal_noise_imag
-        caldata_obj.data_visibilities[..., 0] += thermal_noise
+        if simulate_noise:
+            thermal_noise_real, thermal_noise_imag = sim.simulate_thermal_noise(
+                sigma_t_0=sigma_t,
+                n_times=np.size(caldata_obj.data_visibilities, axis=0),
+                n_bls=np.size(caldata_obj.data_visibilities, axis=1),
+                n_freqs=1,
+                seed=seed + 1,
+            )
+            thermal_noise = thermal_noise_real + 1.0j * thermal_noise_imag
+            caldata_obj.data_visibilities[..., 0] += thermal_noise
         # model error is missing sources so "v_T > m"
         e = v_T - m
         sigma_m = np.std(e)
@@ -906,7 +917,7 @@ class TestStringMethods(unittest.TestCase):
         vwa.plot_weights_per_baseline(caldata_obj, 0, 0, filename_suffix="skycal")
         # skycal
         caldata_obj.unified_calibration(
-            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
+            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme=optimizer
         )
         skycal_gains = caldata_obj.gains[..., 0, 0]
         # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
@@ -914,9 +925,10 @@ class TestStringMethods(unittest.TestCase):
         skycal_m = np.ravel(caldata_obj.model_visibilities[..., 0, 0])
         skycal_e = np.ravel(e[..., 0, 0])
         # restore quantities for unical
-        caldata_obj.model_visibilities = m
-        caldata_obj.data_visibilities = v_T
-        caldata_obj.data_visibilities[..., 0] += thermal_noise
+        caldata_obj.model_visibilities = m.copy()
+        caldata_obj.data_visibilities = v_T.copy()
+        if simulate_noise:
+            caldata_obj.data_visibilities[..., 0] += thermal_noise
         # g and u guesses were originally set in caldata.load_data(, lambda_val=100)
         caldata_obj.gains = np.ones_like(caldata_obj.gains)
         caldata_obj.fit_vis = m.copy()
@@ -936,7 +948,7 @@ class TestStringMethods(unittest.TestCase):
         )
         vwa.plot_weights_per_baseline(caldata_obj, 0, 0, filename_suffix="unical")
         caldata_obj.unified_calibration(
-            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme="pytorch"
+            verbose=True, xtol=1e-5, maxiter=200, optimization_scheme=optimizer
         )
         unical_gains = caldata_obj.gains[..., 0, 0]
         # flatten data arrays from (Ntimes, Nbls) to (Nblts,)
@@ -968,12 +980,15 @@ class TestStringMethods(unittest.TestCase):
         plt.ylabel("$Re(g)$")
         # plt.ylim(0.88, 1.12)
         plt.legend()
-        plt.savefig(f"calico/images/gains_avg_unical_vs_skycal_{data_filename}.png")
+        plt.savefig(
+            f"calico/images/gains_avg_unical_vs_skycal_{data_filename}_{optimizer}.png"
+        )
         plt.close()
 
         # plotting u's hist for skycal
         # shared bins so identical distributions line up bar for bar
-        bins = np.linspace(0, 15, 51)
+        # range floats with the data rather than a fixed cutoff
+        bins = np.linspace(0, max(np.max(skycal_vT_u_diff), np.max(skycal_e)), 51)
         plt.hist(
             skycal_vT_u_diff,
             bins=bins,
@@ -991,14 +1006,16 @@ class TestStringMethods(unittest.TestCase):
             "Fit model parameter $u$s convergence (skycal)"
             f"\n$\\sigma_m=${sigma_m:.2f} $\\sigma_t=${sigma_t:.2f}"
         )
-        plt.xlim(0, 15)
         plt.legend()
-        plt.savefig(f"calico/images/fit_us_convergence_skycal_{data_filename}.png")
+        plt.savefig(
+            f"calico/images/fit_us_convergence_skycal_{data_filename}_{optimizer}.png"
+        )
         plt.close()
 
         # plotting u's hist for unical
         # shared bins so identical distributions line up bar for bar
-        bins = np.linspace(0, 15, 51)
+        # range floats with the data rather than a fixed cutoff
+        bins = np.linspace(0, max(np.max(unical_vT_u_diff), np.max(unical_e)), 51)
         plt.hist(
             unical_vT_u_diff,
             bins=bins,
@@ -1022,9 +1039,10 @@ class TestStringMethods(unittest.TestCase):
             "Fit model parameter $u$s convergence (unical)"
             f"\n$\\sigma_m=${sigma_m:.2f} $\\sigma_t=${sigma_t:.2f}"
         )
-        plt.xlim(0, 15)
         plt.legend()
-        plt.savefig(f"calico/images/fit_us_convergence_unical_{data_filename}.png")
+        plt.savefig(
+            f"calico/images/fit_us_convergence_unical_{data_filename}_{optimizer}.png"
+        )
         plt.close()
 
     def examine_gains_fit_time_by_time(self):
@@ -1165,12 +1183,37 @@ if __name__ == "__main__":
         default="1",
         help="file suffix for FHD files only (the cutoff number)",
     )
+    parser.add_argument(
+        "--data",
+        choices=["fhd", "observed"],
+        default="fhd",
+        help="data file: FHD baseline model (fhd_data_one_freq_<suffix>) or the "
+        "1061316296 observation matched to the model (obs_data_one_freq_<suffix>)",
+    )
+    parser.add_argument(
+        "--simulate-noise",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="add simulated thermal noise to the data (default: on for fhd data, "
+        "off for observed data)",
+    )
+    parser.add_argument(
+        "--optimizer",
+        choices=["pytorch", "adam", "powell", "bfgs"],
+        default="pytorch",
+        help="optimization scheme for both the skycal and unical fits "
+        "(default pytorch, i.e. pytorch lbfgs)",
+    )
     args = parser.parse_args()
     # TestStringMethods.examine_gains_fit_time_by_time(TestStringMethods)
     # TestStringMethods.gain_offset_with_more_times(TestStringMethods)
-    TestStringMethods.compare_unical_skycal_gains_and_us(TestStringMethods)
-    # TestStringMethods.compare_unical_skycal_gains_and_us_fhd(
-    #     TestStringMethods, suffix=args.suffix
-    # )
-    TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
-    TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
+    # TestStringMethods.compare_unical_skycal_gains_and_us(TestStringMethods)
+    TestStringMethods.compare_unical_skycal_gains_and_us_fhd(
+        TestStringMethods,
+        suffix=args.suffix,
+        data_source=args.data,
+        simulate_noise=args.simulate_noise,
+        optimizer=args.optimizer,
+    )
+    # TestStringMethods.test_basic_stability(TestStringMethods, "bfgs")
+    # TestStringMethods.test_basic_stability(TestStringMethods, "newton-cg")
